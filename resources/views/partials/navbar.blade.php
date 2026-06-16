@@ -9,55 +9,47 @@
     <div class="navbar-nav-right d-flex align-items-center justify-content-end" id="navbar-collapse">
 
         <ul class="navbar-nav flex-row align-items-center ms-md-auto">
-            <!-- User -->
             <li class="nav-item navbar-dropdown dropdown-user dropdown">
-                <a class="nav-link dropdown-toggle hide-arrow p-0" href="#" role="button"
-                    data-bs-toggle="dropdown">
-                    <div class="avatar avatar-online">
-                        <img src="{{ asset('sneat/assets/img/avatars/1.png') }}" alt
-                            class="w-px-40 h-auto rounded-circle" />
-                    </div>
+                <a class="nav-link dropdown-toggle hide-arrow d-flex flex-column align-items-end" href="#"
+                    role="button" data-bs-toggle="dropdown">
+
+                    <span class="fw-semibold">
+                        {{ Auth::user()->name ?? 'John Doe' }}
+                    </span>
+
+                    <small class="text-muted">
+                        {{ ucfirst(Auth::user()->getRoleNames()->first()) }}
+                    </small>
+
                 </a>
+
                 <ul class="dropdown-menu dropdown-menu-end">
                     <li>
                         <a class="dropdown-item" href="#">
-                            <div class="d-flex">
-                                <div class="flex-shrink-0 me-3">
-                                    <div class="avatar avatar-online">
-                                        <img src="{{ asset('sneat/assets/img/avatars/1.png') }}" alt
-                                            class="w-px-40 h-auto rounded-circle" />
-                                    </div>
-                                </div>
-                                <div class="flex-grow-1">
-                                    <h6 class="mb-0">John Doe</h6>
-                                    <small class="text-body-secondary">Admin</small>
-                                </div>
-                            </div>
+                            <i class="bx bx-user me-2"></i>
+                            Profil Saya
                         </a>
                     </li>
+
                     <li>
-                        <div class="dropdown-divider my-1"></div>
+                        <div class="dropdown-divider"></div>
                     </li>
+
                     <li>
-                        <a class="dropdown-item" href="#">
-                            <i class="icon-base bx bx-user icon-md me-3"></i><span>My Profile</span>
-                        </a>
-                    </li>
-                    <li>
-                        <div class="dropdown-divider my-1"></div>
-                    </li>
-                    <li>
-                        <a class="dropdown-item" method="POST" href="{{ route('logout') }}" onclick="event.preventDefault(); document.getElementById('logout-form').submit()">
-                            <i class="icon-base bx bx-power-off icon-md me-3"></i><span>Log Out</span>
+                        <a class="dropdown-item" href="{{ route('logout') }}"
+                            onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
+
+                            <i class="bx bx-power-off me-2"></i>
+                            Keluar
                         </a>
 
                         <form id="logout-form" action="{{ route('logout') }}" method="POST" class="d-none">
                             @csrf
                         </form>
                     </li>
+
                 </ul>
             </li>
-            <!--/ User -->
         </ul>
     </div>
 </nav>
