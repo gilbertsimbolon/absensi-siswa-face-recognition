@@ -34,6 +34,12 @@ class User extends Authenticatable
     // relasi one to one ke student
     public function student()
     {
-        return $this->belongsTo(Student::class);
+        return $this->hasOne(Student::class);
+    }
+
+    // relasi one to one ke teacher
+    public function teacher()
+    {
+        return $this->hasOne(Teacher::class);
     }
 }

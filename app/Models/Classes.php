@@ -10,6 +10,7 @@ class Classes extends Model
     use HasFactory;
 
     protected $fillable = [
+        'teacher_id',
         'name', 
         'grade_level',
     ];
@@ -17,12 +18,12 @@ class Classes extends Model
     // relasi ke teacher
     public function teacher()
     {
-        return $this->hasOne(Teacher::class, 'id', 'teacher_id');
+        return $this->belongsTo(Teacher::class);
     }
 
     // relasi ke student
     public function student()
     {
-        return $this->belongsTo(Student::class);
+        return $this->hasMany(Student::class);
     }
 }

@@ -15,9 +15,15 @@ class Teacher extends Model
         'phone',
     ];
 
+    // relasi ke user
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
+
     // relasi ke classes
     public function classes()
     {
-        return $this->belongsTo(Classes::class);
+        return $this->hasOne(Classes::class);
     }
 }

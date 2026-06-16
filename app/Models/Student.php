@@ -21,12 +21,12 @@ class Student extends Model
     // relasi ke user
     public function user()
     {
-        return $this->hasOne(User::class, 'id', 'user_id');
+        return $this->belongsTo(User::class);
     }
 
     // relasi ke kelas
-    public function class()
+    public function classes()
     {
-        return $this->hasMany(Classes::class, 'id', 'class_id');
+        return $this->belongsTo(Classes::class);
     }
 }
