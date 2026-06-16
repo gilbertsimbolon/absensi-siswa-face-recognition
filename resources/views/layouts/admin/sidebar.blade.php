@@ -58,7 +58,7 @@
                 </li>
 
                 <li class="menu-item">
-                    <a href="#" class="menu-link">
+                    <a href="{{ route('admin.teacher.index') }}" class="menu-link">
                         <div>Data Guru</div>
                     </a>
                 </li>

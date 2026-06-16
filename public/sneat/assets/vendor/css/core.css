@@ -22303,7 +22303,7 @@ li:not(:first-child) .dropdown-item, .dropdown-menu .dropdown-item:not(:first-ch
   inline-size: calc(100% - 1.625rem * 2);
   margin-block: 1rem 0;
   padding-block: 0;
-  padding-inline: 1.5rem;
+  padding-inline: 1rem;
 }
 .layout-navbar.navbar-detached.container-xxl {
   max-inline-size: calc(1440px - 1.625rem * 2);
@@ -22312,6 +22312,11 @@ li:not(:first-child) .dropdown-item, .dropdown-menu .dropdown-item:not(:first-ch
   .layout-menu-fixed .layout-navbar.navbar-detached {
     inline-size: calc(100% - 1rem * 2) !important;
   }
+}
+@media (max-width: 767.98px) {
+    .layout-navbar.navbar-detached {
+        inline-size: calc(100% - 1rem * 2) !important;
+    }
 }
 .layout-navbar-fixed.layout-menu-collapsed .layout-navbar.navbar-detached {
   inline-size: calc(100% - 1.625rem * 2 - 5.25rem);
