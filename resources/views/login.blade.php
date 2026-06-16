@@ -30,11 +30,11 @@
                     <h4 class="fw-bold">Smart Attedance System</h4>
                     <p>Silahkan login terlebih dahulu.</p>
 
-                    <form>
+                    <form action="{{ route('login.store') }}" method="POST">
+                        @csrf
                         <div class="mb-3">
-                            <label for="exampleInputEmail1" class="form-label">Email</label>
-                            <input type="email" class="form-control" id="exampleInputEmail1" aria-describedby="emailHelp"
-                                placeholder="xxxxxxxxxxx@smansatdo.com">
+                            <label for="email" class="form-label">Email</label>
+                            <input type="email" class="form-control" id="email" name="email" aria-describedby="emailHelp" placeholder="xxxxxxxxxxx@smansatdo.com">
                             <div id="emailHelp" class="form-text">Gunakan akun yang sudah diberikan oleh admin.</div>
                         </div>
 
@@ -42,7 +42,7 @@
                             <label for="password" class="form-label">Password</label>
 
                             <div class="input-group">
-                                <input type="password" class="form-control" id="password" placeholder="Masukkan password">
+                                <input type="password" class="form-control" id="password" name="password" placeholder="Masukkan password">
 
                                 <button class="btn btn-outline-secondary" type="button" id="togglePassword">
                                     <i class="bi bi-eye"></i>
