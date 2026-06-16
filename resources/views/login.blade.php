@@ -2,6 +2,10 @@
 
 @section('title', 'Sistem Absensi | SMAN 1 Tondano')
 
+@php
+    $hideLayout = true;
+@endphp
+
 @section('content')
     <div class="container min-vh-100 d-flex justify-content-center align-items-center">
         <div class="card shadow-lg border-0 rounded-5 overflow-hidden" style="width: 80rem; height: 40rem;">
