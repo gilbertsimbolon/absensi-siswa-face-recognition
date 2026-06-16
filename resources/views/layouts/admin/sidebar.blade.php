@@ -2,7 +2,7 @@
 
     <!-- Logo -->
     <div class="app-brand demo">
-        <a href="{{ route('dashboard') }}" class="app-brand-link d-flex align-items-center">
+        <a href="{{ route('admin.dashboard.index') }}" class="app-brand-link d-flex align-items-center">
             <span class="app-brand-logo demo">
                 <img src="{{ asset('img/logo.png') }}" alt="Logo" style="width: 40px">
             </span>
@@ -33,7 +33,7 @@
 
         <!-- Dashboard -->
         <li class="menu-item active">
-            <a href="{{ route('dashboard') }}" class="menu-link">
+            <a href="{{ route('admin.dashboard.index') }}" class="menu-link">
                 <i class="menu-icon tf-icons bx bx-home-circle"></i>
                 <div>Dashboard</div>
             </a>
