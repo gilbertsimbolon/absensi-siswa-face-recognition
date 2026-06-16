@@ -30,4 +30,10 @@ class User extends Authenticatable
             'password' => 'hashed',
         ];
     }
+
+    // relasi one to one ke student
+    public function student()
+    {
+        return $this->belongsTo(Student::class);
+    }
 }
