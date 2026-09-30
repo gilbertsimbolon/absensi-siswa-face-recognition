@@ -19,7 +19,7 @@ class TeacherController extends Controller
         return view('admin.master-data.data-guru', compact('teachers'));
     }
 
-    // fungsi create
+    // fungsi tambah data
     public function store(Request $request)
     {
         $validate = Validator::make($request->all(), [
@@ -56,5 +56,21 @@ class TeacherController extends Controller
 
         // return
         return redirect()->route('admin.teacher.index')->with('success', 'Data guru berhasil ditambahkan');
+    }
+
+    // fungsi edit data
+    public function update(Request $request, Teacher $teacher)
+    {
+        $validate = Validator::make($request->all(), [
+            'name' => 'required',
+            'email' => 'required|email|unique:users,email',
+            'password' => 'required|min:8',
+            'nip' => 'required|unique:teachers,nip',
+            'phone' => 'required',
+        ]);
+
+        // $teacher->user->update([
+        //     ''
+        // ]);
     }
 }
