@@ -16,29 +16,32 @@
                     <img src="{{ asset('img/logo.png') }}" alt="Logo Sekolah" class="w-25" data-aos="flip-left"
                         data-aos-easing="ease-out-cubic" data-aos-duration="2000">
 
-                    <h1 class="text-white fw-bold" data-aos="fade-right" data-aos-duration="2000">SMA Negeri 1 Tondano</h1>
-                    <p class="text-white-50 text-center" data-aos="fade-right" data-aos-duration="3000">Smart Attedance System using Face Recognition Technology.</p>
+                    <h1 class="text-white fw-bold" data-aos="fade-right" data-aos-duration="2000">SMA Negeri 2 Tondano</h1>
+                    <p class="text-white-50 text-center" data-aos="fade-right" data-aos-duration="3000">Sistem Kehadiran
+                        Pintar menggunakan Teknologi Pengenalan Wajah.</p>
 
                     <div data-aos="flip-left" data-aos-duration="2500">
                         <small class="text-white-50">
                             &copy; {{ date('Y') }} <a href="https://www.instagram.com/gilbertsmbln" target="_blank"
                                 class="text-white-50 text-decoration-none">
                                 bolonsite |
-                            </a>SMA Negeri 1 Tondano.
+                            </a>SMA Negeri 2 Tondano.
                         </small>
                     </div>
                 </div>
 
                 <!-- Form Layout -->
-                <div class="col-lg-6 d-flex flex-column justify-content-center align-items-center" data-aos="fade-down-right" data-aos-duration="2000">
-                    <h4 class="fw-bold">Smart Attedance System</h4>
+                <div class="col-lg-6 d-flex flex-column justify-content-center align-items-center"
+                    data-aos="fade-down-right" data-aos-duration="2000">
+                    <h4 class="fw-bold">Sistem Kehadiran Pintar</h4>
                     <p>Silahkan login terlebih dahulu.</p>
 
                     <form action="{{ route('login.store') }}" method="POST">
                         @csrf
                         <div class="mb-3">
                             <label for="email" class="form-label">Email</label>
-                            <input type="email" class="form-control" id="email" name="email" aria-describedby="emailHelp" placeholder="xxxxxxxxxxx@smansatdo.com">
+                            <input type="email" class="form-control" id="email" name="email"
+                                aria-describedby="emailHelp" placeholder="xxxxxxxxxxx@smansatdo.com">
                             <div id="emailHelp" class="form-text">Gunakan akun yang sudah diberikan oleh admin.</div>
                         </div>
 
@@ -46,7 +49,8 @@
                             <label for="password" class="form-label">Password</label>
 
                             <div class="input-group">
-                                <input type="password" class="form-control" id="password" name="password" placeholder="Masukkan password">
+                                <input type="password" class="form-control" id="password" name="password"
+                                    placeholder="Masukkan password">
 
                                 <button class="btn btn-outline-secondary" type="button" id="togglePassword">
                                     <i class="bi bi-eye"></i>
@@ -80,7 +84,6 @@
                 icon.classList.remove('bi-eye-slash');
                 icon.classList.add('bi-eye');
             }
-
         });
     </script>
 @endsection
