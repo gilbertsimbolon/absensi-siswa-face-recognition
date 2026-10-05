@@ -45,43 +45,25 @@
             <span class="menu-header-text">Master Data</span>
         </li>
 
-        <li class="menu-item {{ request()->routeIs('admin.student.*', 'admin.teacher.*', 'admin.classes.*') ? 'active open' : '' }}">
-            <a href="javascript:void(0);" class="menu-link menu-toggle">
-                <i class="menu-icon tf-icons bx bx-data"></i>
-                <div>Master Data</div>
+        <li class="menu-item {{ request()->routeIs('admin.student.*') ? 'active' : '' }}">
+            <a href="{{ route('admin.student.index') }}" class="menu-link">
+                <i class="menu-icon tf-icons bx bx-user"></i>
+                <div>Data Siswa</div>
             </a>
+        </li>
 
-            <ul class="menu-sub">
-                <li class="menu-item {{ request()->routeIs('admin.student.*') ? 'active' : '' }}">
-                    <a href="{{ route('admin.student.index') }}" class="menu-link">
-                        <div>Data Siswa</div>
-                    </a>
-                </li>
+        <li class="menu-item {{ request()->routeIs('admin.teacher.*') ? 'active' : '' }}">
+            <a href="{{ route('admin.teacher.index') }}" class="menu-link">
+                <i class="menu-icon tf-icons bx bx-id-card"></i>
+                <div>Data Guru</div>
+            </a>
+        </li>
 
-                <li class="menu-item {{ request()->routeIs('admin.teacher.*') ? 'active' : '' }}">
-                    <a href="{{ route('admin.teacher.index') }}" class="menu-link">
-                        <div>Data Guru</div>
-                    </a>
-                </li>
-
-                <li class="menu-item {{ request()->routeIs('admin.classes.*') ? 'active' : '' }}">
-                    <a href="{{ route('admin.classes.index') }}" class="menu-link">
-                        <div>Data Kelas</div>
-                    </a>
-                </li>
-
-                <li class="menu-item">
-                    <a href="#" class="menu-link">
-                        <div>Mata Pelajaran</div>
-                    </a>
-                </li>
-
-                <li class="menu-item">
-                    <a href="#" class="menu-link">
-                        <div>Tahun Ajaran</div>
-                    </a>
-                </li>
-            </ul>
+        <li class="menu-item {{ request()->routeIs('admin.classes.*') ? 'active' : '' }}">
+            <a href="{{ route('admin.classes.index') }}" class="menu-link">
+                <i class="menu-icon tf-icons bx bx-door-open"></i>
+                <div>Data Kelas</div>
+            </a>
         </li>
 
         <!-- PERANGKAT -->
