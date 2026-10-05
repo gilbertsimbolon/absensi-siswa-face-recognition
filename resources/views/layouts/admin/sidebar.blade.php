@@ -1,38 +1,39 @@
-<aside id="layout-menu" class="layout-menu menu-vertical menu bg-menu-theme">
+<aside id="layout-menu" class="layout-menu menu-vertical menu bg-menu-theme d-flex flex-column" style="height: 100vh; max-height: 100vh; overflow: hidden;">
 
-    <!-- Logo -->
-    <div class="app-brand demo">
-        <a href="{{ route('admin.dashboard.index') }}" class="app-brand-link d-flex align-items-center">
-            <span class="app-brand-logo demo">
-                <img src="{{ asset('img/logo.png') }}" alt="Logo" style="width: 40px">
+    <!-- Logo (Fixed Header) -->
+    <div class="sidebar-brand-custom d-flex flex-column align-items-center justify-content-center py-4 px-3 flex-shrink-0" 
+        style="height: auto !important; min-height: 150px !important; position: sticky; top: 0; z-index: 10; background-color: #fff; width: 100%;">
+        <div class="d-flex align-items-center justify-content-end w-100 position-relative">
+            <a href="javascript:void(0);" class="layout-menu-toggle menu-link text-large position-absolute end-0 top-0 d-xl-none" style="top: -10px !important;">
+                <i class="bx bx-chevron-left align-middle"></i>
+            </a>
+        </div>
+
+        <a href="{{ route('admin.dashboard.index') }}" class="d-flex flex-column align-items-center text-center text-decoration-none w-100">
+            <div class="mb-2 text-center">
+                <img src="{{ asset('img/logo.png') }}" alt="Logo SMAN 2 Tondano" style="width: 55px; height: auto; display: inline-block;">
+            </div>
+
+            <span class="fw-bold text-uppercase fs-6 text-dark" style="letter-spacing: 0.5px; line-height: 1.2;">
+                SMAN 2 Tondano
             </span>
 
-            <div class="ms-2 mt-1 d-flex flex-column">
-                <span class="fw-bold text-uppercase" style="font-size:16px;">
-                    SMAN 1 Tondano
-                </span>
+            <hr class="w-75 my-2" style="border-color: #e0e0e0; opacity: 1;">
 
-                <hr class="my-1" style="border-color:#bdbdbd;opacity:1;">
-
-                <small class="text-muted text-center" style="font-size:11px;">
-                    Smart Attendance System
-                </small>
-            </div>
-        </a>
-
-        <a href="javascript:void(0);" class="layout-menu-toggle menu-link text-large ms-auto">
-            <i class="bx bx-chevron-left d-block d-xl-none align-middle"></i>
+            <p class="text-muted mb-0" style="font-size: 11px; line-height: 1.4;">
+                Sistem Kehadiran Pintar
+            </p>
         </a>
     </div>
 
-    <div class="menu-divider mt-0"></div>
+    <div class="menu-divider mt-0 flex-shrink-0"></div>
 
     <div class="menu-inner-shadow"></div>
 
-    <ul class="menu-inner py-1">
+    <ul class="menu-inner py-1 flex-grow-1 overflow-auto" style="overflow-y: auto !important; height: calc(100vh - 150px);">
 
         <!-- Dashboard -->
-        <li class="menu-item active">
+        <li class="menu-item {{ request()->routeIs('admin.dashboard.*') ? 'active' : '' }}">
             <a href="{{ route('admin.dashboard.index') }}" class="menu-link">
                 <i class="menu-icon tf-icons bx bx-home-circle"></i>
                 <div>Dashboard</div>
@@ -44,26 +45,26 @@
             <span class="menu-header-text">Master Data</span>
         </li>
 
-        <li class="menu-item">
+        <li class="menu-item {{ request()->routeIs('admin.student.*', 'admin.teacher.*', 'admin.classes.*') ? 'active open' : '' }}">
             <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon tf-icons bx bx-data"></i>
                 <div>Master Data</div>
             </a>
 
             <ul class="menu-sub">
-                <li class="menu-item">
-                    <a href="#" class="menu-link">
+                <li class="menu-item {{ request()->routeIs('admin.student.*') ? 'active' : '' }}">
+                    <a href="{{ route('admin.student.index') }}" class="menu-link">
                         <div>Data Siswa</div>
                     </a>
                 </li>
 
-                <li class="menu-item">
+                <li class="menu-item {{ request()->routeIs('admin.teacher.*') ? 'active' : '' }}">
                     <a href="{{ route('admin.teacher.index') }}" class="menu-link">
                         <div>Data Guru</div>
                     </a>
                 </li>
 
-                <li class="menu-item">
+                <li class="menu-item {{ request()->routeIs('admin.classes.*') ? 'active' : '' }}">
                     <a href="{{ route('admin.classes.index') }}" class="menu-link">
                         <div>Data Kelas</div>
                     </a>

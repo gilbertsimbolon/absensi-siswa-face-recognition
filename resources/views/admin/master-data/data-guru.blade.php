@@ -1,201 +1,226 @@
 @extends('layouts.admin.app')
 
-@section('title', 'Data Guru | SMAN 1 Tondano')
+@section('title', 'Data Guru | SMAN 2 Tondano')
 
 @section('content')
     <div class="mt-0">
-        <div class=" d-flex justify-content-end align-items-center mb-5">
-            <!-- Modal Tambah Data -->
-            <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalTambahDataGuru">Tambah
-                Data</button>
+        <!-- Notifikasi -->
+        @if (session('success'))
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                {{ session('success') }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        @endif
 
-            <div class="modal fade" id="modalTambahDataGuru" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1"
-                aria-labelledby="staticBackdropLabel" aria-hidden="true">
-                <div class="modal-dialog modal-dialog-centered">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h1 class="modal-title fs-5" id="staticBackdropLabel">Tambah Data Guru</h1>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                        </div>
-                        <div class="modal-body">
-                            <form method="POST" action="{{ route('admin.teacher.store') }}">
-                                @csrf
-                                <div class="d-flex align-items-center mb-4">
-                                    <span class="text-uppercase small fw-semibold text-muted me-3">
-                                        Akun
-                                    </span>
-                                    <hr class="flex-grow-1 m-0">
-                                </div>
+        @if ($errors->any())
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <ul class="mb-0">
+                    @foreach ($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        @endif
 
-                                <!-- Input Nama -->
-                                <div class="row mb-6">
-                                    <label class="col-sm-2 col-form-label" for="basic-icon-default-fullname">Nama</label>
-                                    <div class="col-sm-10">
-                                        <div class="input-group input-group-merge">
-                                            <span id="basic-icon-default-fullname2" class="input-group-text"><i
-                                                    class="icon-base bx bx-user"></i></span>
-                                            <input type="text" class="form-control" id="basic-icon-default-fullname"
-                                                name="name" placeholder="Josep Gilbert Andriano Simbolon, S. Kom.,"
-                                                aria-label="Josep Gilbert Andriano Simbolon, S. Kom.,"
-                                                aria-describedby="basic-icon-default-fullname2" />
-                                        </div>
-                                    </div>
-                                </div>
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h4 class="fw-bold mb-0">Master Data Guru</h4>
+            <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalTambahDataGuru">
+                <i class="icon-base bx bx-plus me-1"></i> Tambah Data Guru
+            </button>
+        </div>
 
-                                <!-- Input Email -->
-                                <div class="row mb-6">
-                                    <label class="col-sm-2 col-form-label" for="basic-icon-default-email">Email</label>
-                                    <div class="col-sm-10">
-                                        <div class="input-group input-group-merge">
-                                            <span class="input-group-text"><i class="icon-base bx bx-envelope"></i></span>
-                                            <input type="text" id="basic-icon-default-email" class="form-control"
-                                                name="email" placeholder="gilbertsimbolon@smansatdo.com"
-                                                aria-label="gilbertsimbolon@smansatdo.com"
-                                                aria-describedby="basic-icon-default-email2" />
-                                            <span id="basic-icon-default-email2"
-                                                class="input-group-text">@smansatdo.com</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Input Password -->
-                                <div class="row mb-6">
-                                    <label class="col-sm-2 col-form-label" for="basic-icon-default-key">Password</label>
-                                    <div class="col-sm-10">
-                                        <div class="input-group input-group-merge">
-                                            <span id="basic-icon-default-key2" class="input-group-text"><i
-                                                    class="icon-base bx bx-lock-alt"></i></span>
-                                            <input type="text" id="basic-icon-default-key" name="password"
-                                                class="form-control" placeholder="Masukkan password"
-                                                aria-label="Masukkan password" aria-describedby="basic-icon-default-key2" />
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div class="d-flex align-items-center mb-4">
-                                    <span class="text-uppercase small fw-semibold text-muted me-3">
-                                        Personal
-                                    </span>
-                                    <hr class="flex-grow-1 m-0">
-                                </div>
-
-                                <!-- Input NIP -->
-                                <div class="row mb-6">
-                                    <label class="col-sm-2 col-form-label" for="basic-icon-default-phone">NIP</label>
-                                    <div class="col-sm-10">
-                                        <div class="input-group input-group-merge">
-                                            <span id="basic-icon-default-phone2" class="input-group-text"><i
-                                                    class="icon-base bx bx-id-card"></i></span>
-                                            <input type="text" id="basic-icon-default-phone"
-                                                class="form-control phone-mask" name="nip" placeholder="1239824142xxxxx"
-                                                aria-label="1239824142xxxxx" aria-describedby="basic-icon-default-phone2" />
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Input No. Handphone -->
-                                <div class="row mb-1">
-                                    <label class="col-sm-2 col-form-label" for="basic-icon-default-phone">No.
-                                        Telp</label>
-                                    <div class="col-sm-10">
-                                        <div class="input-group input-group-merge">
-                                            <span id="basic-icon-default-phone2" class="input-group-text"><i
-                                                    class="icon-base bx bx-phone"></i></span>
-                                            <input type="text" id="basic-icon-default-phone" name="phone"
-                                                class="form-control phone-mask" placeholder="0812 3456 7890"
-                                                aria-label="0812 3456 7890"
-                                                aria-describedby="basic-icon-default-phone2" />
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Button -->
-                                <div class="d-flex justify-content-end gap-2 mt-4">
-                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                                        Tutup
-                                    </button>
-
-                                    <button type="submit" class="btn btn-success">
-                                        Simpan
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-
+        <!-- Modal Tambah Guru -->
+        <div class="modal fade" id="modalTambahDataGuru" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1"
+            aria-labelledby="staticBackdropLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="staticBackdropLabel">Tambah Data Guru</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
+                    <form method="POST" action="{{ route('admin.teacher.store') }}">
+                        @csrf
+                        <div class="modal-body">
+                            <div class="d-flex align-items-center mb-3">
+                                <span class="text-uppercase small fw-semibold text-muted me-2">Akun & Identitas</span>
+                                <hr class="flex-grow-1 m-0">
+                            </div>
+
+                            <!-- Input Nama -->
+                            <div class="mb-3">
+                                <label class="form-label" for="name">Nama Lengkap</label>
+                                <div class="input-group input-group-merge">
+                                    <span class="input-group-text"><i class="icon-base bx bx-user"></i></span>
+                                    <input type="text" class="form-control" id="name" name="name"
+                                        placeholder="Nama beserta gelar" value="{{ old('name') }}" required />
+                                </div>
+                            </div>
+
+                            <!-- Input NIP -->
+                            <div class="mb-3">
+                                <label class="form-label" for="nip">Nomor Induk Pegawai (NIP)</label>
+                                <div class="input-group input-group-merge">
+                                    <span class="input-group-text"><i class="icon-base bx bx-id-card"></i></span>
+                                    <input type="text" class="form-control" id="nip" name="nip"
+                                        placeholder="19840606..." value="{{ old('nip') }}" required />
+                                </div>
+                            </div>
+
+                            <!-- Input Email -->
+                            <div class="mb-3">
+                                <label class="form-label" for="email">Email</label>
+                                <div class="input-group input-group-merge">
+                                    <span class="input-group-text"><i class="icon-base bx bx-envelope"></i></span>
+                                    <input type="email" id="email" class="form-control" name="email"
+                                        placeholder="nama@smandutdo.com" value="{{ old('email') }}" required />
+                                </div>
+                            </div>
+
+                            <!-- Input Password -->
+                            <div class="mb-3">
+                                <label class="form-label" for="password">Password</label>
+                                <div class="input-group input-group-merge">
+                                    <span class="input-group-text"><i class="icon-base bx bx-key"></i></span>
+                                    <input type="password" id="password" class="form-control" name="password"
+                                        placeholder="Minimal 8 karakter" required />
+                                </div>
+                            </div>
+
+                            <!-- Input No. Handphone -->
+                            <div class="mb-3">
+                                <label class="form-label" for="phone">No. Telp / WhatsApp</label>
+                                <div class="input-group input-group-merge">
+                                    <span class="input-group-text"><i class="icon-base bx bx-phone"></i></span>
+                                    <input type="text" id="phone" name="phone" class="form-control"
+                                        placeholder="0812 3456 7890" value="{{ old('phone') }}" required />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
+                            <button type="submit" class="btn btn-success">Simpan Data Guru</button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>
+
+        <!-- Tabel Data Guru -->
         <div class="card">
-            <h5 class="card-header">Data Guru</h5>
+            <h5 class="card-header">Daftar Guru</h5>
             <div class="table-responsive text-nowrap">
                 <table class="table table-striped">
                     <thead>
                         <tr>
-                            <th class="text-center">No.</th>
+                            <th class="text-center" style="width: 50px;">No.</th>
                             <th>Nama</th>
+                            <th>NIP</th>
                             <th>Email</th>
-                            <th>Nomor Induk Pegawai</th>
-                            <th>Kelas</th>
+                            <th>Wali Kelas</th>
                             <th>No. Handphone</th>
-                            <th class="text-center">Actions</th>
+                            <th class="text-center" style="width: 120px;">Aksi</th>
                         </tr>
                     </thead>
                     <tbody class="table-border-bottom-0">
                         @forelse ($teachers as $teacher)
                             <tr>
-                                <!-- Nomor -->
-                                <td class="text-center">
-                                    {{ $loop->iteration }}
-                                </td>
-
-                                <!-- Nama -->
-                                <td>{{ $teacher->user->name }}</td>
-
-                                <!-- Email -->
+                                <td class="text-center">{{ $loop->iteration }}</td>
+                                <td><strong>{{ $teacher->user->name }}</strong></td>
+                                <td><span class="badge bg-label-dark">{{ $teacher->nip }}</span></td>
                                 <td>{{ $teacher->user->email }}</td>
-
-                                <!-- NIP -->
-                                <td>{{ $teacher->nip }}</td>
-
-                                <!-- Kelas -->
                                 <td>
                                     @if ($teacher->classes)
-                                        <span class="badge bg-label-primary">
-                                            {{ $teacher->classes->name }}
-                                        </span>
+                                        <span class="badge bg-label-primary">{{ $teacher->classes->name }}</span>
                                     @else
                                         <span class="text-muted">-</span>
                                     @endif
                                 </td>
-
-                                <!-- No. Telp -->
-                                <td>{{ $teacher->phone }}</td>
-
-                                <!-- Aksi -->
+                                <td>
+                                    @if ($teacher->phone)
+                                        <a href="https://wa.me/{{ preg_replace('/[^0-9]/', '', $teacher->phone) }}" target="_blank" class="text-success text-decoration-none">
+                                            <i class="icon-base bx bxl-whatsapp me-1"></i>{{ $teacher->phone }}
+                                        </a>
+                                    @else
+                                        <span class="text-muted">-</span>
+                                    @endif
+                                </td>
                                 <td class="text-center">
-                                    <div class="dropdown">
-                                        <button type="button" class="btn p-0 dropdown-hide-arrow" data-bs-toggle="dropdown">
-                                            <i class="icon-base bx bx-dots-vertical-rounded"></i> 
+                                    <div class="d-flex justify-content-center gap-2">
+                                        <!-- Tombol Edit Modal -->
+                                        <button type="button" class="btn btn-sm btn-outline-primary"
+                                            data-bs-toggle="modal" data-bs-target="#modalEditGuru{{ $teacher->id }}">
+                                            <i class="icon-base bx bx-edit-alt"></i>
                                         </button>
-                                        <div class="dropdown-menu"> 
-                                            <a class="dropdown-item" href="javascript:void(0);">
-                                                <i class="icon-base bx bx-edit-alt me-1"></i>
-                                                Edit
-                                            </a> 
-                                            <a class="dropdown-item" href="javascript:void(0);">
-                                                <i class="icon-base bx bx-trash me-1"></i>
-                                                Delete
-                                            </a> 
+
+                                        <!-- Form Delete -->
+                                        <form action="{{ route('admin.teacher.destroy', $teacher->id) }}" method="POST"
+                                            onsubmit="return confirm('Apakah Anda yakin ingin menghapus data guru {{ $teacher->user->name }}?')">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="btn btn-sm btn-outline-danger">
+                                                <i class="icon-base bx bx-trash"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+
+                                    <!-- Modal Edit Guru -->
+                                    <div class="modal fade" id="modalEditGuru{{ $teacher->id }}" data-bs-backdrop="static" tabindex="-1" aria-hidden="true">
+                                        <div class="modal-dialog modal-dialog-centered text-start">
+                                            <div class="modal-content">
+                                                <div class="modal-header">
+                                                    <h5 class="modal-title">Edit Data Guru</h5>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                </div>
+                                                <form method="POST" action="{{ route('admin.teacher.update', $teacher->id) }}">
+                                                    @csrf
+                                                    @method('PUT')
+                                                    <div class="modal-body">
+                                                        <div class="mb-3">
+                                                            <label class="form-label">Nama Lengkap</label>
+                                                            <input type="text" class="form-control" name="name"
+                                                                value="{{ $teacher->user->name }}" required />
+                                                        </div>
+
+                                                        <div class="mb-3">
+                                                            <label class="form-label">NIP</label>
+                                                            <input type="text" class="form-control" name="nip"
+                                                                value="{{ $teacher->nip }}" required />
+                                                        </div>
+
+                                                        <div class="mb-3">
+                                                            <label class="form-label">Email</label>
+                                                            <input type="email" class="form-control" name="email"
+                                                                value="{{ $teacher->user->email }}" required />
+                                                        </div>
+
+                                                        <div class="mb-3">
+                                                            <label class="form-label">Password Baru (Kosongkan jika tidak diubah)</label>
+                                                            <input type="password" class="form-control" name="password"
+                                                                placeholder="Kosongkan jika tetap" />
+                                                        </div>
+
+                                                        <div class="mb-3">
+                                                            <label class="form-label">No. Handphone</label>
+                                                            <input type="text" class="form-control" name="phone"
+                                                                value="{{ $teacher->phone }}" required />
+                                                        </div>
+                                                    </div>
+
+                                                    <div class="modal-footer">
+                                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                                                        <button type="submit" class="btn btn-primary">Simpan Perubahan</button>
+                                                    </div>
+                                                </form>
+                                            </div>
                                         </div>
                                     </div>
                                 </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="7" class="text-center text-muted py-4">
-                                    Belum ada data.
-                                </td>
+                                <td colspan="7" class="text-center text-muted py-4">Belum ada data guru.</td>
                             </tr>
                         @endforelse
                     </tbody>

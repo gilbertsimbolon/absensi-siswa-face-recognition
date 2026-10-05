@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Sistem Absensi | SMAN 1 Tondano')
+@section('title', 'Sistem Absensi | SMAN 2 Tondano')
 
 @php
     $hideLayout = true;
@@ -41,7 +41,7 @@
                         <div class="mb-3">
                             <label for="email" class="form-label">Email</label>
                             <input type="email" class="form-control" id="email" name="email"
-                                aria-describedby="emailHelp" placeholder="xxxxxxxxxxx@smansatdo.com">
+                                aria-describedby="emailHelp" placeholder="xxxxxxxxxxx@smandutdo.com">
                             <div id="emailHelp" class="form-text">Gunakan akun yang sudah diberikan oleh admin.</div>
                         </div>
 

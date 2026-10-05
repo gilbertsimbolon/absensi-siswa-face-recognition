@@ -9,7 +9,7 @@
                 <a href="https://www.instagram.com/gilbertsmbln" target="_blank"
                     class="text-decoration-none text-black">
                     bolonsite |
-                </a>SMA Negeri 1 Tondano.
+                </a>SMA Negeri 2 Tondano.
             </div>
         </div>
     </div>

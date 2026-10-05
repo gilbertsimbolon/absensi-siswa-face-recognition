@@ -2,8 +2,6 @@
 
 namespace App\Models;
 
-use App\Models\Classes;
-use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -13,9 +11,13 @@ class Student extends Model
 
     protected $fillable = [
         'user_id',
+        'name',
         'nisn',
         'class_id',
         'gender',
+        'phone',
+        'parent_name',
+        'parent_phone',
     ];
 
     // relasi ke user
