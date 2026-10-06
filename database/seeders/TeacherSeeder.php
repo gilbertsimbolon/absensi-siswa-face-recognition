@@ -82,6 +82,72 @@ class TeacherSeeder extends Seeder
                 'nip' => '199107302019032010',
                 'phone' => '08114301010',
             ],
+            [
+                'name' => 'Dra. Marlina Waworuntu, M.Pd',
+                'email' => 'marlina.waworuntu@smandutdo.com',
+                'nip' => '197104111997022011',
+                'phone' => '08114301011',
+            ],
+            [
+                'name' => 'Drs. Maxie Rondonuwu, M.Si',
+                'email' => 'maxie.rondonuwu@smandutdo.com',
+                'nip' => '196908121995031012',
+                'phone' => '08114301012',
+            ],
+            [
+                'name' => 'Priscilia Sumanti, S.Pd',
+                'email' => 'priscilia.sumanti@smandutdo.com',
+                'nip' => '198603152010012013',
+                'phone' => '08114301013',
+            ],
+            [
+                'name' => 'Johan Pangemanan, S.Pd',
+                'email' => 'johan.pangemanan@smandutdo.com',
+                'nip' => '198305222008041014',
+                'phone' => '08114301014',
+            ],
+            [
+                'name' => 'Juliana Paat, S.Pd, M.Pd',
+                'email' => 'juliana.paat@smandutdo.com',
+                'nip' => '197809182003122015',
+                'phone' => '08114301015',
+            ],
+            [
+                'name' => 'Hendy Tombokan, S.Kom',
+                'email' => 'hendy.tombokan@smandutdo.com',
+                'nip' => '198711042011011016',
+                'phone' => '08114301016',
+            ],
+            [
+                'name' => 'Vanda Wowor, S.Si, M.Pd',
+                'email' => 'vanda.wowor@smandutdo.com',
+                'nip' => '198112252006042017',
+                'phone' => '08114301017',
+            ],
+            [
+                'name' => 'Edwin Sarundajang, S.Pd',
+                'email' => 'edwin.sarundajang@smandutdo.com',
+                'nip' => '198402142009031018',
+                'phone' => '08114301018',
+            ],
+            [
+                'name' => 'Nova Manoppo, S.Pd',
+                'email' => 'nova.manoppo@smandutdo.com',
+                'nip' => '198907192015032019',
+                'phone' => '08114301019',
+            ],
+            [
+                'name' => 'Christian Sondakh, S.Pd',
+                'email' => 'christian.sondakh@smandutdo.com',
+                'nip' => '199008272017051020',
+                'phone' => '08114301020',
+            ],
+            [
+                'name' => 'Meyke Rumondor, S.Pd',
+                'email' => 'meyke.rumondor@smandutdo.com',
+                'nip' => '198510102010012021',
+                'phone' => '08114301021',
+            ],
         ];
 
         foreach ($teachers as $data) {

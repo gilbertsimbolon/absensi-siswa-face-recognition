@@ -11,6 +11,7 @@ use App\Models\Teacher;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 
 class ClassesController extends Controller
 {
@@ -101,12 +102,21 @@ class ClassesController extends Controller
      */
     public function store(Request $request)
     {
+        $cleanedName = trim($request->name ?? '');
+        $request->merge(['name' => $cleanedName]);
+
         $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:100',
+            'name' => [
+                'required',
+                'string',
+                'max:100',
+                'unique:classes,name',
+            ],
             'grade_level' => 'required|in:X,XI,XII',
             'teacher_id' => 'nullable|exists:teachers,id',
         ], [
             'name.required' => 'Nama kelas wajib diisi.',
+            'name.unique' => 'Nama kelas sudah ada, silakan gunakan nama yang berbeda.',
             'grade_level.required' => 'Tingkat kelas wajib dipilih.',
             'grade_level.in' => 'Tingkat kelas harus berupa X, XI, atau XII.',
         ]);
@@ -115,8 +125,14 @@ class ClassesController extends Controller
             return back()->withErrors($validator)->withInput();
         }
 
+        // Pengecekan case-insensitive jika ada perbedaan huruf besar/kecil
+        $alreadyExists = Classes::whereRaw('LOWER(name) = ?', [strtolower($cleanedName)])->exists();
+        if ($alreadyExists) {
+            return back()->withErrors(['name' => 'Nama kelas sudah ada, silakan gunakan nama yang berbeda.'])->withInput();
+        }
+
         $class = Classes::create([
-            'name' => $request->name,
+            'name' => $cleanedName,
             'grade_level' => $request->grade_level,
             'teacher_id' => $request->teacher_id ?: null,
         ]);
@@ -130,12 +146,21 @@ class ClassesController extends Controller
      */
     public function update(Request $request, Classes $class)
     {
+        $cleanedName = trim($request->name ?? '');
+        $request->merge(['name' => $cleanedName]);
+
         $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:100',
+            'name' => [
+                'required',
+                'string',
+                'max:100',
+                Rule::unique('classes', 'name')->ignore($class->id),
+            ],
             'grade_level' => 'required|in:X,XI,XII',
             'teacher_id' => 'nullable|exists:teachers,id',
         ], [
             'name.required' => 'Nama kelas wajib diisi.',
+            'name.unique' => 'Nama kelas sudah ada, silakan gunakan nama yang berbeda.',
             'grade_level.required' => 'Tingkat kelas wajib dipilih.',
             'grade_level.in' => 'Tingkat kelas harus berupa X, XI, atau XII.',
         ]);
@@ -144,8 +169,16 @@ class ClassesController extends Controller
             return back()->withErrors($validator)->withInput();
         }
 
+        // Pengecekan case-insensitive jika ada perbedaan huruf besar/kecil pada kelas lain
+        $alreadyExists = Classes::where('id', '!=', $class->id)
+            ->whereRaw('LOWER(name) = ?', [strtolower($cleanedName)])
+            ->exists();
+        if ($alreadyExists) {
+            return back()->withErrors(['name' => 'Nama kelas sudah ada, silakan gunakan nama yang berbeda.'])->withInput();
+        }
+
         $class->update([
-            'name' => $request->name,
+            'name' => $cleanedName,
             'grade_level' => $request->grade_level,
             'teacher_id' => $request->teacher_id ?: null,
         ]);

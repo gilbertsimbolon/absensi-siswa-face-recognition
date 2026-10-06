@@ -3,7 +3,7 @@
 @section('title', 'Kenaikan Kelas Massal | SMAN 2 Tondano')
 
 @section('content')
-    <div class="mt-0">
+    <div class="d-flex flex-column flex-grow-1 h-100 overflow-y-auto content-scrollable pe-1 pb-4" style="min-height: 0;">
         <!-- Notifikasi -->
         @if (session('success'))
             <div class="alert alert-success alert-dismissible fade show" role="alert">

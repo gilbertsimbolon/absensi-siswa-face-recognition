@@ -71,19 +71,23 @@
         .content-footer {
             flex-shrink: 0;
         }
-        /* Custom scrollbar untuk tabel */
-        .table-responsive::-webkit-scrollbar {
+        /* Custom scrollbar untuk tabel dan container scrollable */
+        .table-responsive::-webkit-scrollbar,
+        .content-scrollable::-webkit-scrollbar {
             width: 6px;
             height: 6px;
         }
-        .table-responsive::-webkit-scrollbar-track {
+        .table-responsive::-webkit-scrollbar-track,
+        .content-scrollable::-webkit-scrollbar-track {
             background: #f1f1f1;
         }
-        .table-responsive::-webkit-scrollbar-thumb {
+        .table-responsive::-webkit-scrollbar-thumb,
+        .content-scrollable::-webkit-scrollbar-thumb {
             background: #ccc;
             border-radius: 4px;
         }
-        .table-responsive::-webkit-scrollbar-thumb:hover {
+        .table-responsive::-webkit-scrollbar-thumb:hover,
+        .content-scrollable::-webkit-scrollbar-thumb:hover {
             background: #aaa;
         }
         .card-header {
