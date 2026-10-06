@@ -26,4 +26,10 @@ class Teacher extends Model
     {
         return $this->hasOne(Classes::class);
     }
+
+    // relasi ke foto wajah guru
+    public function faces()
+    {
+        return $this->hasMany(TeacherFace::class);
+    }
 }
