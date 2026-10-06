@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="layout-menu-fixed layout-compact">
 
 <head>
     <meta charset="UTF-8">
@@ -33,6 +33,68 @@
 
     <!-- endbuild -->
     <link rel="stylesheet" href="{{ asset('sneat/assets/vendor/libs/apex-charts/apex-charts.css') }}" />
+
+    <style>
+        html, body {
+            height: 100vh;
+            overflow: hidden;
+        }
+        .layout-wrapper, .layout-container {
+            height: 100vh;
+            max-height: 100vh;
+            overflow: hidden;
+        }
+        .layout-page {
+            height: 100vh;
+            max-height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        .content-wrapper {
+            flex: 1 1 auto;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            min-height: 0;
+        }
+        .content-wrapper > .container-xxl {
+            flex: 1 1 auto;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            min-height: 0;
+            padding-top: 1rem !important;
+            padding-bottom: 0.5rem !important;
+        }
+        .content-footer {
+            flex-shrink: 0;
+        }
+        /* Custom scrollbar untuk tabel */
+        .table-responsive::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .table-responsive::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        .table-responsive::-webkit-scrollbar-thumb {
+            background: #ccc;
+            border-radius: 4px;
+        }
+        .table-responsive::-webkit-scrollbar-thumb:hover {
+            background: #aaa;
+        }
+        /* Sticky header tabel */
+        .table-sticky-header thead th {
+            position: sticky;
+            top: 0;
+            z-index: 5;
+            background-color: #f5f5f9 !important;
+            box-shadow: 0 1px 0 rgba(0, 0, 0, 0.08);
+        }
+    </style>
 
     <!-- Helpers -->
     <script src="{{ asset('sneat/assets/vendor/js/helpers.js') }}"></script>

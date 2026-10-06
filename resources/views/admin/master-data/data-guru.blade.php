@@ -3,17 +3,17 @@
 @section('title', 'Data Guru | SMAN 2 Tondano')
 
 @section('content')
-    <div class="mt-0">
+    <div class="d-flex flex-column flex-grow-1 h-100" style="min-height: 0; overflow: hidden;">
         <!-- Notifikasi -->
         @if (session('success'))
-            <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <div class="alert alert-success alert-dismissible fade show flex-shrink-0" role="alert">
                 {{ session('success') }}
                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
             </div>
         @endif
 
         @if ($errors->any())
-            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <div class="alert alert-danger alert-dismissible fade show flex-shrink-0" role="alert">
                 <ul class="mb-0">
                     @foreach ($errors->all() as $error)
                         <li>{{ $error }}</li>
@@ -23,7 +23,7 @@
             </div>
         @endif
 
-        <div class="d-flex justify-content-between align-items-center mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-3 flex-shrink-0">
             <h4 class="fw-bold mb-0">Data Guru</h4>
             <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalTambahDataGuru">
                 <i class="icon-base bx bx-plus me-1"></i> Tambah Data Guru
@@ -143,8 +143,8 @@
         </div>
 
         <!-- Tabel Data Guru -->
-        <div class="card">
-            <div class="card-header d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2 py-3">
+        <div class="card flex-grow-1 d-flex flex-column shadow-sm mb-0" style="min-height: 0; overflow: hidden;">
+            <div class="card-header d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2 py-3 flex-shrink-0">
                 <h5 class="mb-0">Daftar Guru</h5>
 
                 <!-- Filter & Pencarian -->
@@ -165,8 +165,8 @@
                 </form>
             </div>
 
-            <div class="table-responsive">
-                <table class="table table-striped align-middle mb-0">
+            <div class="table-responsive flex-grow-1" style="overflow-y: auto; min-height: 0;">
+                <table class="table table-striped align-middle mb-0 table-sticky-header">
                     <thead>
                         <tr>
                             <th class="text-center" style="width: 4%;">No.</th>
@@ -474,7 +474,7 @@
             </div>
 
             <!-- Pagination Links -->
-            <div class="card-footer d-flex flex-column flex-sm-row justify-content-between align-items-center py-3 gap-2">
+            <div class="card-footer d-flex flex-column flex-sm-row justify-content-between align-items-center py-2 gap-2 flex-shrink-0">
                 <small class="text-muted">
                     Menampilkan {{ $teachers->firstItem() ?? 0 }} sampai {{ $teachers->lastItem() ?? 0 }} dari {{ $teachers->total() }} guru
                 </small>
