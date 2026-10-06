@@ -96,26 +96,26 @@
                                     @endif
                                 </td>
                                 <td class="text-center">
-                                    <div class="d-flex justify-content-center gap-1">
+                                    <div class="d-flex justify-content-center align-items-center gap-1">
                                         <!-- Tombol Detail Foto Modal -->
-                                        <button type="button" class="btn btn-sm btn-outline-info"
+                                        <button type="button" class="btn btn-sm btn-icon p-1 text-secondary"
                                             data-bs-toggle="modal" data-bs-target="#modalDetailFotoSiswa{{ $siswa->id }}"
-                                            title="Lihat Sampel Foto Wajah">
-                                            <i class="icon-base bx bx-image"></i>
+                                            data-bs-placement="top" title="Lihat Foto Wajah">
+                                            <i class="icon-base bx bx-image fs-5"></i>
                                         </button>
 
                                         <!-- Tombol Edit Modal -->
-                                        <button type="button" class="btn btn-sm btn-outline-primary"
+                                        <button type="button" class="btn btn-sm btn-icon p-1 text-secondary"
                                             data-bs-toggle="modal" data-bs-target="#modalUbahSiswa{{ $siswa->id }}"
-                                            title="Edit Data Siswa">
-                                            <i class="icon-base bx bx-edit-alt"></i>
+                                            data-bs-placement="top" title="Edit Data Siswa">
+                                            <i class="icon-base bx bx-edit-alt fs-5"></i>
                                         </button>
 
                                         <!-- Tombol Hapus Modal -->
-                                        <button type="button" class="btn btn-sm btn-outline-danger"
+                                        <button type="button" class="btn btn-sm btn-icon p-1 text-secondary"
                                             data-bs-toggle="modal" data-bs-target="#modalHapusSiswa{{ $siswa->id }}"
-                                            title="Hapus Data Siswa">
-                                            <i class="icon-base bx bx-trash"></i>
+                                            data-bs-placement="top" title="Hapus Siswa">
+                                            <i class="icon-base bx bx-trash fs-5"></i>
                                         </button>
                                     </div>
 
@@ -131,7 +131,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="9" class="text-center text-muted py-4">Belum ada data siswa.</td>
+                                <td colspan="10" class="text-center text-muted py-4">Belum ada data siswa.</td>
                             </tr>
                         @endforelse
                     </tbody>
@@ -142,4 +142,13 @@
 
     <!-- Include Modal Tambah Siswa -->
     @include('admin.master-data.siswa.modal-tambah', ['classes' => $classes])
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            tooltipTriggerList.map(function (tooltipTriggerEl) {
+                return new bootstrap.Tooltip(tooltipTriggerEl);
+            });
+        });
+    </script>
 @endsection
