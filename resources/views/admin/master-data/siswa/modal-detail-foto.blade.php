@@ -1,6 +1,6 @@
 <div class="modal fade" id="modalDetailFotoSiswa{{ $siswa->id }}" data-bs-backdrop="static" tabindex="-1" aria-labelledby="judulDetailFoto{{ $siswa->id }}" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">
-        <div class="modal-content">
+        <div class="modal-content" style="white-space: normal;">
             <div class="modal-header">
                 <h5 class="modal-title" id="judulDetailFoto{{ $siswa->id }}">
                     Foto Wajah Siswa - {{ $siswa->name }}

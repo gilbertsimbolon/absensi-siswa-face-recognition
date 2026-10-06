@@ -24,7 +24,7 @@
         @endif
 
         <div class="d-flex justify-content-between align-items-center mb-4">
-            <h4 class="fw-bold mb-0">Master Data Siswa</h4>
+            <h4 class="fw-bold mb-0">Data Siswa</h4>
             <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalTambahSiswa">
                 <i class="icon-base bx bx-plus me-1"></i> Tambah Data Siswa
             </button>
@@ -32,89 +32,114 @@
 
         <!-- Tabel Data Siswa -->
         <div class="card">
-            <h5 class="card-header">Daftar Siswa</h5>
-            <div class="table-responsive text-nowrap">
-                <table class="table table-striped">
+            <div class="card-header d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2 py-3">
+                <h5 class="mb-0">Daftar Siswa</h5>
+
+                <!-- Filter & Pencarian -->
+                <form method="GET" action="{{ route('admin.student.index') }}" class="d-flex align-items-center gap-2 m-0 flex-nowrap">
+                    <!-- Filter Kelas -->
+                    <select name="class_id" class="form-select form-select-sm" style="width: 150px;" onchange="this.form.submit()">
+                        <option value="">Semua Kelas</option>
+                        @foreach ($classes as $kelas)
+                            <option value="{{ $kelas->id }}" {{ request('class_id') == $kelas->id ? 'selected' : '' }}>
+                                {{ $kelas->name }}
+                            </option>
+                        @endforeach
+                    </select>
+
+                    <!-- Input Search -->
+                    <div class="input-group input-group-sm" style="width: 220px;">
+                        <input type="text" name="search" class="form-control" placeholder="Cari nama / NISN..."
+                            value="{{ request('search') }}">
+                        <button class="btn btn-secondary" type="submit" title="Cari">
+                            <i class="icon-base bx bx-search"></i>
+                        </button>
+                    </div>
+
+                    @if (request()->hasAny(['search', 'class_id']) && (request('search') || request('class_id')))
+                        <a href="{{ route('admin.student.index') }}" class="btn btn-sm btn-secondary" title="Reset Filter">
+                            <i class="icon-base bx bx-reset"></i>
+                        </a>
+                    @endif
+                </form>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-striped align-middle mb-0">
                     <thead>
                         <tr>
-                            <th class="text-center" style="width: 50px;">No.</th>
-                            <th class="text-center" style="width: 80px;">Foto Siswa</th>
-                            <th>Nama Siswa</th>
-                            <th>NISN</th>
-                            <th>Kelas</th>
-                            <th>L/P</th>
-                            <th>WhatsApp Siswa</th>
-                            <th>Orang Tua / Wali</th>
-                            <th>WhatsApp Orang Tua</th>
-                            <th class="text-center" style="width: 140px;">Aksi</th>
+                            <th class="text-center" style="width: 4%;">No.</th>
+                            <th class="text-center" style="width: 6%;">Foto</th>
+                            <th style="width: 11%;">NISN</th>
+                            <th style="width: 18%;">Nama Siswa</th>
+                            <th style="width: 10%;">Kelas</th>
+                            <th class="text-center" style="width: 5%;">L/P</th>
+                            <th style="width: 12%;">No. WA Siswa</th>
+                            <th style="width: 14%;">Orang Tua</th>
+                            <th style="width: 12%;">No. WA Ortu</th>
+                            <th class="text-center" style="width: 8%;">Aksi</th>
                         </tr>
                     </thead>
                     <tbody class="table-border-bottom-0">
                         @forelse ($students as $siswa)
                             <tr>
-                                <td class="text-center">{{ $loop->iteration }}</td>
-                                <td class="text-center">
+                                <td class="text-center text-nowrap">{{ $students->firstItem() + $loop->index }}</td>
+                                <td class="text-center text-nowrap">
                                     @php
                                         $primaryFace = $siswa->faces->first();
                                     @endphp
                                     @if ($primaryFace)
-                                        <a href="javascript:void(0);" data-bs-toggle="modal" data-bs-target="#modalDetailFotoSiswa{{ $siswa->id }}" title="Lihat sampel foto">
+                                        <a href="javascript:void(0);" data-bs-toggle="modal" data-bs-target="#modalDetailFotoSiswa{{ $siswa->id }}" title="Lihat Foto Wajah">
                                             <img src="{{ asset('storage/' . $primaryFace->file_path) }}" alt="{{ $siswa->name }}"
-                                                class="rounded-circle border" style="width: 40px; height: 40px; object-fit: cover;">
+                                                class="rounded-circle" style="width: 36px; height: 36px; object-fit: cover;">
                                         </a>
-                                    @else
-                                        <span class="badge bg-label-warning p-1" style="font-size: 10px;">Belum Ada</span>
-                                    @endif
-                                </td>
-                                <td><strong>{{ $siswa->name }}</strong></td>
-                                <td><span class="badge bg-label-dark">{{ $siswa->nisn }}</span></td>
-                                <td>
-                                    @if ($siswa->classes)
-                                        <span class="badge bg-label-primary">{{ $siswa->classes->name }}</span>
                                     @else
                                         <span class="text-muted">-</span>
                                     @endif
                                 </td>
-                                <td>{{ $siswa->gender }}</td>
-                                <td>
+                                <td class="text-nowrap">{{ $siswa->nisn }}</td>
+                                <td><strong>{{ $siswa->name }}</strong></td>
+                                <td class="text-nowrap">{{ $siswa->classes ? $siswa->classes->name : '-' }}</td>
+                                <td class="text-center text-nowrap">{{ $siswa->gender }}</td>
+                                <td class="text-nowrap">
                                     @if ($siswa->phone)
-                                        <a href="https://wa.me/{{ preg_replace('/[^0-9]/', '', $siswa->phone) }}" target="_blank" class="text-success text-decoration-none">
-                                            <i class="icon-base bx bxl-whatsapp me-1"></i>{{ $siswa->phone }}
+                                        <a href="https://wa.me/{{ preg_replace('/[^0-9]/', '', $siswa->phone) }}" target="_blank" class="text-body text-decoration-none">
+                                            {{ $siswa->phone }}
                                         </a>
                                     @else
                                         <span class="text-muted">-</span>
                                     @endif
                                 </td>
                                 <td>{{ $siswa->parent_name ?: '-' }}</td>
-                                <td>
+                                <td class="text-nowrap">
                                     @if ($siswa->parent_phone)
-                                        <a href="https://wa.me/{{ preg_replace('/[^0-9]/', '', $siswa->parent_phone) }}" target="_blank" class="text-success text-decoration-none">
-                                            <i class="icon-base bx bxl-whatsapp me-1"></i>{{ $siswa->parent_phone }}
+                                        <a href="https://wa.me/{{ preg_replace('/[^0-9]/', '', $siswa->parent_phone) }}" target="_blank" class="text-body text-decoration-none">
+                                            {{ $siswa->parent_phone }}
                                         </a>
                                     @else
                                         <span class="text-muted">-</span>
                                     @endif
                                 </td>
-                                <td class="text-center">
-                                    <div class="d-flex justify-content-center align-items-center gap-1">
-                                        <!-- Tombol Detail Foto Modal -->
-                                        <button type="button" class="btn btn-sm btn-icon p-1 text-secondary"
+                                <td class="text-center text-nowrap">
+                                    <div class="d-inline-flex align-items-center gap-2">
+                                        <!-- Tombol Detail Foto Modal (Hijau) -->
+                                        <button type="button" class="btn btn-sm btn-icon p-0 text-success"
                                             data-bs-toggle="modal" data-bs-target="#modalDetailFotoSiswa{{ $siswa->id }}"
-                                            data-bs-placement="top" title="Lihat Foto Wajah">
+                                            title="Detail Foto">
                                             <i class="icon-base bx bx-image fs-5"></i>
                                         </button>
 
-                                        <!-- Tombol Edit Modal -->
-                                        <button type="button" class="btn btn-sm btn-icon p-1 text-secondary"
+                                        <!-- Tombol Edit Modal (Kuning) -->
+                                        <button type="button" class="btn btn-sm btn-icon p-0 text-warning"
                                             data-bs-toggle="modal" data-bs-target="#modalUbahSiswa{{ $siswa->id }}"
-                                            data-bs-placement="top" title="Edit Data Siswa">
+                                            title="Edit Data Siswa">
                                             <i class="icon-base bx bx-edit-alt fs-5"></i>
                                         </button>
 
-                                        <!-- Tombol Hapus Modal -->
-                                        <button type="button" class="btn btn-sm btn-icon p-1 text-secondary"
+                                        <!-- Tombol Hapus Modal (Merah) -->
+                                        <button type="button" class="btn btn-sm btn-icon p-0 text-danger"
                                             data-bs-toggle="modal" data-bs-target="#modalHapusSiswa{{ $siswa->id }}"
-                                            data-bs-placement="top" title="Hapus Siswa">
+                                            title="Hapus Siswa">
                                             <i class="icon-base bx bx-trash fs-5"></i>
                                         </button>
                                     </div>
@@ -137,18 +162,19 @@
                     </tbody>
                 </table>
             </div>
+
+            <!-- Pagination Links -->
+            <div class="card-footer d-flex flex-column flex-sm-row justify-content-between align-items-center py-3 gap-2">
+                <small class="text-muted">
+                    Menampilkan {{ $students->firstItem() ?? 0 }} sampai {{ $students->lastItem() ?? 0 }} dari {{ $students->total() }} siswa
+                </small>
+                <div>
+                    {{ $students->links() }}
+                </div>
+            </div>
         </div>
     </div>
 
     <!-- Include Modal Tambah Siswa -->
     @include('admin.master-data.siswa.modal-tambah', ['classes' => $classes])
-
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-            tooltipTriggerList.map(function (tooltipTriggerEl) {
-                return new bootstrap.Tooltip(tooltipTriggerEl);
-            });
-        });
-    </script>
 @endsection

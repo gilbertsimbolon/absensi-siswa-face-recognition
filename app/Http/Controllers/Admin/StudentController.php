@@ -14,11 +14,27 @@ use Illuminate\Support\Facades\Validator;
 class StudentController extends Controller
 {
     /**
-     * Tampilkan daftar data siswa beserta relasi foto wajah.
+     * Tampilkan daftar data siswa beserta relasi foto wajah, filter, dan pagination.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $students = Student::with(['classes', 'faces'])->latest()->get();
+        $query = Student::with(['classes', 'faces'])->latest();
+
+        // Filter pencarian nama atau NISN
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('nisn', 'like', "%{$search}%");
+            });
+        }
+
+        // Filter berdasarkan kelas
+        if ($request->filled('class_id')) {
+            $query->where('class_id', $request->class_id);
+        }
+
+        $students = $query->paginate(10)->withQueryString();
         $classes = Classes::orderBy('grade_level')->orderBy('name')->get();
 
         return view('admin.master-data.data-siswa', compact('students', 'classes'));
@@ -109,21 +125,32 @@ class StudentController extends Controller
      */
     public function destroy(Student $student)
     {
-        // Hapus folder dataset di python-service jika ada
-        $pythonDatasetPath = base_path('python-service/dataset/'.$student->nisn);
-        if (File::exists($pythonDatasetPath)) {
-            File::deleteDirectory($pythonDatasetPath);
+        // 1. Hapus setiap berkas foto fisik di storage jika ada
+        foreach ($student->faces as $face) {
+            if ($face->file_path && Storage::disk('public')->exists($face->file_path)) {
+                Storage::disk('public')->delete($face->file_path);
+            }
         }
 
-        // Hapus folder di storage/app/public/faces/{nisn}
+        // 2. Hapus direktori faces/{nisn} di storage public
         $storagePath = 'faces/'.$student->nisn;
         if (Storage::disk('public')->exists($storagePath)) {
             Storage::disk('public')->deleteDirectory($storagePath);
         }
 
+        // 3. Hapus folder dataset siswa di python-service jika ada
+        $pythonDatasetPath = base_path('python-service/dataset/'.$student->nisn);
+        if (File::exists($pythonDatasetPath)) {
+            File::deleteDirectory($pythonDatasetPath);
+        }
+
+        // 4. Hapus relasi record student_faces di database
+        $student->faces()->delete();
+
+        // 5. Hapus record siswa
         $student->delete();
 
-        return redirect()->route('admin.student.index')->with('success', 'Data siswa dan dataset foto berhasil dihapus.');
+        return redirect()->route('admin.student.index')->with('success', 'Data siswa dan seluruh dataset foto berhasil dihapus.');
     }
 
     /**

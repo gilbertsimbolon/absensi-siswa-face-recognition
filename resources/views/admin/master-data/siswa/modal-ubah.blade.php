@@ -1,6 +1,6 @@
 <div class="modal fade" id="modalUbahSiswa{{ $siswa->id }}" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="judulUbahSiswa{{ $siswa->id }}" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">
-        <div class="modal-content">
+        <div class="modal-content" style="white-space: normal;">
             <div class="modal-header">
                 <h5 class="modal-title" id="judulUbahSiswa{{ $siswa->id }}">Edit Data Siswa</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -113,26 +113,62 @@
                         <hr class="flex-grow-1 m-0">
                     </div>
 
+                    @php
+                        $faceDepan = $siswa->faces->firstWhere('label', 'Tampak Depan') ?? $siswa->faces->get(0);
+                        $faceKanan = $siswa->faces->firstWhere('label', 'Serong Kanan') ?? $siswa->faces->get(1);
+                        $faceKiri = $siswa->faces->firstWhere('label', 'Serong Kiri') ?? $siswa->faces->get(2);
+                    @endphp
+
                     <div class="row">
                         <!-- Foto Tampak Depan -->
                         <div class="col-md-4 mb-3">
-                            <label class="form-label fw-semibold">1. Tampak Depan</label>
+                            <label class="form-label fw-semibold d-block">1. Tampak Depan</label>
+                            <div class="mb-2 text-center">
+                                @if ($faceDepan)
+                                    <img src="{{ asset('storage/' . $faceDepan->file_path) }}" alt="Tampak Depan"
+                                        class="rounded border" style="width: 100px; height: 100px; object-fit: cover;">
+                                @else
+                                    <div class="d-flex align-items-center justify-content-center rounded border bg-light mx-auto" style="width: 100px; height: 100px;">
+                                        <span class="text-muted small">Belum ada</span>
+                                    </div>
+                                @endif
+                            </div>
                             <input type="file" class="form-control form-control-sm" name="photo_depan" accept="image/*" />
-                            <small class="text-muted d-block mt-1">Biarkan kosong jika tetap</small>
+                            <small class="text-muted d-block mt-1 text-center">Biarkan kosong jika tetap</small>
                         </div>
 
                         <!-- Foto Serong Kanan -->
                         <div class="col-md-4 mb-3">
-                            <label class="form-label fw-semibold">2. Serong Kanan</label>
+                            <label class="form-label fw-semibold d-block">2. Serong Kanan</label>
+                            <div class="mb-2 text-center">
+                                @if ($faceKanan)
+                                    <img src="{{ asset('storage/' . $faceKanan->file_path) }}" alt="Serong Kanan"
+                                        class="rounded border" style="width: 100px; height: 100px; object-fit: cover;">
+                                @else
+                                    <div class="d-flex align-items-center justify-content-center rounded border bg-light mx-auto" style="width: 100px; height: 100px;">
+                                        <span class="text-muted small">Belum ada</span>
+                                    </div>
+                                @endif
+                            </div>
                             <input type="file" class="form-control form-control-sm" name="photo_kanan" accept="image/*" />
-                            <small class="text-muted d-block mt-1">Biarkan kosong jika tetap</small>
+                            <small class="text-muted d-block mt-1 text-center">Biarkan kosong jika tetap</small>
                         </div>
 
                         <!-- Foto Serong Kiri -->
                         <div class="col-md-4 mb-3">
-                            <label class="form-label fw-semibold">3. Serong Kiri</label>
+                            <label class="form-label fw-semibold d-block">3. Serong Kiri</label>
+                            <div class="mb-2 text-center">
+                                @if ($faceKiri)
+                                    <img src="{{ asset('storage/' . $faceKiri->file_path) }}" alt="Serong Kiri"
+                                        class="rounded border" style="width: 100px; height: 100px; object-fit: cover;">
+                                @else
+                                    <div class="d-flex align-items-center justify-content-center rounded border bg-light mx-auto" style="width: 100px; height: 100px;">
+                                        <span class="text-muted small">Belum ada</span>
+                                    </div>
+                                @endif
+                            </div>
                             <input type="file" class="form-control form-control-sm" name="photo_kiri" accept="image/*" />
-                            <small class="text-muted d-block mt-1">Biarkan kosong jika tetap</small>
+                            <small class="text-muted d-block mt-1 text-center">Biarkan kosong jika tetap</small>
                         </div>
                     </div>
                 </div>
