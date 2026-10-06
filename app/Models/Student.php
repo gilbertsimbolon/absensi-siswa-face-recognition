@@ -18,6 +18,7 @@ class Student extends Model
         'phone',
         'parent_name',
         'parent_phone',
+        'status',
     ];
 
     // relasi ke user
@@ -36,5 +37,11 @@ class Student extends Model
     public function faces()
     {
         return $this->hasMany(StudentFace::class);
+    }
+
+    // relasi ke riwayat kelas siswa
+    public function classHistories()
+    {
+        return $this->hasMany(StudentClassHistory::class);
     }
 }

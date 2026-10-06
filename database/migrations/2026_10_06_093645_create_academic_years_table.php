@@ -11,11 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('student_faces', function (Blueprint $table) {
+        Schema::create('academic_years', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('student_id')->constrained('students')->cascadeOnDelete();
-            $table->string('file_path');
-            $table->string('label')->nullable();
+            $table->string('name');
+            $table->enum('semester', ['Ganjil', 'Genap'])->default('Ganjil');
+            $table->boolean('is_active')->default(false);
             $table->timestamps();
         });
     }
@@ -25,6 +25,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('student_faces');
+        Schema::dropIfExists('academic_years');
     }
 };

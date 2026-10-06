@@ -3,17 +3,17 @@
 @section('title', 'Data Kelas | SMAN 2 Tondano')
 
 @section('content')
-    <div class="mt-0">
+    <div class="d-flex flex-column flex-grow-1 h-100" style="min-height: 0; overflow: hidden;">
         <!-- Notifikasi -->
         @if (session('success'))
-            <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <div class="alert alert-success alert-dismissible fade show flex-shrink-0" role="alert">
                 {{ session('success') }}
                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
             </div>
         @endif
 
         @if ($errors->any())
-            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <div class="alert alert-danger alert-dismissible fade show flex-shrink-0" role="alert">
                 <ul class="mb-0">
                     @foreach ($errors->all() as $error)
                         <li>{{ $error }}</li>
@@ -23,12 +23,193 @@
             </div>
         @endif
 
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h4 class="fw-bold mb-0">Master Data Kelas</h4>
-            <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalTambahKelas">
-                <i class="icon-base bx bx-plus me-1"></i> Tambah Kelas
-            </button>
+        <!-- Header Halaman -->
+        <div class="d-flex justify-content-between align-items-center mb-3 flex-shrink-0">
+            <div>
+                <h4 class="fw-bold mb-0">Data Kelas</h4>
+                <span class="text-muted small">Tahun Ajaran: {{ $activeYear->name }} (Semester {{ $activeYear->semester }})</span>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <a href="{{ route('admin.classes.promotion.preview') }}" class="btn btn-warning text-white">
+                    <i class="icon-base bx bx-trending-up me-1"></i> Kenaikan Kelas
+                </a>
+                <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalTambahKelas">
+                    <i class="icon-base bx bx-plus me-1"></i> Tambah Data Kelas
+                </button>
+            </div>
         </div>
+
+        <!-- Card Utama Berisi Tab Kelas & Tabel Siswa -->
+        <div class="card flex-grow-1 d-flex flex-column shadow-sm mb-0" style="min-height: 0; overflow: hidden;">
+            <!-- Tab Navigasi Kelas -->
+            <div class="card-header border-bottom p-0 flex-shrink-0">
+                <div class="d-flex align-items-center px-3 pt-2">
+                    <ul class="nav nav-tabs card-header-tabs m-0 flex-nowrap" role="tablist" style="overflow-x: auto;">
+                        @forelse ($classes as $cls)
+                            <li class="nav-item">
+                                <a class="nav-link {{ $selectedClass && $selectedClass->id == $cls->id ? 'active fw-bold' : '' }}"
+                                    href="{{ route('admin.classes.index', ['class_id' => $cls->id]) }}">
+                                    {{ $cls->name }}
+                                </a>
+                            </li>
+                        @empty
+                            <li class="nav-item">
+                                <span class="nav-link text-muted">Belum ada kelas</span>
+                            </li>
+                        @endforelse
+                    </ul>
+                </div>
+            </div>
+
+            @if ($selectedClass)
+                <!-- Bar Detail & Aksi Kelas Terpilih -->
+                <div class="d-flex flex-wrap justify-content-between align-items-center px-4 py-2 border-bottom flex-shrink-0 gap-2 bg-white">
+                    <div class="d-flex align-items-center gap-3 flex-wrap" style="font-size: 13.5px;">
+                        <!-- 1. Wali Kelas paling kiri (tanpa tombol edit disini, cukup di pengaturan) -->
+                        <div class="d-flex align-items-center gap-1">
+                            <span class="text-muted">Wali Kelas:</span>
+                            <span class="fw-semibold text-dark">{{ $selectedClass->teacher ? $selectedClass->teacher->user->name : 'Belum ditentukan' }}</span>
+                        </div>
+
+                        <span class="text-muted opacity-50">•</span>
+
+                        <!-- 2. Tingkat (tanpa teks berlatar belakang, ukuran font stabil) -->
+                        <div class="d-flex align-items-center gap-1">
+                            <span class="text-muted">Tingkat:</span>
+                            <span class="fw-semibold text-dark">Kelas {{ $selectedClass->grade_level }}</span>
+                        </div>
+
+                        <span class="text-muted opacity-50">•</span>
+
+                        <!-- 3. Jumlah Siswa (ukuran font stabil) -->
+                        <div class="d-flex align-items-center gap-1">
+                            <span class="text-muted">Jumlah Siswa:</span>
+                            <span class="fw-semibold text-dark">{{ $students->count() }} Orang</span>
+                        </div>
+                    </div>
+
+                    <div class="d-flex align-items-center gap-2">
+                        <!-- Pencarian Siswa -->
+                        <form method="GET" action="{{ route('admin.classes.index') }}" class="d-flex align-items-center m-0">
+                            <input type="hidden" name="class_id" value="{{ $selectedClass->id }}">
+                            <div class="input-group input-group-sm" style="width: 180px;">
+                                <input type="text" name="search_student" class="form-control" placeholder="Cari siswa..."
+                                    value="{{ request('search_student') }}">
+                                <button class="btn btn-secondary" type="submit" title="Cari">
+                                    <i class="icon-base bx bx-search"></i>
+                                </button>
+                            </div>
+                            @if (request('search_student'))
+                                <a href="{{ route('admin.classes.index', ['class_id' => $selectedClass->id]) }}" class="btn btn-sm btn-secondary ms-1" title="Reset">
+                                    <i class="icon-base bx bx-reset"></i>
+                                </a>
+                            @endif
+                        </form>
+
+                        <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#modalTambahSiswa">
+                            <i class="icon-base bx bx-user-plus me-1"></i> Masukkan Siswa
+                        </button>
+
+                        <div class="d-inline-flex align-items-center gap-1 ms-1">
+                            <button type="button" class="btn btn-sm btn-icon p-0 text-warning" data-bs-toggle="modal" data-bs-target="#modalEditKelas" title="Pengaturan Kelas">
+                                <i class="icon-base bx bx-cog fs-5"></i>
+                            </button>
+
+                            <form action="{{ route('admin.classes.destroy', $selectedClass->id) }}" method="POST" class="m-0"
+                                onsubmit="return confirm('Apakah Anda yakin ingin menghapus kelas {{ $selectedClass->name }}?')">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="btn btn-sm btn-icon p-0 text-danger" title="Hapus Kelas">
+                                    <i class="icon-base bx bx-trash fs-5"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tabel Siswa di Kelas Terpilih -->
+                <div class="table-responsive flex-grow-1" style="overflow-y: auto; min-height: 0;">
+                    <table class="table table-striped align-middle mb-0 table-sticky-header">
+                        <thead>
+                            <tr>
+                                <th class="text-center" style="width: 5%;">No.</th>
+                                <th class="text-center" style="width: 7%;">Foto</th>
+                                <th style="width: 14%;">NISN</th>
+                                <th style="width: 24%;">Nama Siswa</th>
+                                <th class="text-center" style="width: 6%;">L/P</th>
+                                <th style="width: 16%;">No. WA Siswa</th>
+                                <th style="width: 18%;">Nama Orang Tua</th>
+                                <th class="text-center" style="width: 10%;">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody class="table-border-bottom-0">
+                            @forelse ($students as $siswa)
+                                @php
+                                    $primaryFace = $siswa->faces->firstWhere('face_position', 'depan') ?? $siswa->faces->first();
+                                @endphp
+                                <tr>
+                                    <td class="text-center text-nowrap">{{ $loop->iteration }}</td>
+                                    <td class="text-center text-nowrap">
+                                        @if ($primaryFace)
+                                            <img src="{{ asset('storage/' . $primaryFace->file_path) }}" alt="{{ $siswa->name }}"
+                                                class="rounded-circle" style="width: 36px; height: 36px; object-fit: cover;">
+                                        @else
+                                            <div class="avatar avatar-sm">
+                                                <span class="avatar-initial rounded-circle bg-label-secondary">
+                                                    {{ strtoupper(substr($siswa->name, 0, 1)) }}
+                                                </span>
+                                            </div>
+                                        @endif
+                                    </td>
+                                    <td class="text-nowrap">{{ $siswa->nisn }}</td>
+                                    <td><strong>{{ $siswa->name }}</strong></td>
+                                    <td class="text-center text-nowrap">
+                                        <span class="badge {{ $siswa->gender == 'L' ? 'bg-label-info' : 'bg-label-danger' }}">
+                                            {{ $siswa->gender }}
+                                        </span>
+                                    </td>
+                                    <td class="text-nowrap">
+                                        @if ($siswa->phone)
+                                            <a href="https://wa.me/{{ preg_replace('/[^0-9]/', '', $siswa->phone) }}" target="_blank" class="text-body text-decoration-none">
+                                                <i class="icon-base bx bxl-whatsapp text-success me-1"></i>{{ $siswa->phone }}
+                                            </a>
+                                        @else
+                                            <span class="text-muted">-</span>
+                                        @endif
+                                    </td>
+                                    <td>{{ $siswa->parent_name ?: '-' }}</td>
+                                    <td class="text-center text-nowrap">
+                                        <form action="{{ route('admin.classes.students.remove', [$selectedClass->id, $siswa->id]) }}" method="POST"
+                                            onsubmit="return confirm('Apakah Anda yakin ingin mengeluarkan {{ $siswa->name }} dari kelas ini?')">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="btn btn-sm btn-icon p-0 text-danger" title="Keluarkan dari kelas">
+                                                <i class="icon-base bx bx-trash fs-5"></i>
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="8" class="text-center py-5 text-muted">
+                                        Belum ada siswa yang terdaftar di kelas {{ $selectedClass->name }}. Silakan klik tombol <strong>Masukkan Siswa</strong> untuk menambahkan.
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            @else
+                <div class="d-flex flex-column align-items-center justify-content-center flex-grow-1 py-5 text-muted">
+                    <p class="mb-2">Belum ada kelas yang dibuat.</p>
+                    <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#modalTambahKelas">
+                        <i class="icon-base bx bx-plus me-1"></i> Tambah Data Kelas Sekarang
+                    </button>
+                </div>
+            @endif
+        </div>
+
+        <!-- ==================== MODALS ==================== -->
 
         <!-- Modal Tambah Kelas -->
         <div class="modal fade" id="modalTambahKelas" data-bs-backdrop="static" tabindex="-1" aria-hidden="true">
@@ -62,125 +243,138 @@
                                 <select class="form-select" id="teacher_id" name="teacher_id">
                                     <option value="">-- Tanpa Wali Kelas --</option>
                                     @foreach ($teachers as $teacher)
-                                        <option value="{{ $teacher->id }}">{{ $teacher->user->name }} (NIP: {{ $teacher->nip }})</option>
+                                        <option value="{{ $teacher->id }}">{{ $teacher->user->name }} (NIP: {{ $teacher->nip ?: '-' }})</option>
                                     @endforeach
                                 </select>
                             </div>
                         </div>
                         <div class="modal-footer">
                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
-                            <button type="submit" class="btn btn-success">Simpan</button>
+                            <button type="submit" class="btn btn-success">Simpan Data Kelas</button>
                         </div>
                     </form>
                 </div>
             </div>
         </div>
 
-        <!-- Tabel Kelas -->
-        <div class="card">
-            <h5 class="card-header">Daftar Kelas</h5>
-            <div class="table-responsive text-nowrap">
-                <table class="table table-striped">
-                    <thead>
-                        <tr>
-                            <th class="text-center" style="width: 5%;">No.</th>
-                            <th style="width: 12%;">Tingkat</th>
-                            <th style="width: 35%;">Nama Kelas</th>
-                            <th style="width: 35%;">Wali Kelas</th>
-                            <th class="text-center" style="width: 13%;">Aksi</th>
-                        </tr>
-                    </thead>
-                    <tbody class="table-border-bottom-0">
-                        @forelse ($classes as $class)
-                            <tr>
-                                <td class="text-center">{{ $loop->iteration }}</td>
-                                <td>
-                                    <span class="badge bg-label-info">{{ $class->grade_level }}</span>
-                                </td>
-                                <td><strong>{{ $class->name }}</strong></td>
-                                <td>
-                                    @if ($class->teacher)
-                                        {{ $class->teacher->user->name }}
-                                    @else
-                                        <span class="text-muted">-</span>
-                                    @endif
-                                </td>
-                                <td class="text-center">
-                                    <div class="d-flex justify-content-center gap-2">
-                                        <!-- Tombol Edit Modal -->
-                                        <button type="button" class="btn btn-sm btn-outline-primary"
-                                            data-bs-toggle="modal" data-bs-target="#modalEditKelas{{ $class->id }}">
-                                            <i class="icon-base bx bx-edit-alt"></i>
-                                        </button>
+        @if ($selectedClass)
+            <!-- Modal Edit Kelas -->
+            <div class="modal fade" id="modalEditKelas" data-bs-backdrop="static" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Pengaturan Data Kelas</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <form method="POST" action="{{ route('admin.classes.update', $selectedClass->id) }}">
+                            @csrf
+                            @method('PUT')
+                            <div class="modal-body">
+                                <div class="mb-3">
+                                    <label class="form-label">Tingkat Kelas</label>
+                                    <select class="form-select" name="grade_level" required>
+                                        <option value="X" {{ $selectedClass->grade_level == 'X' ? 'selected' : '' }}>Kelas X (10)</option>
+                                        <option value="XI" {{ $selectedClass->grade_level == 'XI' ? 'selected' : '' }}>Kelas XI (11)</option>
+                                        <option value="XII" {{ $selectedClass->grade_level == 'XII' ? 'selected' : '' }}>Kelas XII (12)</option>
+                                    </select>
+                                </div>
 
-                                        <!-- Form Delete -->
-                                        <form action="{{ route('admin.classes.destroy', $class->id) }}" method="POST"
-                                            onsubmit="return confirm('Apakah Anda yakin ingin menghapus kelas ini? Siswa di kelas ini juga akan terhapus.')">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button type="submit" class="btn btn-sm btn-outline-danger">
-                                                <i class="icon-base bx bx-trash"></i>
-                                            </button>
-                                        </form>
-                                    </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Nama Kelas</label>
+                                    <input type="text" class="form-control" name="name"
+                                        value="{{ $selectedClass->name }}" required />
+                                </div>
 
-                                    <!-- Modal Edit Kelas -->
-                                    <div class="modal fade" id="modalEditKelas{{ $class->id }}" data-bs-backdrop="static" tabindex="-1" aria-hidden="true">
-                                        <div class="modal-dialog modal-dialog-centered text-start">
-                                            <div class="modal-content">
-                                                <div class="modal-header">
-                                                    <h5 class="modal-title">Edit Data Kelas</h5>
-                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                                </div>
-                                                <form method="POST" action="{{ route('admin.classes.update', $class->id) }}">
-                                                    @csrf
-                                                    @method('PUT')
-                                                    <div class="modal-body">
-                                                        <div class="mb-3">
-                                                            <label class="form-label">Tingkat Kelas</label>
-                                                            <select class="form-select" name="grade_level" required>
-                                                                <option value="X" {{ $class->grade_level == 'X' ? 'selected' : '' }}>Kelas X (10)</option>
-                                                                <option value="XI" {{ $class->grade_level == 'XI' ? 'selected' : '' }}>Kelas XI (11)</option>
-                                                                <option value="XII" {{ $class->grade_level == 'XII' ? 'selected' : '' }}>Kelas XII (12)</option>
-                                                            </select>
-                                                        </div>
-
-                                                        <div class="mb-3">
-                                                            <label class="form-label">Nama Kelas</label>
-                                                            <input type="text" class="form-control" name="name"
-                                                                value="{{ $class->name }}" required />
-                                                        </div>
-
-                                                        <div class="mb-3">
-                                                            <label class="form-label">Wali Kelas (Opsional)</label>
-                                                            <select class="form-select" name="teacher_id">
-                                                                <option value="">-- Tanpa Wali Kelas --</option>
-                                                                @foreach ($teachers as $teacher)
-                                                                    <option value="{{ $teacher->id }}" {{ $class->teacher_id == $teacher->id ? 'selected' : '' }}>
-                                                                        {{ $teacher->user->name }} (NIP: {{ $teacher->nip }})
-                                                                    </option>
-                                                                @endforeach
-                                                            </select>
-                                                        </div>
-                                                    </div>
-                                                    <div class="modal-footer">
-                                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                                                        <button type="submit" class="btn btn-primary">Simpan Perubahan</button>
-                                                    </div>
-                                                </form>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="5" class="text-center text-muted py-4">Belum ada data kelas.</td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
+                                <div class="mb-3">
+                                    <label class="form-label">Wali Kelas</label>
+                                    <select class="form-select" name="teacher_id">
+                                        <option value="">-- Tanpa Wali Kelas --</option>
+                                        @foreach ($teachers as $teacher)
+                                            <option value="{{ $teacher->id }}" {{ $selectedClass->teacher_id == $teacher->id ? 'selected' : '' }}>
+                                                {{ $teacher->user->name }} (NIP: {{ $teacher->nip ?: '-' }})
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                                <button type="submit" class="btn btn-primary">Simpan Perubahan</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
             </div>
-        </div>
+
+            <!-- Modal Tambah Siswa ke Kelas -->
+            <div class="modal fade" id="modalTambahSiswa" data-bs-backdrop="static" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Masukkan Siswa ke {{ $selectedClass->name }}</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <form method="POST" action="{{ route('admin.classes.students.add', $selectedClass->id) }}">
+                            @csrf
+                            <div class="modal-body">
+                                @if ($availableStudents->isEmpty())
+                                    <div class="alert alert-info py-2 mb-0">
+                                        Semua siswa aktif sudah terdaftar di kelas ini atau tidak ada data siswa lainnya.
+                                    </div>
+                                @else
+                                    <div class="table-responsive" style="max-height: 350px; overflow-y: auto;">
+                                        <table class="table table-sm table-hover align-middle">
+                                            <thead class="table-light sticky-top">
+                                                <tr>
+                                                    <th style="width: 40px;" class="text-center">
+                                                        <input type="checkbox" class="form-check-input" id="checkAllStudents"
+                                                            onclick="document.querySelectorAll('.student-checkbox').forEach(c => c.checked = this.checked)">
+                                                    </th>
+                                                    <th>NISN</th>
+                                                    <th>Nama Siswa</th>
+                                                    <th>Kelas Saat Ini</th>
+                                                    <th class="text-center">L/P</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach ($availableStudents as $avail)
+                                                    <tr>
+                                                        <td class="text-center">
+                                                            <input type="checkbox" name="student_ids[]" value="{{ $avail->id }}"
+                                                                class="form-check-input student-checkbox">
+                                                        </td>
+                                                        <td>{{ $avail->nisn }}</td>
+                                                        <td><strong>{{ $avail->name }}</strong></td>
+                                                        <td>
+                                                            @if ($avail->classes)
+                                                                <span class="badge bg-label-secondary">{{ $avail->classes->name }}</span>
+                                                            @else
+                                                                <span class="badge bg-label-warning">Belum ada kelas</span>
+                                                            @endif
+                                                        </td>
+                                                        <td class="text-center">
+                                                            <span class="badge {{ $avail->gender == 'L' ? 'bg-label-info' : 'bg-label-danger' }}">
+                                                                {{ $avail->gender }}
+                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                @endforeach
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                @endif
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
+                                <button type="submit" class="btn btn-primary" {{ $availableStudents->isEmpty() ? 'disabled' : '' }}>
+                                    Tambahkan Siswa
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        @endif
     </div>
 @endsection
+

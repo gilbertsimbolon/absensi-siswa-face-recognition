@@ -11,7 +11,7 @@ class Classes extends Model
 
     protected $fillable = [
         'teacher_id',
-        'name', 
+        'name',
         'grade_level',
     ];
 
@@ -21,9 +21,21 @@ class Classes extends Model
         return $this->belongsTo(Teacher::class);
     }
 
-    // relasi ke student
+    // relasi ke students
+    public function students()
+    {
+        return $this->hasMany(Student::class, 'class_id');
+    }
+
+    // alias relasi ke student untuk backward compatibility
     public function student()
     {
-        return $this->hasMany(Student::class);
+        return $this->students();
+    }
+
+    // relasi ke riwayat kelas
+    public function classHistories()
+    {
+        return $this->hasMany(StudentClassHistory::class, 'class_id');
     }
 }

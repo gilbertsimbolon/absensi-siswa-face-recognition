@@ -86,12 +86,45 @@
         .table-responsive::-webkit-scrollbar-thumb:hover {
             background: #aaa;
         }
-        /* Sticky header tabel */
+        .card-header {
+            background-color: #fff !important;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.08) !important;
+            z-index: 15;
+            position: relative;
+        }
+        .card-footer {
+            background-color: #fff !important;
+            border-top: 1px solid rgba(0, 0, 0, 0.08) !important;
+            z-index: 15;
+            position: relative;
+        }
+        .table-responsive {
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+        /* Sticky header tabel tanpa celah gap */
+        .table-sticky-header {
+            border-collapse: separate !important;
+            border-spacing: 0 !important;
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
+        }
+        .table-sticky-header thead {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        .table-sticky-header thead tr {
+            position: sticky;
+            top: 0;
+        }
         .table-sticky-header thead th {
             position: sticky;
             top: 0;
-            z-index: 5;
+            z-index: 10;
             background-color: #f5f5f9 !important;
+            border-top: none !important;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.08) !important;
             box-shadow: 0 1px 0 rgba(0, 0, 0, 0.08);
         }
     </style>

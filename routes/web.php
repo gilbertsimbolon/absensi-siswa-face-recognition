@@ -26,6 +26,13 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->group(function () {
     // Route Data Kelas
     Route::get('/data-kelas', [ClassesController::class, 'index'])->name('admin.classes.index');
     Route::post('/data-kelas', [ClassesController::class, 'store'])->name('admin.classes.store');
+    Route::get('/data-kelas/kenaikan-kelas', [ClassesController::class, 'promotionPreview'])->name('admin.classes.promotion.preview');
+    Route::post('/data-kelas/kenaikan-kelas', [ClassesController::class, 'promoteProcess'])->name('admin.classes.promotion.process');
+    Route::post('/data-kelas/tahun-ajaran', [ClassesController::class, 'storeAcademicYear'])->name('admin.classes.academic-year.store');
+    Route::put('/data-kelas/tahun-ajaran/{academicYear}/aktifkan', [ClassesController::class, 'setActiveAcademicYear'])->name('admin.classes.academic-year.set-active');
+    Route::put('/data-kelas/{class}/wali-kelas', [ClassesController::class, 'updateTeacher'])->name('admin.classes.teacher.update');
+    Route::post('/data-kelas/{class}/tambah-siswa', [ClassesController::class, 'addStudents'])->name('admin.classes.students.add');
+    Route::delete('/data-kelas/{class}/hapus-siswa/{student}', [ClassesController::class, 'removeStudent'])->name('admin.classes.students.remove');
     Route::put('/data-kelas/{class}', [ClassesController::class, 'update'])->name('admin.classes.update');
     Route::delete('/data-kelas/{class}', [ClassesController::class, 'destroy'])->name('admin.classes.destroy');
 

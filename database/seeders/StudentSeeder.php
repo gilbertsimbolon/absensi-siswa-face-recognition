@@ -16,13 +16,36 @@ class StudentSeeder extends Seeder
      */
     public function run(): void
     {
-        $class = Classes::first();
-        $classId = $class ? $class->id : 1;
+        $class = Classes::firstOrCreate(
+            ['name' => 'XII MIPA 1'],
+            ['grade_level' => 'XII']
+        );
+        $classId = $class->id;
 
-        $sampleFace = StudentFace::first();
-        $sampleFacePath = $sampleFace ? storage_path('app/public/'.$sampleFace->file_path) : null;
+        // Cari file sampel foto wajah jika ada
+        $sampleFacePath = null;
+        $fallbackCandidates = [
+            base_path('python-service/dataset/0025625452/1791218169_photo_depan.jpg'),
+            base_path('python-service/dataset/0025625453/1791269549_photo_depan.jpg'),
+            storage_path('app/public/faces/0025625453/1791269549_photo_depan.jpg'),
+        ];
+        foreach ($fallbackCandidates as $candidate) {
+            if (File::exists($candidate)) {
+                $sampleFacePath = $candidate;
+                break;
+            }
+        }
 
         $students = [
+            [
+                'name' => 'Ciko',
+                'nisn' => '0025625452',
+                'class_id' => $classId,
+                'gender' => 'L',
+                'phone' => '085399684844',
+                'parent_name' => 'Royke',
+                'parent_phone' => '085399684844',
+            ],
             [
                 'name' => 'Bryan Wewengkang',
                 'nisn' => '0025625453',
@@ -121,39 +144,57 @@ class StudentSeeder extends Seeder
                 $studentData
             );
 
-            // Salin foto sampel jika tersedia
-            if ($sampleFacePath && File::exists($sampleFacePath)) {
-                $storageDir = 'faces/'.$student->nisn;
+            // Cek foto yang sudah ada untuk siswa ini di storage atau dataset
+            $storageDir = 'faces/'.$student->nisn;
+            $existingStorageFiles = Storage::disk('public')->exists($storageDir)
+                ? Storage::disk('public')->files($storageDir)
+                : [];
+
+            $pythonDir = base_path('python-service/dataset/'.$student->nisn);
+            $existingPythonFiles = File::exists($pythonDir)
+                ? File::files($pythonDir)
+                : [];
+
+            $relativePhotoPath = null;
+
+            if (! empty($existingStorageFiles)) {
+                $relativePhotoPath = $existingStorageFiles[0];
+            } elseif (! empty($existingPythonFiles)) {
+                $sourceFile = $existingPythonFiles[0]->getRealPath();
+                $fileName = $existingPythonFiles[0]->getFilename();
+                $relativePhotoPath = $storageDir.'/'.$fileName;
+                Storage::disk('public')->makeDirectory($storageDir);
+                File::copy($sourceFile, storage_path('app/public/'.$relativePhotoPath));
+            } elseif ($sampleFacePath && File::exists($sampleFacePath)) {
                 $fileName = time().'_photo_depan.jpg';
-                $relativePath = $storageDir.'/'.$fileName;
+                $relativePhotoPath = $storageDir.'/'.$fileName;
+                Storage::disk('public')->makeDirectory($storageDir);
+                File::copy($sampleFacePath, storage_path('app/public/'.$relativePhotoPath));
 
-                if (! Storage::disk('public')->exists($storageDir)) {
-                    Storage::disk('public')->makeDirectory($storageDir);
-                }
-
-                $destPath = storage_path('app/public/'.$relativePath);
-                if (! File::exists($destPath)) {
-                    File::copy($sampleFacePath, $destPath);
-                }
-
-                // Salin ke dataset python-service
-                $pythonDir = base_path('python-service/dataset/'.$student->nisn);
                 if (! File::exists($pythonDir)) {
                     File::makeDirectory($pythonDir, 0755, true);
                 }
+                File::copy($sampleFacePath, $pythonDir.'/'.$fileName);
+            }
+
+            if ($relativePhotoPath) {
+                // Pastikan juga tersalin ke python-service dataset jika belum ada
+                $fileName = basename($relativePhotoPath);
                 $pythonFilePath = $pythonDir.'/'.$fileName;
-                if (! File::exists($pythonFilePath)) {
-                    File::copy($sampleFacePath, $pythonFilePath);
+                if (! File::exists($pythonFilePath) && File::exists(storage_path('app/public/'.$relativePhotoPath))) {
+                    if (! File::exists($pythonDir)) {
+                        File::makeDirectory($pythonDir, 0755, true);
+                    }
+                    File::copy(storage_path('app/public/'.$relativePhotoPath), $pythonFilePath);
                 }
 
-                // Buat record foto wajah siswa
                 StudentFace::firstOrCreate(
                     [
                         'student_id' => $student->id,
                         'label' => 'Tampak Depan',
                     ],
                     [
-                        'file_path' => $relativePath,
+                        'file_path' => $relativePhotoPath,
                     ]
                 );
             }

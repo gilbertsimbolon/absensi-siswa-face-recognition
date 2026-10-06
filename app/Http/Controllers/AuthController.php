@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
@@ -24,19 +23,19 @@ class AuthController extends Controller
         ]);
 
         // jika validasi gagal
-        if ($validate->fails()){
+        if ($validate->fails()) {
             return redirect()->back()->withErrors($validate)->withInput();
         }
 
-        $credentials = $request->only('email','password');
+        $credentials = $request->only('email', 'password');
 
         // penanganan login
-        if(Auth::attempt($credentials)) {
+        if (Auth::attempt($credentials)) {
             $request->session()->regenerate();
 
             $user = Auth::user();
 
-            if($user->hasRole('admin')) {
+            if ($user->hasRole('admin')) {
                 return redirect()->route('admin.dashboard.index');
             }
 

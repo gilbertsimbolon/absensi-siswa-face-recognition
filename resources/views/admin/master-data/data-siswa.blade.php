@@ -100,7 +100,11 @@
                                 <td class="text-nowrap">{{ $siswa->nisn }}</td>
                                 <td><strong>{{ $siswa->name }}</strong></td>
                                 <td class="text-nowrap">{{ $siswa->classes ? $siswa->classes->name : '-' }}</td>
-                                <td class="text-center text-nowrap">{{ $siswa->gender }}</td>
+                                <td class="text-center text-nowrap">
+                                    <span class="badge {{ $siswa->gender == 'L' ? 'bg-label-info' : 'bg-label-danger' }}">
+                                        {{ $siswa->gender }}
+                                    </span>
+                                </td>
                                 <td class="text-nowrap">
                                     @if ($siswa->phone)
                                         <a href="https://wa.me/{{ preg_replace('/[^0-9]/', '', $siswa->phone) }}" target="_blank" class="text-body text-decoration-none">
