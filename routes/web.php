@@ -26,6 +26,9 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->group(function () {
     // Route Data Kelas
     Route::get('/data-kelas', [ClassesController::class, 'index'])->name('admin.classes.index');
     Route::post('/data-kelas', [ClassesController::class, 'store'])->name('admin.classes.store');
+    // Route Kenaikan Kelas (Menu Akademik)
+    Route::get('/kenaikan-kelas', [ClassesController::class, 'promotionPreview'])->name('admin.promotion.index');
+    Route::post('/kenaikan-kelas', [ClassesController::class, 'promoteProcess'])->name('admin.promotion.process');
     Route::get('/data-kelas/kenaikan-kelas', [ClassesController::class, 'promotionPreview'])->name('admin.classes.promotion.preview');
     Route::post('/data-kelas/kenaikan-kelas', [ClassesController::class, 'promoteProcess'])->name('admin.classes.promotion.process');
     Route::post('/data-kelas/tahun-ajaran', [ClassesController::class, 'storeAcademicYear'])->name('admin.classes.academic-year.store');

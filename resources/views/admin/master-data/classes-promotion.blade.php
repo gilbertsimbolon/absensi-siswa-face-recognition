@@ -1,12 +1,12 @@
 @extends('layouts.admin.app')
 
-@section('title', 'Kenaikan Kelas Massal | SMAN 2 Tondano')
+@section('title', 'Kenaikan Kelas | SMAN 2 Tondano')
 
 @section('content')
-    <div class="d-flex flex-column flex-grow-1 h-100 overflow-y-auto content-scrollable pe-1 pb-4" style="min-height: 0;">
+    <div class="d-flex flex-column flex-grow-1 h-100" style="min-height: 0; overflow: hidden;">
         <!-- Notifikasi -->
         @if (session('success'))
-            <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <div class="alert alert-success alert-dismissible fade show flex-shrink-0" role="alert">
                 <i class="icon-base bx bx-check-circle me-1"></i>
                 {{ session('success') }}
                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
@@ -14,7 +14,7 @@
         @endif
 
         @if ($errors->any())
-            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <div class="alert alert-danger alert-dismissible fade show flex-shrink-0" role="alert">
                 <div class="d-flex align-items-center mb-1">
                     <i class="icon-base bx bx-error-circle me-1"></i>
                     <strong>Terjadi kesalahan:</strong>
@@ -28,123 +28,99 @@
             </div>
         @endif
 
-        <!-- Header -->
-        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+        @php
+            $currentClassTitle = isset($selectedSourceClass) && $selectedSourceClass ? $selectedSourceClass->name : (($sourceClassId && $sourceClassId !== 'all') ? ($classes->firstWhere('id', $sourceClassId)?->name ?? 'Semua Kelas') : 'Semua Kelas');
+        @endphp
+
+        <!-- Header Halaman -->
+        <div class="d-flex justify-content-between align-items-center mb-3 flex-shrink-0">
             <div>
-                <div class="d-flex align-items-center gap-2 mb-1">
-                    <a href="{{ route('admin.classes.index') }}" class="btn btn-sm btn-icon btn-outline-secondary">
-                        <i class="icon-base bx bx-arrow-back"></i>
-                    </a>
-                    <h4 class="fw-bold mb-0">Kenaikan Kelas Massal</h4>
-                </div>
-                <span class="text-muted small">
-                    Proses kenaikan jenjang kelas secara massal antar tahun ajaran dengan preservasi histori data penempatan dan absensi.
-                </span>
+                <h4 class="fw-bold mb-0">Kenaikan Kelas</h4>
+                <span class="text-muted small">Kelas: {{ $currentClassTitle }} (Semester {{ $activeYear ? $activeYear->semester : '-' }})</span>
             </div>
             <div>
-                <a href="{{ route('admin.classes.index') }}" class="btn btn-outline-secondary">
-                    <i class="icon-base bx bx-left-arrow-alt me-1"></i> Kembali ke Data Kelas
-                </a>
+                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalKonfirmasiKenaikan" {{ $previewData->isEmpty() ? 'disabled' : '' }}>
+                    <i class="icon-base bx bx-check-circle me-1"></i> Jalankan Kenaikan Kelas
+                </button>
             </div>
         </div>
 
-        <!-- Filter & Pemilihan Tahun Ajaran / Kelas Asal -->
-        <div class="card mb-4">
-            <div class="card-body">
-                <form method="GET" action="{{ route('admin.classes.promotion.preview') }}">
-                    <div class="row g-3 align-items-end">
-                        <div class="col-md-4">
-                            <label class="form-label fw-semibold">Tahun Ajaran Aktif Saat Ini</label>
-                            <input type="text" class="form-control bg-lighter text-dark fw-bold" readonly
-                                value="{{ $activeYear ? $activeYear->name . ' (' . $activeYear->semester . ')' : 'Belum Ditentukan' }}">
-                        </div>
+        <!-- Card Utama: Tab Kelas & Tabel Siswa Kenaikan Kelas -->
+        <div class="card flex-grow-1 d-flex flex-column shadow-sm mb-0" style="min-height: 0; overflow: hidden;">
+            <!-- Tab Navigasi Kelas (Sama seperti Data Kelas) -->
+            <div class="card-header border-bottom p-0 flex-shrink-0">
+                <div class="d-flex align-items-center px-3 pt-2">
+                    <ul class="nav nav-tabs card-header-tabs m-0 flex-nowrap" role="tablist" style="overflow-x: auto;">
+                        <li class="nav-item">
+                            <a class="nav-link {{ $sourceClassId === 'all' || !$sourceClassId ? 'active fw-bold' : '' }}"
+                                href="{{ route('admin.promotion.index', ['source_class_id' => 'all', 'target_academic_year_id' => $targetAcademicYear?->id]) }}">
+                                Semua Kelas
+                            </a>
+                        </li>
+                        @foreach ($classes as $cls)
+                            <li class="nav-item">
+                                <a class="nav-link {{ $sourceClassId == $cls->id ? 'active fw-bold' : '' }}"
+                                    href="{{ route('admin.promotion.index', ['source_class_id' => $cls->id, 'target_academic_year_id' => $targetAcademicYear?->id]) }}">
+                                    {{ $cls->name }}
+                                </a>
+                            </li>
+                        @endforeach
+                    </ul>
+                </div>
+            </div>
 
-                        <div class="col-md-4">
-                            <label class="form-label fw-semibold">Tahun Ajaran Tujuan (Baru) <span class="text-danger">*</span></label>
-                            <select name="target_academic_year_id" class="form-select" required onchange="this.form.submit()">
-                                @foreach ($academicYears as $year)
-                                    @if ($year->id != $activeYear?->id)
-                                        <option value="{{ $year->id }}" {{ $targetAcademicYear && $targetAcademicYear->id == $year->id ? 'selected' : '' }}>
-                                            {{ $year->name }} ({{ $year->semester }})
-                                        </option>
-                                    @endif
-                                @endforeach
-                            </select>
-                        </div>
-
-                        <div class="col-md-3">
-                            <label class="form-label fw-semibold">Filter Kelas Asal</label>
-                            <select name="source_class_id" class="form-select" onchange="this.form.submit()">
-                                <option value="all" {{ request('source_class_id') == 'all' || !request('source_class_id') ? 'selected' : '' }}>
-                                    -- Semua Kelas --
-                                </option>
-                                @foreach ($classes as $cls)
-                                    <option value="{{ $cls->id }}" {{ request('source_class_id') == $cls->id ? 'selected' : '' }}>
-                                        [{{ $cls->grade_level }}] {{ $cls->name }}
+            <!-- Sub-Bar Detail & Pengaturan Target Tahun Ajaran -->
+            <div class="d-flex flex-wrap justify-content-between align-items-center px-4 py-2 border-bottom flex-shrink-0 gap-2 bg-white" style="font-size: 13.5px;">
+                <div class="d-flex align-items-center gap-3 flex-wrap">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="text-muted">Tahun Tujuan:</span>
+                        <select class="form-select form-select-sm" style="width: 200px;"
+                            onchange="window.location.href = '{{ route('admin.promotion.index') }}?source_class_id={{ $sourceClassId }}&target_academic_year_id=' + this.value;">
+                            @foreach ($academicYears as $year)
+                                @if ($year->id != $activeYear?->id)
+                                    <option value="{{ $year->id }}" {{ $targetAcademicYear && $targetAcademicYear->id == $year->id ? 'selected' : '' }}>
+                                        {{ $year->name }} ({{ $year->semester }})
                                     </option>
-                                @endforeach
-                            </select>
-                        </div>
-
-                        <div class="col-md-1">
-                            <button type="submit" class="btn btn-primary w-100" title="Terapkan Filter">
-                                <i class="icon-base bx bx-filter-alt"></i>
-                            </button>
-                        </div>
+                                @endif
+                            @endforeach
+                        </select>
                     </div>
-                </form>
-            </div>
-        </div>
 
-        <!-- Panduan & Peringatan Histori Data -->
-        <div class="alert alert-primary d-flex align-items-center mb-4" role="alert">
-            <i class="icon-base bx bx-info-circle fs-4 me-2 flex-shrink-0"></i>
-            <div>
-                <strong>Aturan Otomatis Kenaikan Kelas:</strong>
-                <ul class="mb-0 ps-3 small mt-1">
-                    <li><strong>Kelas X</strong> dipersiapkan naik ke kelas <strong>XI</strong>.</li>
-                    <li><strong>Kelas XI</strong> dipersiapkan naik ke kelas <strong>XII</strong>.</li>
-                    <li><strong>Kelas XII</strong> secara otomatis diset dengan status <strong>Lulus</strong> (tidak dipindahkan ke kelas lain).</li>
-                    <li>Histori absensi dan kelas siswa pada tahun ajaran lama tetap <strong>100% tersimpan aman</strong> di database.</li>
-                </ul>
-            </div>
-        </div>
+                    <span class="text-muted opacity-50">•</span>
 
-        <!-- Form Preview & Eksekusi Kenaikan Kelas Massal -->
-        @if ($previewData->isEmpty())
-            <div class="card">
-                <div class="card-body text-center py-5 text-muted">
-                    <i class="icon-base bx bx-user-x display-4 text-secondary mb-2"></i>
-                    <h5>Tidak Ada Siswa yang Ditemukan</h5>
-                    <p class="mb-0">Tidak ada siswa aktif pada filter kelas yang dipilih.</p>
+                    <div class="d-flex align-items-center gap-1">
+                        <span class="text-muted">Total Siswa:</span>
+                        <span class="fw-semibold text-dark">{{ $previewData->count() }} Orang</span>
+                    </div>
+                </div>
+
+                <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" name="set_target_as_active" id="setTargetAsActive" value="1" form="formKenaikanKelas" checked>
+                    <label class="form-check-label text-muted small fw-medium" for="setTargetAsActive">
+                        Jadikan tahun tujuan aktif
+                    </label>
                 </div>
             </div>
-        @else
-            <form id="formKenaikanKelas" method="POST" action="{{ route('admin.classes.promotion.process') }}">
-                @csrf
-                <input type="hidden" name="target_academic_year_id" value="{{ $targetAcademicYear?->id }}">
 
-                <div class="card">
-                    <div class="card-header d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-2">
-                        <div>
-                            <h5 class="mb-0 fw-bold">Preview Kenaikan Kelas</h5>
-                            <span class="text-muted small">Total: {{ $previewData->count() }} siswa ditemukan. Periksa status dan kelas tujuan sebelum mengeksekusi.</span>
-                        </div>
-                        <div class="form-check form-switch">
-                            <input class="form-check-input" type="checkbox" name="set_target_as_active" id="setTargetAsActive" value="1" checked>
-                            <label class="form-check-label small fw-semibold" for="setTargetAsActive">
-                                Jadikan Tahun Ajaran Tujuan sebagai Aktif
-                            </label>
-                        </div>
-                    </div>
+            <!-- Area Tabel & Konten -->
+            @if ($previewData->isEmpty())
+                <div class="d-flex flex-column align-items-center justify-content-center flex-grow-1 py-5 text-muted">
+                    <i class="icon-base bx bx-user-x display-4 text-secondary mb-2"></i>
+                    <h5 class="text-muted">Tidak Ada Siswa</h5>
+                    <p class="mb-0 small">Tidak ditemukan siswa aktif pada kelas ini.</p>
+                </div>
+            @else
+                <form id="formKenaikanKelas" method="POST" action="{{ route('admin.promotion.process') }}" class="d-flex flex-column flex-grow-1" style="min-height: 0; overflow: hidden;">
+                    @csrf
+                    <input type="hidden" name="target_academic_year_id" value="{{ $targetAcademicYear?->id }}">
 
-                    <div class="table-responsive text-nowrap">
-                        <table class="table table-striped table-hover align-middle">
+                    <div class="table-responsive flex-grow-1" style="overflow-y: auto;">
+                        <table class="table table-striped table-hover align-middle table-sticky-header">
                             <thead class="table-light">
                                 <tr>
                                     <th class="text-center" style="width: 40px;">
                                         <input type="checkbox" class="form-check-input" id="checkAllPromotion" checked
-                                            onclick="document.querySelectorAll('.promote-checkbox').forEach(c => c.checked = this.checked)">
+                                            onclick="document.querySelectorAll('.promote-checkbox').forEach(c => c.checked = this.checked); updateSelectedCount();">
                                     </th>
                                     <th class="text-center" style="width: 50px;">No.</th>
                                     <th style="width: 130px;">NISN</th>
@@ -172,7 +148,7 @@
                                         <td><strong>{{ $s->name }}</strong></td>
                                         <td>
                                             <span class="badge bg-label-secondary">
-                                                {{ $item['current_grade'] }} - {{ $item['current_class_name'] }}
+                                                {{ $item['current_class_name'] }}
                                             </span>
                                         </td>
                                         <!-- Pilihan Status Kenaikan -->
@@ -243,78 +219,121 @@
                         </table>
                     </div>
 
-                    <!-- Footer & Tombol Aksi dengan Konfirmasi -->
-                    <div class="card-footer d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-3 bg-light">
+                    <!-- Footer Card (Tanpa tombol ganda, cukup tombol di header atas) -->
+                    <div class="card-footer d-flex align-items-center bg-white flex-shrink-0 py-2">
                         <div class="text-muted small">
                             <i class="icon-base bx bx-shield-quarter text-success me-1"></i>
-                            Histori penempatan lama akan diarsipkan otomatis ke database.
-                        </div>
-                        <div class="d-flex align-items-center gap-2">
-                            <a href="{{ route('admin.classes.index') }}" class="btn btn-secondary">
-                                Batal
-                            </a>
-                            <!-- Tombol Trigger Modal Konfirmasi (Butir 9: Jangan langsung mengeksekusi tanpa konfirmasi Admin) -->
-                            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalKonfirmasiKenaikan">
-                                <i class="icon-base bx bx-check-circle me-1"></i> Jalankan Kenaikan Kelas Massal
-                            </button>
+                            Histori penempatan siswa lama tersimpan aman di database.
                         </div>
                     </div>
-                </div>
+                </form>
+            @endif
+        </div>
 
-                <!-- Modal Konfirmasi Eksekusi Kenaikan Kelas (Butir 9) -->
-                <div class="modal fade" id="modalKonfirmasiKenaikan" data-bs-backdrop="static" tabindex="-1" aria-hidden="true">
-                    <div class="modal-dialog modal-dialog-centered">
-                        <div class="modal-content">
-                            <div class="modal-header">
-                                <h5 class="modal-title text-warning d-flex align-items-center gap-2">
-                                    <i class="icon-base bx bx-error-circle fs-3"></i> Konfirmasi Kenaikan Kelas
-                                </h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        <!-- Modal Konfirmasi Eksekusi Kenaikan Kelas -->
+        <div class="modal fade" id="modalKonfirmasiKenaikan" data-bs-backdrop="static" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title d-flex align-items-center gap-2">
+                            <i class="icon-base bx bx-help-circle text-primary fs-4"></i> Konfirmasi Kenaikan Kelas
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="mb-3">
+                            Apakah Anda yakin ingin memproses kenaikan kelas untuk siswa yang dipilih?
+                        </p>
+                        <div class="p-3 rounded bg-light mb-3" style="font-size: 13.5px;">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="text-muted">Tahun Ajaran Tujuan:</span>
+                                <strong class="text-dark">{{ $targetAcademicYear?->name }} ({{ $targetAcademicYear?->semester }})</strong>
                             </div>
-                            <div class="modal-body">
-                                <p class="mb-3">
-                                    Apakah Anda yakin ingin mengeksekusi proses kenaikan kelas ini?
-                                </p>
-                                <div class="p-3 rounded bg-lighter mb-3">
-                                    <div class="d-flex justify-content-between mb-1 small">
-                                        <span class="text-muted">Tahun Ajaran Tujuan:</span>
-                                        <strong class="text-dark">{{ $targetAcademicYear?->name }} ({{ $targetAcademicYear?->semester }})</strong>
-                                    </div>
-                                    <div class="d-flex justify-content-between mb-1 small">
-                                        <span class="text-muted">Total Siswa Diproses:</span>
-                                        <strong class="text-dark">{{ $previewData->count() }} Siswa</strong>
-                                    </div>
-                                </div>
-                                <div class="alert alert-warning py-2 small mb-0">
-                                    <i class="icon-base bx bx-info-circle me-1"></i>
-                                    Data absensi tahun ajaran sebelumnya tidak akan terpengaruh karena kelas historis telah tersimpan.
-                                </div>
-                            </div>
-                            <div class="modal-footer">
-                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Kembali Periksa</button>
-                                <button type="submit" class="btn btn-success">
-                                    <i class="icon-base bx bx-check me-1"></i> Ya, Eksekusi Sekarang
-                                </button>
+                            <div class="d-flex justify-content-between">
+                                <span class="text-muted">Total Siswa Diproses:</span>
+                                <strong class="text-dark" id="modalTotalSelectedSiswa">{{ $previewData->count() }} Siswa</strong>
                             </div>
                         </div>
+                        <div class="alert alert-info py-2 small mb-0">
+                            <i class="icon-base bx bx-info-circle me-1"></i>
+                            Histori absensi dan penempatan kelas tahun sebelumnya tetap tersimpan utuh di database.
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                        <button type="button" class="btn btn-primary" onclick="submitPromotionForm();">
+                            <i class="icon-base bx bx-check me-1"></i> Ya, Jalankan Sekarang
+                        </button>
                     </div>
                 </div>
-            </form>
-        @endif
-
+            </div>
+        </div>
     </div>
 
-    <!-- Script Interaktif untuk Dropdown Status -->
+    <!-- Script Interaktif untuk Dropdown Status, Dynamic Counter, & Auto Scroll Tab -->
     <script>
+        function updateSelectedCount() {
+            const checkedBoxes = document.querySelectorAll('.promote-checkbox:checked');
+            const countSpan = document.getElementById('modalTotalSelectedSiswa');
+            if (countSpan) {
+                countSpan.textContent = checkedBoxes.length + ' Siswa';
+            }
+        }
+
+        function submitPromotionForm() {
+            const form = document.getElementById('formKenaikanKelas');
+            if (!form) return;
+
+            const checkedBoxes = document.querySelectorAll('.promote-checkbox:checked');
+            if (checkedBoxes.length === 0) {
+                alert('Silakan pilih minimal 1 siswa untuk diproses kenaikan kelasnya.');
+                return;
+            }
+
+            // Pastikan switch status target tahun aktif ikut terkirim di form
+            const switchActive = document.getElementById('setTargetAsActive');
+            let hiddenActive = document.getElementById('hidden_set_target_as_active');
+            if (!hiddenActive) {
+                hiddenActive = document.createElement('input');
+                hiddenActive.type = 'hidden';
+                hiddenActive.name = 'set_target_as_active';
+                hiddenActive.id = 'hidden_set_target_as_active';
+                form.appendChild(hiddenActive);
+            }
+            hiddenActive.value = (switchActive && switchActive.checked) ? '1' : '0';
+
+            form.submit();
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
+            // Auto scroll ke tab aktif
+            const activeTab = document.querySelector('.card-header-tabs .nav-link.active');
+            if (activeTab) {
+                activeTab.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'nearest',
+                    inline: 'center'
+                });
+            }
+
+            // Update modal count when modal is shown
+            const modal = document.getElementById('modalKonfirmasiKenaikan');
+            if (modal) {
+                modal.addEventListener('show.bs.modal', updateSelectedCount);
+            }
+
+            // Listener checkbox per siswa
+            document.querySelectorAll('.promote-checkbox').forEach(function(cb) {
+                cb.addEventListener('change', updateSelectedCount);
+            });
+
+            // Dropdown aksi disable/enable target class
             document.querySelectorAll('.action-select').forEach(function(select) {
                 select.addEventListener('change', function() {
                     const targetSelectId = this.dataset.targetSelect;
                     const targetSelect = document.getElementById(targetSelectId);
                     if (targetSelect) {
-                        if (this.value === 'lulus') {
-                            targetSelect.disabled = true;
-                        } else if (this.value === 'tinggal') {
+                        if (this.value === 'lulus' || this.value === 'tinggal') {
                             targetSelect.disabled = true;
                         } else {
                             targetSelect.disabled = false;

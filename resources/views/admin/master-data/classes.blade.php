@@ -27,12 +27,9 @@
         <div class="d-flex justify-content-between align-items-center mb-3 flex-shrink-0">
             <div>
                 <h4 class="fw-bold mb-0">Data Kelas</h4>
-                <span class="text-muted small">Tahun Ajaran: {{ $activeYear->name }} (Semester {{ $activeYear->semester }})</span>
+                <span class="text-muted small">Kelas: {{ $selectedClass ? $selectedClass->name : 'Semua Kelas' }} (Semester {{ $activeYear->semester }})</span>
             </div>
             <div class="d-flex align-items-center gap-2">
-                <a href="{{ route('admin.classes.promotion.preview') }}" class="btn btn-warning text-white">
-                    <i class="icon-base bx bx-trending-up me-1"></i> Kenaikan Kelas
-                </a>
                 <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalTambahKelas">
                     <i class="icon-base bx bx-plus me-1"></i> Tambah Data Kelas
                 </button>

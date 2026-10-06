@@ -59,10 +59,22 @@
             </a>
         </li>
 
-        <li class="menu-item {{ request()->routeIs('admin.classes.*') ? 'active' : '' }}">
+        <li class="menu-item {{ request()->routeIs('admin.classes.*') && !request()->routeIs('admin.classes.promotion.*') ? 'active' : '' }}">
             <a href="{{ route('admin.classes.index') }}" class="menu-link">
                 <i class="menu-icon tf-icons bx bx-door-open"></i>
                 <div>Data Kelas</div>
+            </a>
+        </li>
+
+        <!-- AKADEMIK -->
+        <li class="menu-header small text-uppercase">
+            <span class="menu-header-text">Akademik</span>
+        </li>
+
+        <li class="menu-item {{ request()->routeIs('admin.promotion.*') || request()->routeIs('admin.classes.promotion.*') ? 'active' : '' }}">
+            <a href="{{ route('admin.promotion.index') }}" class="menu-link">
+                <i class="menu-icon tf-icons bx bx-trending-up"></i>
+                <div>Kenaikan Kelas</div>
             </a>
         </li>
 

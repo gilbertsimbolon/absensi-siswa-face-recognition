@@ -139,24 +139,29 @@ test('admin can add and remove student from a class', function () {
     ]);
 });
 
-test('admin can access promotion preview page', function () {
+test('admin can access promotion preview page via dedicated route and see sidebar menu', function () {
     $class = Classes::firstOrCreate(['name' => 'X MIPA 1'], ['grade_level' => 'X']);
     $student = Student::firstOrCreate(
         ['nisn' => '9999990005'],
         ['name' => 'Siswa Test Preview', 'gender' => 'L', 'class_id' => $class->id, 'status' => 'aktif']
     );
 
-    $response = $this->actingAs($this->admin)->get(route('admin.classes.promotion.preview', [
+    // Akses via route baru admin.promotion.index
+    $response = $this->actingAs($this->admin)->get(route('admin.promotion.index', [
         'source_class_id' => 'all',
         'target_academic_year_id' => $this->targetYear->id,
     ]));
 
     $response->assertStatus(200);
     $response->assertViewIs('admin.master-data.classes-promotion');
-    $response->assertViewHas('previewData');
-    $response->assertSee('Kenaikan Kelas Massal');
-    $response->assertSee('Preview Kenaikan Kelas');
+    $response->assertSee('Kenaikan Kelas');
+    $response->assertSee('Semua Kelas');
+    $response->assertSee('Akademik');
     $response->assertSee($student->name);
+
+    // Akses via route alias lama tetap berfungsi
+    $responseAlias = $this->actingAs($this->admin)->get(route('admin.classes.promotion.preview'));
+    $responseAlias->assertStatus(200);
 });
 
 test('mass promotion safely promotes classes, graduates class XII, and archives past history', function () {
