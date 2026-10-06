@@ -31,4 +31,10 @@ class Student extends Model
     {
         return $this->belongsTo(Classes::class);
     }
+
+    // relasi ke data wajah siswa
+    public function faces()
+    {
+        return $this->hasMany(StudentFace::class);
+    }
 }

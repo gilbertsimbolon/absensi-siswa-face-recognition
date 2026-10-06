@@ -6,7 +6,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
 
-            <form method="POST" action="{{ route('admin.student.update', $siswa->id) }}">
+            <form method="POST" action="{{ route('admin.student.update', $siswa->id) }}" enctype="multipart/form-data">
                 @csrf
                 @method('PUT')
                 <div class="modal-body text-start">
@@ -23,7 +23,7 @@
                             <div class="input-group input-group-merge">
                                 <span class="input-group-text"><i class="icon-base bx bx-user"></i></span>
                                 <input type="text" class="form-control" name="name"
-                                    value="{{ $siswa->name }}" required />
+                                    value="{{ old('name', $siswa->name) }}" required />
                             </div>
                         </div>
 
@@ -33,7 +33,7 @@
                             <div class="input-group input-group-merge">
                                 <span class="input-group-text"><i class="icon-base bx bx-id-card"></i></span>
                                 <input type="text" class="form-control" name="nisn"
-                                    value="{{ $siswa->nisn }}" required />
+                                    value="{{ old('nisn', $siswa->nisn) }}" required />
                             </div>
                         </div>
                     </div>
@@ -44,7 +44,7 @@
                             <label class="form-label">Kelas</label>
                             <select class="form-select" name="class_id" required>
                                 @foreach ($classes as $kelas)
-                                    <option value="{{ $kelas->id }}" {{ $siswa->class_id == $kelas->id ? 'selected' : '' }}>
+                                    <option value="{{ $kelas->id }}" {{ old('class_id', $siswa->class_id) == $kelas->id ? 'selected' : '' }}>
                                         {{ $kelas->name }}
                                     </option>
                                 @endforeach
@@ -56,11 +56,11 @@
                             <label class="form-label">Jenis Kelamin</label>
                             <div class="d-flex gap-4 mt-2">
                                 <div class="form-check">
-                                    <input class="form-check-input" type="radio" name="gender" id="edit_gender_l_{{ $siswa->id }}" value="L" {{ $siswa->gender == 'L' ? 'checked' : '' }} required>
+                                    <input class="form-check-input" type="radio" name="gender" id="edit_gender_l_{{ $siswa->id }}" value="L" {{ old('gender', $siswa->gender) == 'L' ? 'checked' : '' }} required>
                                     <label class="form-check-label" for="edit_gender_l_{{ $siswa->id }}">Laki-laki</label>
                                 </div>
                                 <div class="form-check">
-                                    <input class="form-check-input" type="radio" name="gender" id="edit_gender_p_{{ $siswa->id }}" value="P" {{ $siswa->gender == 'P' ? 'checked' : '' }} required>
+                                    <input class="form-check-input" type="radio" name="gender" id="edit_gender_p_{{ $siswa->id }}" value="P" {{ old('gender', $siswa->gender) == 'P' ? 'checked' : '' }} required>
                                     <label class="form-check-label" for="edit_gender_p_{{ $siswa->id }}">Perempuan</label>
                                 </div>
                             </div>
@@ -74,7 +74,7 @@
                             <div class="input-group input-group-merge">
                                 <span class="input-group-text"><i class="icon-base bx bxl-whatsapp"></i></span>
                                 <input type="text" class="form-control" name="phone"
-                                    value="{{ $siswa->phone }}" placeholder="0812 3456 7890" />
+                                    value="{{ old('phone', $siswa->phone) }}" placeholder="0812 3456 7890" />
                             </div>
                         </div>
                     </div>
@@ -92,7 +92,7 @@
                             <div class="input-group input-group-merge">
                                 <span class="input-group-text"><i class="icon-base bx bx-user"></i></span>
                                 <input type="text" class="form-control" name="parent_name"
-                                    value="{{ $siswa->parent_name }}" placeholder="Nama orang tua / wali" />
+                                    value="{{ old('parent_name', $siswa->parent_name) }}" placeholder="Nama orang tua / wali" />
                             </div>
                         </div>
 
@@ -100,10 +100,39 @@
                         <div class="col-md-6 mb-3">
                             <label class="form-label">No. Telp / WhatsApp Orang Tua (Untuk Notifikasi Absensi)</label>
                             <div class="input-group input-group-merge">
-                                <span class="input-group-text"><i class="icon-base bx bxl-whatsapp"></i></span>
+                                <span class="input-group-text"><i class="icon-base bx bx-phone"></i></span>
                                 <input type="text" class="form-control" name="parent_phone"
-                                    value="{{ $siswa->parent_phone }}" placeholder="0812 3456 7890" />
+                                    value="{{ old('parent_phone', $siswa->parent_phone) }}" placeholder="0812 3456 7890" />
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- Garis Pemisah Dataset Foto Wajah (3 Sampel) -->
+                    <div class="d-flex align-items-center mb-3 mt-2">
+                        <span class="text-uppercase small fw-semibold text-muted me-2">Pembaruan Sampel Foto Wajah (Opsional)</span>
+                        <hr class="flex-grow-1 m-0">
+                    </div>
+
+                    <div class="row">
+                        <!-- Foto Tampak Depan -->
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label fw-semibold">1. Tampak Depan</label>
+                            <input type="file" class="form-control form-control-sm" name="photo_depan" accept="image/*" />
+                            <small class="text-muted d-block mt-1">Biarkan kosong jika tetap</small>
+                        </div>
+
+                        <!-- Foto Serong Kanan -->
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label fw-semibold">2. Serong Kanan</label>
+                            <input type="file" class="form-control form-control-sm" name="photo_kanan" accept="image/*" />
+                            <small class="text-muted d-block mt-1">Biarkan kosong jika tetap</small>
+                        </div>
+
+                        <!-- Foto Serong Kiri -->
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label fw-semibold">3. Serong Kiri</label>
+                            <input type="file" class="form-control form-control-sm" name="photo_kiri" accept="image/*" />
+                            <small class="text-muted d-block mt-1">Biarkan kosong jika tetap</small>
                         </div>
                     </div>
                 </div>

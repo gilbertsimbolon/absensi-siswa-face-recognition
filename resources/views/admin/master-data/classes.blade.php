@@ -83,11 +83,11 @@
                 <table class="table table-striped">
                     <thead>
                         <tr>
-                            <th class="text-center" style="width: 60px;">No.</th>
-                            <th>Tingkat</th>
-                            <th>Nama Kelas</th>
-                            <th>Wali Kelas</th>
-                            <th class="text-center" style="width: 120px;">Aksi</th>
+                            <th class="text-center" style="width: 5%;">No.</th>
+                            <th style="width: 12%;">Tingkat</th>
+                            <th style="width: 35%;">Nama Kelas</th>
+                            <th style="width: 35%;">Wali Kelas</th>
+                            <th class="text-center" style="width: 13%;">Aksi</th>
                         </tr>
                     </thead>
                     <tbody class="table-border-bottom-0">
@@ -102,7 +102,7 @@
                                     @if ($class->teacher)
                                         {{ $class->teacher->user->name }}
                                     @else
-                                        <span class="text-muted font-italic">- Belum Diatur -</span>
+                                        <span class="text-muted">-</span>
                                     @endif
                                 </td>
                                 <td class="text-center">

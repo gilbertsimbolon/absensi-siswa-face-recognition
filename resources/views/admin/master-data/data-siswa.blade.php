@@ -38,6 +38,7 @@
                     <thead>
                         <tr>
                             <th class="text-center" style="width: 50px;">No.</th>
+                            <th class="text-center" style="width: 80px;">Foto Siswa</th>
                             <th>Nama Siswa</th>
                             <th>NISN</th>
                             <th>Kelas</th>
@@ -45,13 +46,26 @@
                             <th>WhatsApp Siswa</th>
                             <th>Orang Tua / Wali</th>
                             <th>WhatsApp Orang Tua</th>
-                            <th class="text-center" style="width: 120px;">Aksi</th>
+                            <th class="text-center" style="width: 140px;">Aksi</th>
                         </tr>
                     </thead>
                     <tbody class="table-border-bottom-0">
                         @forelse ($students as $siswa)
                             <tr>
                                 <td class="text-center">{{ $loop->iteration }}</td>
+                                <td class="text-center">
+                                    @php
+                                        $primaryFace = $siswa->faces->first();
+                                    @endphp
+                                    @if ($primaryFace)
+                                        <a href="javascript:void(0);" data-bs-toggle="modal" data-bs-target="#modalDetailFotoSiswa{{ $siswa->id }}" title="Lihat sampel foto">
+                                            <img src="{{ asset('storage/' . $primaryFace->file_path) }}" alt="{{ $siswa->name }}"
+                                                class="rounded-circle border" style="width: 40px; height: 40px; object-fit: cover;">
+                                        </a>
+                                    @else
+                                        <span class="badge bg-label-warning p-1" style="font-size: 10px;">Belum Ada</span>
+                                    @endif
+                                </td>
                                 <td><strong>{{ $siswa->name }}</strong></td>
                                 <td><span class="badge bg-label-dark">{{ $siswa->nisn }}</span></td>
                                 <td>
@@ -82,19 +96,31 @@
                                     @endif
                                 </td>
                                 <td class="text-center">
-                                    <div class="d-flex justify-content-center gap-2">
+                                    <div class="d-flex justify-content-center gap-1">
+                                        <!-- Tombol Detail Foto Modal -->
+                                        <button type="button" class="btn btn-sm btn-outline-info"
+                                            data-bs-toggle="modal" data-bs-target="#modalDetailFotoSiswa{{ $siswa->id }}"
+                                            title="Lihat Sampel Foto Wajah">
+                                            <i class="icon-base bx bx-image"></i>
+                                        </button>
+
                                         <!-- Tombol Edit Modal -->
                                         <button type="button" class="btn btn-sm btn-outline-primary"
-                                            data-bs-toggle="modal" data-bs-target="#modalUbahSiswa{{ $siswa->id }}">
+                                            data-bs-toggle="modal" data-bs-target="#modalUbahSiswa{{ $siswa->id }}"
+                                            title="Edit Data Siswa">
                                             <i class="icon-base bx bx-edit-alt"></i>
                                         </button>
 
                                         <!-- Tombol Hapus Modal -->
                                         <button type="button" class="btn btn-sm btn-outline-danger"
-                                            data-bs-toggle="modal" data-bs-target="#modalHapusSiswa{{ $siswa->id }}">
+                                            data-bs-toggle="modal" data-bs-target="#modalHapusSiswa{{ $siswa->id }}"
+                                            title="Hapus Data Siswa">
                                             <i class="icon-base bx bx-trash"></i>
                                         </button>
                                     </div>
+
+                                    <!-- Include Modal Detail Foto Siswa -->
+                                    @include('admin.master-data.siswa.modal-detail-foto', ['siswa' => $siswa])
 
                                     <!-- Include Modal Edit Siswa -->
                                     @include('admin.master-data.siswa.modal-ubah', ['siswa' => $siswa, 'classes' => $classes])

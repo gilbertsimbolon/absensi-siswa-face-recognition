@@ -6,7 +6,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
 
-            <form method="POST" action="{{ route('admin.student.store') }}">
+            <form method="POST" action="{{ route('admin.student.store') }}" enctype="multipart/form-data">
                 @csrf
                 <div class="modal-body">
                     <!-- Garis Pemisah Data Siswa -->
@@ -100,10 +100,45 @@
                         <div class="col-md-6 mb-3">
                             <label class="form-label" for="tambah_no_ortu">No. Telp / WhatsApp Orang Tua (Untuk Notifikasi Absensi)</label>
                             <div class="input-group input-group-merge">
-                                <span class="input-group-text"><i class="icon-base bx bxl-whatsapp"></i></span>
+                                <span class="input-group-text"><i class="icon-base bx bx-phone"></i></span>
                                 <input type="text" class="form-control" id="tambah_no_ortu" name="parent_phone"
                                     placeholder="0812 3456 7890" value="{{ old('parent_phone') }}" />
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- Garis Pemisah Dataset Foto Wajah (3 Sampel) -->
+                    <div class="d-flex align-items-center mb-3 mt-2">
+                        <span class="text-uppercase small fw-semibold text-muted me-2">Sampel Foto Wajah (Dataset DeepFace - Min. 3 Foto)</span>
+                        <hr class="flex-grow-1 m-0">
+                    </div>
+
+                    <div class="row">
+                        <!-- Foto Tampak Depan -->
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label fw-semibold" for="photo_depan">
+                                1. Tampak Depan <span class="text-danger">*</span>
+                            </label>
+                            <input type="file" class="form-control form-control-sm" id="photo_depan" name="photo_depan" accept="image/*" required />
+                            <small class="text-muted d-block mt-1">Wajah lurus ke kamera</small>
+                        </div>
+
+                        <!-- Foto Serong Kanan -->
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label fw-semibold" for="photo_kanan">
+                                2. Serong Kanan <span class="text-danger">*</span>
+                            </label>
+                            <input type="file" class="form-control form-control-sm" id="photo_kanan" name="photo_kanan" accept="image/*" required />
+                            <small class="text-muted d-block mt-1">Wajah miring sedikit kanan</small>
+                        </div>
+
+                        <!-- Foto Serong Kiri -->
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label fw-semibold" for="photo_kiri">
+                                3. Serong Kiri <span class="text-danger">*</span>
+                            </label>
+                            <input type="file" class="form-control form-control-sm" id="photo_kiri" name="photo_kiri" accept="image/*" required />
+                            <small class="text-muted d-block mt-1">Wajah miring sedikit kiri</small>
                         </div>
                     </div>
                 </div>
@@ -116,3 +151,4 @@
         </div>
     </div>
 </div>
+
