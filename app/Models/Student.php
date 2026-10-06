@@ -29,7 +29,7 @@ class Student extends Model
     // relasi ke kelas
     public function classes()
     {
-        return $this->belongsTo(Classes::class);
+        return $this->belongsTo(Classes::class, 'class_id');
     }
 
     // relasi ke data wajah siswa
