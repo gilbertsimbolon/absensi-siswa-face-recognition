@@ -12,11 +12,25 @@ use Illuminate\Support\Facades\Validator;
 class TeacherController extends Controller
 {
     /**
-     * Tampilkan data guru.
+     * Tampilkan data guru beserta fitur pencarian dan pagination.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $teachers = Teacher::with(['user', 'classes'])->latest()->get();
+        $query = Teacher::with(['user', 'classes'])->latest();
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('nip', 'like', "%{$search}%")
+                    ->orWhere('phone', 'like', "%{$search}%")
+                    ->orWhereHas('user', function ($uq) use ($search) {
+                        $uq->where('name', 'like', "%{$search}%")
+                            ->orWhere('email', 'like', "%{$search}%");
+                    });
+            });
+        }
+
+        $teachers = $query->paginate(10)->withQueryString();
 
         return view('admin.master-data.data-guru', compact('teachers'));
     }
