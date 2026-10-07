@@ -7,6 +7,7 @@ use App\Models\Classes;
 use App\Models\Student;
 use App\Models\StudentFace;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
@@ -18,7 +19,28 @@ class StudentController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Student::with(['classes', 'faces'])->latest();
+        $user = Auth::user();
+        $isTeacher = $user && $user->hasRole('teacher') && ! $user->hasRole('admin');
+        $teacherRecord = $isTeacher ? $user->teacher : null;
+        $myClass = $teacherRecord ? Classes::where('teacher_id', $teacherRecord->id)->first() : null;
+
+        $query = Student::with(['classes', 'faces']);
+
+        if ($isTeacher) {
+            if ($myClass) {
+                $query->where('class_id', $myClass->id);
+                $classes = Classes::where('id', $myClass->id)->get();
+            } else {
+                $query->whereRaw('1 = 0');
+                $classes = collect();
+            }
+        } else {
+            // Filter berdasarkan kelas
+            if ($request->filled('class_id')) {
+                $query->where('class_id', $request->class_id);
+            }
+            $classes = Classes::orderBy('grade_level')->orderBy('name')->get();
+        }
 
         // Filter pencarian nama atau NISN
         if ($request->filled('search')) {
@@ -29,15 +51,18 @@ class StudentController extends Controller
             });
         }
 
-        // Filter berdasarkan kelas
-        if ($request->filled('class_id')) {
-            $query->where('class_id', $request->class_id);
-        }
+        $sort = $request->query('sort', 'name_asc');
+        match ($sort) {
+            'name_desc' => $query->orderByDesc('name'),
+            'nisn_asc' => $query->orderBy('nisn'),
+            'nisn_desc' => $query->orderByDesc('nisn'),
+            'latest' => $query->latest(),
+            default => $query->orderBy('name'),
+        };
 
         $students = $query->paginate(10)->withQueryString();
-        $classes = Classes::orderBy('grade_level')->orderBy('name')->get();
 
-        return view('admin.master-data.data-siswa', compact('students', 'classes'));
+        return view('admin.master-data.data-siswa', compact('students', 'classes', 'isTeacher', 'myClass'));
     }
 
     /**
@@ -45,6 +70,16 @@ class StudentController extends Controller
      */
     public function store(Request $request)
     {
+        $user = Auth::user();
+        if ($user && $user->hasRole('teacher') && ! $user->hasRole('admin')) {
+            $teacher = $user->teacher;
+            $myClass = $teacher ? Classes::where('teacher_id', $teacher->id)->first() : null;
+            if (! $myClass) {
+                abort(403, 'Anda belum ditugaskan sebagai wali kelas.');
+            }
+            $request->merge(['class_id' => $myClass->id]);
+        }
+
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
             'nisn' => 'required|string|max:30|unique:students,nisn',
@@ -79,7 +114,7 @@ class StudentController extends Controller
         // Simpan 3 sampel foto wajah
         $this->saveStudentPhotos($request, $student);
 
-        return redirect()->route('admin.student.index')->with('success', 'Data siswa dan 3 sampel foto wajah berhasil disimpan.');
+        return redirect()->route('admin.student.index')->with('success', 'Berhasil');
     }
 
     /**
@@ -87,6 +122,16 @@ class StudentController extends Controller
      */
     public function update(Request $request, Student $student)
     {
+        $user = Auth::user();
+        if ($user && $user->hasRole('teacher') && ! $user->hasRole('admin')) {
+            $teacher = $user->teacher;
+            $myClass = $teacher ? Classes::where('teacher_id', $teacher->id)->first() : null;
+            if (! $myClass || $student->class_id !== $myClass->id) {
+                abort(403, 'Anda hanya dapat mengubah data siswa di kelas Anda sendiri.');
+            }
+            $request->merge(['class_id' => $myClass->id]);
+        }
+
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
             'nisn' => 'required|string|max:30|unique:students,nisn,'.$student->id,
@@ -117,7 +162,7 @@ class StudentController extends Controller
         // Update foto jika diunggah baru
         $this->saveStudentPhotos($request, $student, true);
 
-        return redirect()->route('admin.student.index')->with('success', 'Data siswa berhasil diperbarui.');
+        return redirect()->route('admin.student.index')->with('success', 'Berhasil');
     }
 
     /**
@@ -125,6 +170,14 @@ class StudentController extends Controller
      */
     public function destroy(Student $student)
     {
+        $user = Auth::user();
+        if ($user && $user->hasRole('teacher') && ! $user->hasRole('admin')) {
+            $teacher = $user->teacher;
+            $myClass = $teacher ? Classes::where('teacher_id', $teacher->id)->first() : null;
+            if (! $myClass || $student->class_id !== $myClass->id) {
+                abort(403, 'Anda hanya dapat menghapus data siswa di kelas Anda sendiri.');
+            }
+        }
         // 1. Hapus setiap berkas foto fisik di storage jika ada
         foreach ($student->faces as $face) {
             if ($face->file_path && Storage::disk('public')->exists($face->file_path)) {
@@ -150,7 +203,7 @@ class StudentController extends Controller
         // 5. Hapus record siswa
         $student->delete();
 
-        return redirect()->route('admin.student.index')->with('success', 'Data siswa dan seluruh dataset foto berhasil dihapus.');
+        return redirect()->route('admin.student.index')->with('success', 'Berhasil');
     }
 
     /**

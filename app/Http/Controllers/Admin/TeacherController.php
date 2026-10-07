@@ -19,7 +19,7 @@ class TeacherController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Teacher::with(['user', 'classes', 'faces'])->latest();
+        $query = Teacher::with(['user', 'classes', 'faces']);
 
         if ($request->filled('search')) {
             $search = $request->search;
@@ -31,6 +31,19 @@ class TeacherController extends Controller
                             ->orWhere('email', 'like', "%{$search}%");
                     });
             });
+        }
+
+        $sort = $request->query('sort', 'name_asc');
+        if ($sort === 'name_asc') {
+            $query->join('users', 'teachers.user_id', '=', 'users.id')->orderBy('users.name')->select('teachers.*');
+        } elseif ($sort === 'name_desc') {
+            $query->join('users', 'teachers.user_id', '=', 'users.id')->orderByDesc('users.name')->select('teachers.*');
+        } elseif ($sort === 'nip_asc') {
+            $query->orderBy('nip');
+        } elseif ($sort === 'nip_desc') {
+            $query->orderByDesc('nip');
+        } else {
+            $query->latest('teachers.created_at');
         }
 
         $teachers = $query->paginate(10)->withQueryString();
@@ -77,7 +90,7 @@ class TeacherController extends Controller
         // Simpan foto wajah jika diunggah
         $this->saveTeacherPhotos($request, $teacher);
 
-        return redirect()->route('admin.teacher.index')->with('success', 'Data guru dan sampel foto wajah berhasil ditambahkan.');
+        return redirect()->route('admin.teacher.index')->with('success', 'Berhasil');
     }
 
     /**
@@ -121,7 +134,7 @@ class TeacherController extends Controller
         // Update foto wajah jika diunggah baru
         $this->saveTeacherPhotos($request, $teacher, true);
 
-        return redirect()->route('admin.teacher.index')->with('success', 'Data guru berhasil diperbarui.');
+        return redirect()->route('admin.teacher.index')->with('success', 'Berhasil');
     }
 
     /**
@@ -160,7 +173,7 @@ class TeacherController extends Controller
             }
         });
 
-        return redirect()->route('admin.teacher.index')->with('success', 'Data guru dan seluruh dataset foto berhasil dihapus.');
+        return redirect()->route('admin.teacher.index')->with('success', 'Berhasil');
     }
 
     /**

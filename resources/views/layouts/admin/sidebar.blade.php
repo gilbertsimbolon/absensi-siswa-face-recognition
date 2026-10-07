@@ -52,12 +52,14 @@
             </a>
         </li>
 
-        <li class="menu-item {{ request()->routeIs('admin.teacher.*') ? 'active' : '' }}">
-            <a href="{{ route('admin.teacher.index') }}" class="menu-link">
-                <i class="menu-icon tf-icons bx bx-id-card"></i>
-                <div>Data Guru</div>
-            </a>
-        </li>
+        @if (auth()->user()?->hasRole('admin'))
+            <li class="menu-item {{ request()->routeIs('admin.teacher.*') ? 'active' : '' }}">
+                <a href="{{ route('admin.teacher.index') }}" class="menu-link">
+                    <i class="menu-icon tf-icons bx bx-id-card"></i>
+                    <div>Data Guru</div>
+                </a>
+            </li>
+        @endif
 
         <li class="menu-item {{ request()->routeIs('admin.classes.*') && !request()->routeIs('admin.classes.promotion.*') ? 'active' : '' }}">
             <a href="{{ route('admin.classes.index') }}" class="menu-link">

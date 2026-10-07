@@ -7,18 +7,24 @@
         <!-- Notifikasi -->
         @if (session('success'))
             <div class="alert alert-success alert-dismissible fade show flex-shrink-0" role="alert">
+                <i class="icon-base bx bx-check-circle me-1"></i>
                 {{ session('success') }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        @endif
+
+        @if (session('error'))
+            <div class="alert alert-danger alert-dismissible fade show flex-shrink-0" role="alert">
+                <i class="icon-base bx bx-error-circle me-1"></i>
+                {{ session('error') }}
                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
             </div>
         @endif
 
         @if ($errors->any())
             <div class="alert alert-danger alert-dismissible fade show flex-shrink-0" role="alert">
-                <ul class="mb-0">
-                    @foreach ($errors->all() as $error)
-                        <li>{{ $error }}</li>
-                    @endforeach
-                </ul>
+                <i class="icon-base bx bx-error-circle me-1"></i>
+                Gagal
                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
             </div>
         @endif
@@ -149,6 +155,14 @@
 
                 <!-- Filter & Pencarian -->
                 <form method="GET" action="{{ route('admin.teacher.index') }}" class="d-flex align-items-center gap-2 m-0 flex-nowrap">
+                    <!-- Urutkan -->
+                    <select name="sort" class="form-select form-select-sm" style="width: 140px;" onchange="this.form.submit()">
+                        <option value="name_asc" {{ request('sort', 'name_asc') == 'name_asc' ? 'selected' : '' }}>Nama (A - Z)</option>
+                        <option value="name_desc" {{ request('sort') == 'name_desc' ? 'selected' : '' }}>Nama (Z - A)</option>
+                        <option value="nip_asc" {{ request('sort') == 'nip_asc' ? 'selected' : '' }}>NIP (Terkecil)</option>
+                        <option value="nip_desc" {{ request('sort') == 'nip_desc' ? 'selected' : '' }}>NIP (Terbesar)</option>
+                    </select>
+
                     <div class="input-group input-group-sm" style="width: 240px;">
                         <input type="text" name="search" class="form-control" placeholder="Cari nama, NIP, atau email..."
                             value="{{ request('search') }}">
@@ -157,7 +171,7 @@
                         </button>
                     </div>
 
-                    @if (request()->filled('search'))
+                    @if (request()->hasAny(['search', 'sort']) && (request('search') || request('sort') !== 'name_asc'))
                         <a href="{{ route('admin.teacher.index') }}" class="btn btn-sm btn-secondary" title="Reset Filter">
                             <i class="icon-base bx bx-reset"></i>
                         </a>
@@ -215,21 +229,21 @@
                                         <button type="button" class="btn btn-sm btn-icon p-0 text-success"
                                             data-bs-toggle="modal" data-bs-target="#modalDetailFotoGuru{{ $teacher->id }}"
                                             title="Detail Foto">
-                                            <i class="icon-base bx bx-image fs-5"></i>
+                                            <i class="icon-base bx bx-image fs-6"></i>
                                         </button>
 
                                         <!-- Tombol Edit Modal (Kuning) -->
                                         <button type="button" class="btn btn-sm btn-icon p-0 text-warning"
                                             data-bs-toggle="modal" data-bs-target="#modalEditGuru{{ $teacher->id }}"
                                             title="Edit Data Guru">
-                                            <i class="icon-base bx bx-edit-alt fs-5"></i>
+                                            <i class="icon-base bx bx-edit-alt fs-6"></i>
                                         </button>
 
                                         <!-- Tombol Hapus Modal (Merah) -->
                                         <button type="button" class="btn btn-sm btn-icon p-0 text-danger"
                                             data-bs-toggle="modal" data-bs-target="#modalHapusGuru{{ $teacher->id }}"
                                             title="Hapus Guru">
-                                            <i class="icon-base bx bx-trash fs-5"></i>
+                                            <i class="icon-base bx bx-trash fs-6"></i>
                                         </button>
                                     </div>
 

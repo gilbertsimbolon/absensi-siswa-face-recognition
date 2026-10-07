@@ -155,7 +155,7 @@ test('admin can access promotion preview page via dedicated route and see sideba
     $response->assertStatus(200);
     $response->assertViewIs('admin.master-data.classes-promotion');
     $response->assertSee('Kenaikan Kelas');
-    $response->assertSee('Semua Kelas');
+    $response->assertSee($class->name);
     $response->assertSee('Akademik');
     $response->assertSee($student->name);
 
@@ -282,4 +282,73 @@ test('mass promotion safely promotes classes, graduates class XII, and archives 
     // 4. Verifikasi tahun ajaran target telah aktif
     $this->targetYear->refresh();
     expect($this->targetYear->is_active)->toBeTrue();
+});
+
+test('teacher can only access and view their own class and cannot access other classes', function () {
+    Role::firstOrCreate(['name' => 'teacher', 'guard_name' => 'web']);
+
+    $teacherUser = User::firstOrCreate(
+        ['email' => 'wali_guru@test.com'],
+        ['name' => 'Wali Kelas 1', 'password' => bcrypt('password')]
+    );
+    if (! $teacherUser->hasRole('teacher')) {
+        $teacherUser->assignRole('teacher');
+    }
+
+    $teacher = Teacher::firstOrCreate(
+        ['user_id' => $teacherUser->id],
+        ['nip' => '199001012020011001', 'phone' => '081299990001']
+    );
+
+    $myClass = Classes::firstOrCreate(['name' => 'X MIPA 1'], ['grade_level' => 'X', 'teacher_id' => $teacher->id]);
+    $myClass->update(['teacher_id' => $teacher->id]);
+
+    $otherClass = Classes::firstOrCreate(['name' => 'X MIPA 2'], ['grade_level' => 'X']);
+
+    $myStudent = Student::firstOrCreate(
+        ['nisn' => '9999990088'],
+        ['name' => 'Siswa Kelas Saya', 'gender' => 'L', 'class_id' => $myClass->id, 'status' => 'aktif']
+    );
+
+    $otherStudent = Student::firstOrCreate(
+        ['nisn' => '9999990089'],
+        ['name' => 'Siswa Kelas Lain', 'gender' => 'P', 'class_id' => $otherClass->id, 'status' => 'aktif']
+    );
+
+    // 1. Data Kelas: Guru hanya melihat kelasnya sendiri
+    $responseClasses = $this->actingAs($teacherUser)->get(route('admin.classes.index', ['class_id' => $otherClass->id]));
+    $responseClasses->assertStatus(200);
+    $responseClasses->assertSee($myClass->name);
+    $responseClasses->assertDontSee($otherClass->name);
+    $responseClasses->assertSee($myStudent->name);
+    $responseClasses->assertDontSee($otherStudent->name);
+
+    // 2. Kenaikan Kelas: Guru hanya melihat kelasnya sendiri
+    $responsePromotion = $this->actingAs($teacherUser)->get(route('admin.promotion.index', ['source_class_id' => $otherClass->id]));
+    $responsePromotion->assertStatus(200);
+    $responsePromotion->assertSee($myClass->name);
+    $responsePromotion->assertDontSee($otherClass->name);
+    $responsePromotion->assertSee($myStudent->name);
+    $responsePromotion->assertDontSee($otherStudent->name);
+
+    // 3. Kenaikan Kelas: Guru dilarang memproses kenaikan kelas milik orang lain
+    $responseProcess = $this->actingAs($teacherUser)->post(route('admin.promotion.process'), [
+        'source_class_id' => $otherClass->id,
+        'target_academic_year_id' => $this->targetYear->id,
+        'promotions' => [
+            0 => [
+                'selected' => '1',
+                'student_id' => $otherStudent->id,
+                'action' => 'naik',
+                'target_class_id' => $otherClass->id,
+            ],
+        ],
+    ]);
+    $responseProcess->assertStatus(403);
+
+    // 4. Data Siswa: Guru hanya melihat siswa di kelasnya sendiri
+    $responseStudents = $this->actingAs($teacherUser)->get(route('admin.student.index'));
+    $responseStudents->assertStatus(200);
+    $responseStudents->assertSee($myStudent->name);
+    $responseStudents->assertDontSee($otherStudent->name);
 });

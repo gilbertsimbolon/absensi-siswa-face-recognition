@@ -9,6 +9,7 @@ use App\Models\Student;
 use App\Models\StudentClassHistory;
 use App\Models\Teacher;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
@@ -33,30 +34,48 @@ class ClassesController extends Controller
         $academicYears = AcademicYear::orderByDesc('name')->orderBy('semester')->get();
         $teachers = Teacher::with('user')->get();
 
+        $user = Auth::user();
+        $isTeacher = $user && $user->hasRole('teacher') && ! $user->hasRole('admin');
+        $teacherRecord = $isTeacher ? $user->teacher : null;
+        $myClass = $teacherRecord ? Classes::where('teacher_id', $teacherRecord->id)->first() : null;
+
         // Urutkan kelas berdasarkan jenjang tingkat X, XI, XII dan nama kelas
-        $classes = Classes::with(['teacher.user'])
+        $classesQuery = Classes::with(['teacher.user'])
             ->withCount(['students' => function ($q) {
                 $q->where('status', 'aktif');
-            }])
-            ->orderByRaw("CASE
+            }]);
+
+        if ($isTeacher) {
+            if ($myClass) {
+                $classesQuery->where('id', $myClass->id);
+            } else {
+                $classesQuery->whereRaw('1 = 0');
+            }
+        } else {
+            $classesQuery->orderByRaw("CASE
                 WHEN grade_level = 'X' THEN 1
                 WHEN grade_level = 'XI' THEN 2
                 WHEN grade_level = 'XII' THEN 3
                 ELSE 4 END")
-            ->orderBy('name')
-            ->get();
+                ->orderBy('name');
+        }
+
+        $classes = $classesQuery->get();
 
         // Tentukan kelas yang sedang aktif/dipilih
         $selectedClassId = $request->query('class_id');
         $selectedClass = null;
 
-        if ($selectedClassId) {
-            $selectedClass = $classes->firstWhere('id', $selectedClassId);
-        }
-
-        // Jika tidak ada parameter atau tidak ditemukan, pilih kelas pertama
-        if (! $selectedClass && $classes->isNotEmpty()) {
+        if ($isTeacher) {
             $selectedClass = $classes->first();
+        } else {
+            if ($selectedClassId) {
+                $selectedClass = $classes->firstWhere('id', $selectedClassId);
+            }
+
+            if (! $selectedClass && $classes->isNotEmpty()) {
+                $selectedClass = $classes->first();
+            }
         }
 
         $students = collect();
@@ -77,13 +96,17 @@ class ClassesController extends Controller
             $students = $queryStudents->orderBy('name')->get();
 
             // Daftar siswa aktif yang belum masuk ke kelas ini (untuk modal tambah siswa)
-            $availableStudents = Student::where(function ($q) use ($selectedClass) {
-                $q->whereNull('class_id')
-                    ->orWhere('class_id', '!=', $selectedClass->id);
-            })
-                ->where('status', 'aktif')
-                ->orderBy('name')
-                ->get();
+            $availableStudentsQuery = Student::where('status', 'aktif');
+            if ($isTeacher) {
+                // Guru hanya bisa menambahkan siswa yang belum memiliki kelas
+                $availableStudentsQuery->whereNull('class_id');
+            } else {
+                $availableStudentsQuery->where(function ($q) use ($selectedClass) {
+                    $q->whereNull('class_id')
+                        ->orWhere('class_id', '!=', $selectedClass->id);
+                });
+            }
+            $availableStudents = $availableStudentsQuery->orderBy('name')->get();
         }
 
         return view('admin.master-data.classes', compact(
@@ -138,7 +161,7 @@ class ClassesController extends Controller
         ]);
 
         return redirect()->route('admin.classes.index', ['class_id' => $class->id])
-            ->with('success', "Kelas {$class->name} berhasil ditambahkan.");
+            ->with('success', 'Berhasil');
     }
 
     /**
@@ -184,7 +207,7 @@ class ClassesController extends Controller
         ]);
 
         return redirect()->route('admin.classes.index', ['class_id' => $class->id])
-            ->with('success', "Data kelas {$class->name} berhasil diperbarui.");
+            ->with('success', 'Berhasil');
     }
 
     /**
@@ -204,10 +227,8 @@ class ClassesController extends Controller
             'teacher_id' => $request->teacher_id ?: null,
         ]);
 
-        $teacherName = $class->teacher ? $class->teacher->user->name : 'Tanpa Wali Kelas';
-
         return redirect()->route('admin.classes.index', ['class_id' => $class->id])
-            ->with('success', "Wali kelas {$class->name} berhasil diubah menjadi {$teacherName}.");
+            ->with('success', 'Berhasil');
     }
 
     /**
@@ -215,6 +236,14 @@ class ClassesController extends Controller
      */
     public function addStudents(Request $request, Classes $class)
     {
+        $user = Auth::user();
+        if ($user && $user->hasRole('teacher') && ! $user->hasRole('admin')) {
+            $teacher = $user->teacher;
+            if (! $teacher || $class->teacher_id !== $teacher->id) {
+                abort(403, 'Anda hanya dapat mengelola siswa di kelas Anda sendiri.');
+            }
+        }
+
         $validator = Validator::make($request->all(), [
             'student_ids' => 'required|array',
             'student_ids.*' => 'exists:students,id',
@@ -256,7 +285,7 @@ class ClassesController extends Controller
         $count = count($request->student_ids);
 
         return redirect()->route('admin.classes.index', ['class_id' => $class->id])
-            ->with('success', "Berhasil menambahkan {$count} siswa ke kelas {$class->name}.");
+            ->with('success', 'Berhasil');
     }
 
     /**
@@ -264,12 +293,20 @@ class ClassesController extends Controller
      */
     public function removeStudent(Classes $class, Student $student)
     {
+        $user = Auth::user();
+        if ($user && $user->hasRole('teacher') && ! $user->hasRole('admin')) {
+            $teacher = $user->teacher;
+            if (! $teacher || $class->teacher_id !== $teacher->id || $student->class_id !== $class->id) {
+                abort(403, 'Anda hanya dapat mengeluarkan siswa dari kelas Anda sendiri.');
+            }
+        }
+
         $student->update([
             'class_id' => null,
         ]);
 
         return redirect()->route('admin.classes.index', ['class_id' => $class->id])
-            ->with('success', "Siswa {$student->name} berhasil dikeluarkan dari kelas {$class->name}.");
+            ->with('success', 'Berhasil');
     }
 
     /**
@@ -285,7 +322,7 @@ class ClassesController extends Controller
         $class->delete();
 
         return redirect()->route('admin.classes.index')
-            ->with('success', "Data kelas {$className} berhasil dihapus.");
+            ->with('success', 'Berhasil');
     }
 
     /**
@@ -315,7 +352,7 @@ class ClassesController extends Controller
             'is_active' => $isActive,
         ]);
 
-        return back()->with('success', "Tahun ajaran {$academicYear->name} ({$academicYear->semester}) berhasil ditambahkan.");
+        return back()->with('success', 'Berhasil');
     }
 
     /**
@@ -326,30 +363,47 @@ class ClassesController extends Controller
         AcademicYear::where('id', '!=', $academicYear->id)->update(['is_active' => false]);
         $academicYear->update(['is_active' => true]);
 
-        return back()->with('success', "Tahun ajaran aktif berhasil diubah menjadi {$academicYear->name} ({$academicYear->semester}).");
+        return back()->with('success', 'Berhasil');
     }
 
     /**
-     * Halaman / Tampilan Preview Kenaikan Kelas Massal.
+     * Halaman / Tampilan Preview Kenaikan Kelas per Kelas.
      */
     public function promotionPreview(Request $request)
     {
+        $user = Auth::user();
+        $isTeacher = $user && $user->hasRole('teacher') && ! $user->hasRole('admin');
+        $teacherRecord = $isTeacher ? $user->teacher : null;
+        $myClass = $teacherRecord ? Classes::where('teacher_id', $teacherRecord->id)->first() : null;
+
         $activeYear = AcademicYear::getActive();
         $academicYears = AcademicYear::orderByDesc('name')->orderBy('semester')->get();
 
-        $classes = Classes::with('teacher.user')
-            ->orderByRaw("CASE
-                WHEN grade_level = 'X' THEN 1
-                WHEN grade_level = 'XI' THEN 2
-                WHEN grade_level = 'XII' THEN 3
-                ELSE 4 END")
-            ->orderBy('name')
-            ->get();
+        if ($isTeacher) {
+            // Guru wali kelas hanya dapat melihat kelasnya sendiri
+            $classes = $myClass ? Classes::with('teacher.user')->where('id', $myClass->id)->get() : collect();
+            $sourceClassId = $myClass?->id;
+        } else {
+            // Admin melihat seluruh kelas
+            $classes = Classes::with('teacher.user')
+                ->orderByRaw("CASE
+                    WHEN grade_level = 'X' THEN 1
+                    WHEN grade_level = 'XI' THEN 2
+                    WHEN grade_level = 'XII' THEN 3
+                    ELSE 4 END")
+                ->orderBy('name')
+                ->get();
 
-        $sourceClassId = $request->query('source_class_id');
+            $sourceClassId = $request->query('source_class_id');
+            // Jika tidak ada atau bukan ID kelas yang valid, selalu default ke kelas pertama (per kelas)
+            if (! $sourceClassId || $sourceClassId === 'all' || ! $classes->contains('id', $sourceClassId)) {
+                $sourceClassId = $classes->first()?->id;
+            }
+        }
+
+        $selectedSourceClass = $classes->firstWhere('id', $sourceClassId);
+
         $targetAcademicYearId = $request->query('target_academic_year_id');
-
-        // Target academic year default adalah tahun berikutnya jika ada
         $targetAcademicYear = null;
         if ($targetAcademicYearId) {
             $targetAcademicYear = AcademicYear::find($targetAcademicYearId);
@@ -357,22 +411,22 @@ class ClassesController extends Controller
             $targetAcademicYear = AcademicYear::where('id', '!=', $activeYear?->id)->orderBy('id')->first();
         }
 
-        // Ambil siswa berdasarkan kelas asal yang dipilih
-        $studentsQuery = Student::with(['classes'])
-            ->whereNotNull('class_id')
-            ->where('status', 'aktif');
-
-        if ($sourceClassId && $sourceClassId !== 'all') {
-            $studentsQuery->where('class_id', $sourceClassId);
+        // Ambil siswa HANYA untuk kelas yang dipilih (PER KELAS)
+        $students = collect();
+        if ($selectedSourceClass) {
+            $students = Student::with(['classes'])
+                ->where('class_id', $selectedSourceClass->id)
+                ->where('status', 'aktif')
+                ->orderBy('name')
+                ->get();
         }
 
-        $students = $studentsQuery->orderBy('class_id')->orderBy('name')->get();
-
-        // Pisahkan daftar kelas berdasarkan jenjang untuk kemudahan rekomendasi & select option
+        // Pisahkan daftar seluruh kelas berdasarkan jenjang untuk kemudahan rekomendasi & select option
+        $allClasses = Classes::orderBy('name')->get();
         $classesByGrade = [
-            'X' => $classes->where('grade_level', 'X'),
-            'XI' => $classes->where('grade_level', 'XI'),
-            'XII' => $classes->where('grade_level', 'XII'),
+            'X' => $allClasses->where('grade_level', 'X'),
+            'XI' => $allClasses->where('grade_level', 'XI'),
+            'XII' => $allClasses->where('grade_level', 'XII'),
         ];
 
         // Buat data preview dengan rekomendasi aksi otomatis
@@ -384,12 +438,10 @@ class ClassesController extends Controller
             $recommendedTargetClassId = null;
 
             if ($currentGrade === 'XII') {
-                // Sesuai butir 10: Siswa kelas XII tidak boleh dipindahkan ke kelas berikutnya, sediakan status Lulus
                 $defaultAction = 'lulus';
                 $recommendedTargetClassId = null;
             } elseif ($currentGrade === 'XI') {
                 $defaultAction = 'naik';
-                // Rekomendasikan kelas tingkat XII yang namanya bersesuaian jika ada
                 $targetGradeClasses = $classesByGrade['XII'];
                 $match = $targetGradeClasses->first(function ($cls) use ($currentClassName) {
                     $suffix = trim(str_replace('XI', '', $currentClassName));
@@ -399,7 +451,6 @@ class ClassesController extends Controller
                 $recommendedTargetClassId = $match ? $match->id : $targetGradeClasses->first()?->id;
             } elseif ($currentGrade === 'X') {
                 $defaultAction = 'naik';
-                // Rekomendasikan kelas tingkat XI yang namanya bersesuaian jika ada
                 $targetGradeClasses = $classesByGrade['XI'];
                 $match = $targetGradeClasses->first(function ($cls) use ($currentClassName) {
                     $suffix = trim(str_replace('X', '', $currentClassName));
@@ -425,43 +476,74 @@ class ClassesController extends Controller
             'classes',
             'classesByGrade',
             'sourceClassId',
-            'previewData'
+            'selectedSourceClass',
+            'previewData',
+            'isTeacher'
         ));
     }
 
     /**
-     * Proses eksekusi kenaikan kelas massal secara aman dengan histori data lengkap.
+     * Proses eksekusi kenaikan kelas per kelas secara aman dengan histori data lengkap.
      */
     public function promoteProcess(Request $request)
     {
+        $user = Auth::user();
+        $isTeacher = $user && $user->hasRole('teacher') && ! $user->hasRole('admin');
+        $teacherRecord = $isTeacher ? $user->teacher : null;
+        $myClass = $teacherRecord ? Classes::where('teacher_id', $teacherRecord->id)->first() : null;
+
         $validator = Validator::make($request->all(), [
-            'target_academic_year_id' => 'required|exists:academic_years,id',
+            'target_academic_year_id' => 'nullable|exists:academic_years,id',
+            'source_class_id' => 'nullable|exists:classes,id',
             'promotions' => 'required|array',
             'promotions.*.student_id' => 'required|exists:students,id',
             'promotions.*.action' => 'required|in:naik,tinggal,lulus',
             'promotions.*.target_class_id' => 'nullable|exists:classes,id',
         ], [
-            'target_academic_year_id.required' => 'Tahun ajaran tujuan wajib dipilih.',
-            'promotions.required' => 'Tidak ada siswa yang dipilih untuk diproses kenaikan kelas.',
+            'promotions.required' => 'Gagal',
         ]);
 
         if ($validator->fails()) {
             return back()->withErrors($validator)->withInput();
         }
 
-        $targetAcademicYear = AcademicYear::findOrFail($request->target_academic_year_id);
+        // Jika guru, pastikan hanya memproses kelasnya sendiri
+        if ($isTeacher) {
+            if (! $myClass) {
+                abort(403, 'Anda belum ditugaskan sebagai wali kelas.');
+            }
+            if ($request->filled('source_class_id') && $request->source_class_id != $myClass->id) {
+                abort(403, 'Guru hanya dapat memproses kenaikan kelas untuk kelasnya sendiri.');
+            }
+        }
+
+        $sourceClassId = $request->source_class_id ?: ($isTeacher ? $myClass?->id : null);
+        $sourceClass = $sourceClassId ? Classes::find($sourceClassId) : null;
+
         $activeYear = AcademicYear::getActive();
+        $targetAcademicYear = null;
+        if ($request->filled('target_academic_year_id')) {
+            $targetAcademicYear = AcademicYear::find($request->target_academic_year_id);
+        }
+        if (! $targetAcademicYear) {
+            $targetAcademicYear = AcademicYear::where('id', '!=', $activeYear?->id)->first() ?? $activeYear;
+        }
 
         $processedCount = 0;
 
-        DB::transaction(function () use ($request, $targetAcademicYear, $activeYear, &$processedCount) {
+        DB::transaction(function () use ($request, $targetAcademicYear, $activeYear, $sourceClassId, &$processedCount) {
             foreach ($request->promotions as $item) {
                 // Periksa apakah checkbox siswa ini dicentang (jika ada flag selected)
                 if (isset($item['selected']) && ! $item['selected']) {
                     continue;
                 }
 
-                $student = Student::find($item['student_id']);
+                $studentQuery = Student::where('id', $item['student_id']);
+                if ($sourceClassId) {
+                    $studentQuery->where('class_id', $sourceClassId);
+                }
+
+                $student = $studentQuery->first();
                 if (! $student) {
                     continue;
                 }
@@ -548,7 +630,11 @@ class ClassesController extends Controller
             }
         });
 
-        return redirect()->route('admin.classes.index')
-            ->with('success', "Proses kenaikan kelas berhasil diproses untuk {$processedCount} siswa ke Tahun Ajaran {$targetAcademicYear->name} ({$targetAcademicYear->semester}).");
+        $redirectRoute = $sourceClassId
+            ? route('admin.promotion.index', ['source_class_id' => $sourceClassId])
+            : route('admin.classes.index');
+
+        return redirect($redirectRoute)
+            ->with('success', 'Berhasil');
     }
 }

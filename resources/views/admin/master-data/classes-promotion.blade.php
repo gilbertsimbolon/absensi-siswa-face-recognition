@@ -13,23 +13,24 @@
             </div>
         @endif
 
+        @if (session('error'))
+            <div class="alert alert-danger alert-dismissible fade show flex-shrink-0" role="alert">
+                <i class="icon-base bx bx-error-circle me-1"></i>
+                {{ session('error') }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        @endif
+
         @if ($errors->any())
             <div class="alert alert-danger alert-dismissible fade show flex-shrink-0" role="alert">
-                <div class="d-flex align-items-center mb-1">
-                    <i class="icon-base bx bx-error-circle me-1"></i>
-                    <strong>Terjadi kesalahan:</strong>
-                </div>
-                <ul class="mb-0 ps-3">
-                    @foreach ($errors->all() as $error)
-                        <li>{{ $error }}</li>
-                    @endforeach
-                </ul>
+                <i class="icon-base bx bx-error-circle me-1"></i>
+                Gagal
                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
             </div>
         @endif
 
         @php
-            $currentClassTitle = isset($selectedSourceClass) && $selectedSourceClass ? $selectedSourceClass->name : (($sourceClassId && $sourceClassId !== 'all') ? ($classes->firstWhere('id', $sourceClassId)?->name ?? 'Semua Kelas') : 'Semua Kelas');
+            $currentClassTitle = $selectedSourceClass ? $selectedSourceClass->name : '-';
         @endphp
 
         <!-- Header Halaman -->
@@ -39,67 +40,56 @@
                 <span class="text-muted small">Kelas: {{ $currentClassTitle }} (Semester {{ $activeYear ? $activeYear->semester : '-' }})</span>
             </div>
             <div>
-                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalKonfirmasiKenaikan" {{ $previewData->isEmpty() ? 'disabled' : '' }}>
-                    <i class="icon-base bx bx-check-circle me-1"></i> Jalankan Kenaikan Kelas
-                </button>
+                @if ($selectedSourceClass)
+                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalKonfirmasiKenaikan" {{ $previewData->isEmpty() ? 'disabled' : '' }}>
+                        <i class="icon-base bx bx-trending-up me-1"></i> Jalankan Kenaikan Kelas ({{ $selectedSourceClass->name }})
+                    </button>
+                @endif
             </div>
         </div>
 
-        <!-- Card Utama: Tab Kelas & Tabel Siswa Kenaikan Kelas -->
+        <!-- Card Utama: Tab Kelas & Tabel Siswa Kenaikan Kelas (Per Kelas) -->
         <div class="card flex-grow-1 d-flex flex-column shadow-sm mb-0" style="min-height: 0; overflow: hidden;">
-            <!-- Tab Navigasi Kelas (Sama seperti Data Kelas) -->
+            <!-- Tab Navigasi Kelas (Per Kelas) -->
             <div class="card-header border-bottom p-0 flex-shrink-0">
                 <div class="d-flex align-items-center px-3 pt-2">
                     <ul class="nav nav-tabs card-header-tabs m-0 flex-nowrap" role="tablist" style="overflow-x: auto;">
-                        <li class="nav-item">
-                            <a class="nav-link {{ $sourceClassId === 'all' || !$sourceClassId ? 'active fw-bold' : '' }}"
-                                href="{{ route('admin.promotion.index', ['source_class_id' => 'all', 'target_academic_year_id' => $targetAcademicYear?->id]) }}">
-                                Semua Kelas
-                            </a>
-                        </li>
-                        @foreach ($classes as $cls)
+                        @forelse ($classes as $cls)
                             <li class="nav-item">
                                 <a class="nav-link {{ $sourceClassId == $cls->id ? 'active fw-bold' : '' }}"
-                                    href="{{ route('admin.promotion.index', ['source_class_id' => $cls->id, 'target_academic_year_id' => $targetAcademicYear?->id]) }}">
+                                    href="{{ route('admin.promotion.index', ['source_class_id' => $cls->id]) }}">
                                     {{ $cls->name }}
                                 </a>
                             </li>
-                        @endforeach
+                        @empty
+                            <li class="nav-item">
+                                <span class="nav-link text-muted">Tidak ada kelas yang dapat diakses</span>
+                            </li>
+                        @endforelse
                     </ul>
                 </div>
             </div>
 
-            <!-- Sub-Bar Detail & Pengaturan Target Tahun Ajaran -->
-            <div class="d-flex flex-wrap justify-content-between align-items-center px-4 py-2 border-bottom flex-shrink-0 gap-2 bg-white" style="font-size: 13.5px;">
-                <div class="d-flex align-items-center gap-3 flex-wrap">
+            <!-- Sub-Bar Detail Total Siswa & Fitur Urutkan -->
+            <div class="d-flex flex-wrap justify-content-between align-items-center px-4 py-2 border-bottom flex-shrink-0 bg-white gap-2" style="font-size: 13.5px;">
+                <div class="d-flex align-items-center gap-1">
+                    <span class="text-muted">Total Siswa ({{ $selectedSourceClass?->name }}):</span>
+                    <span class="fw-semibold text-dark">{{ $previewData->count() }} Orang</span>
+                </div>
+
+                @if ($previewData->isNotEmpty())
                     <div class="d-flex align-items-center gap-2">
-                        <span class="text-muted">Tahun Tujuan:</span>
-                        <select class="form-select form-select-sm" style="width: 200px;"
-                            onchange="window.location.href = '{{ route('admin.promotion.index') }}?source_class_id={{ $sourceClassId }}&target_academic_year_id=' + this.value;">
-                            @foreach ($academicYears as $year)
-                                @if ($year->id != $activeYear?->id)
-                                    <option value="{{ $year->id }}" {{ $targetAcademicYear && $targetAcademicYear->id == $year->id ? 'selected' : '' }}>
-                                        {{ $year->name }} ({{ $year->semester }})
-                                    </option>
-                                @endif
-                            @endforeach
+                        <label for="sortPromotion" class="text-muted small mb-0 fw-medium text-nowrap">
+                            <i class="icon-base bx bx-sort-alt-2 me-1"></i>Urutkan:
+                        </label>
+                        <select id="sortPromotion" class="form-select form-select-sm" style="width: 175px;" onchange="sortPromotionTable(this.value)">
+                            <option value="name_asc" selected>Nama Siswa (A - Z)</option>
+                            <option value="name_desc">Nama Siswa (Z - A)</option>
+                            <option value="nisn_asc">NISN (Terkecil)</option>
+                            <option value="nisn_desc">NISN (Terbesar)</option>
                         </select>
                     </div>
-
-                    <span class="text-muted opacity-50">•</span>
-
-                    <div class="d-flex align-items-center gap-1">
-                        <span class="text-muted">Total Siswa:</span>
-                        <span class="fw-semibold text-dark">{{ $previewData->count() }} Orang</span>
-                    </div>
-                </div>
-
-                <div class="form-check form-switch mb-0">
-                    <input class="form-check-input" type="checkbox" name="set_target_as_active" id="setTargetAsActive" value="1" form="formKenaikanKelas" checked>
-                    <label class="form-check-label text-muted small fw-medium" for="setTargetAsActive">
-                        Jadikan tahun tujuan aktif
-                    </label>
-                </div>
+                @endif
             </div>
 
             <!-- Area Tabel & Konten -->
@@ -107,11 +97,12 @@
                 <div class="d-flex flex-column align-items-center justify-content-center flex-grow-1 py-5 text-muted">
                     <i class="icon-base bx bx-user-x display-4 text-secondary mb-2"></i>
                     <h5 class="text-muted">Tidak Ada Siswa</h5>
-                    <p class="mb-0 small">Tidak ditemukan siswa aktif pada kelas ini.</p>
+                    <p class="mb-0 small">Tidak ditemukan siswa aktif pada kelas {{ $selectedSourceClass?->name ?? '' }}.</p>
                 </div>
             @else
                 <form id="formKenaikanKelas" method="POST" action="{{ route('admin.promotion.process') }}" class="d-flex flex-column flex-grow-1" style="min-height: 0; overflow: hidden;">
                     @csrf
+                    <input type="hidden" name="source_class_id" value="{{ $selectedSourceClass?->id }}">
                     <input type="hidden" name="target_academic_year_id" value="{{ $targetAcademicYear?->id }}">
 
                     <div class="table-responsive flex-grow-1" style="overflow-y: auto;">
@@ -122,28 +113,30 @@
                                         <input type="checkbox" class="form-check-input" id="checkAllPromotion" checked
                                             onclick="document.querySelectorAll('.promote-checkbox').forEach(c => c.checked = this.checked); updateSelectedCount();">
                                     </th>
-                                    <th class="text-center" style="width: 50px;">No.</th>
-                                    <th style="width: 130px;">NISN</th>
-                                    <th>Nama Siswa</th>
+                                    <th style="width: 140px; cursor: pointer; user-select: none;" onclick="togglePromotionSort('nisn')" title="Klik untuk mengurutkan berdasarkan NISN">
+                                        NISN <i id="sortIconNisn" class="bx bx-sort text-muted ms-1" style="font-size: 11px; vertical-align: middle;"></i>
+                                    </th>
+                                    <th style="cursor: pointer; user-select: none;" onclick="togglePromotionSort('name')" title="Klik untuk mengurutkan berdasarkan Nama">
+                                        Nama Siswa <i id="sortIconName" class="bx bx-chevron-up text-primary ms-1" style="font-size: 11px; vertical-align: middle;"></i>
+                                    </th>
                                     <th>Kelas Saat Ini</th>
                                     <th style="width: 170px;">Status Kenaikan</th>
                                     <th style="width: 250px;">Kelas Tujuan</th>
                                 </tr>
                             </thead>
-                            <tbody>
+                            <tbody id="promotionTableBody">
                                 @foreach ($previewData as $index => $item)
                                     @php
                                         $s = $item['student'];
                                         $isGrade12 = $item['current_grade'] === 'XII';
                                     @endphp
-                                    <tr>
+                                    <tr data-name="{{ strtolower($s->name) }}" data-nisn="{{ $s->nisn }}">
                                         <!-- Checkbox Pilih Siswa -->
                                         <td class="text-center">
                                             <input type="checkbox" name="promotions[{{ $index }}][selected]" value="1"
                                                 class="form-check-input promote-checkbox" checked>
                                             <input type="hidden" name="promotions[{{ $index }}][student_id]" value="{{ $s->id }}">
                                         </td>
-                                        <td class="text-center text-muted">{{ $loop->iteration }}</td>
                                         <td><span class="fw-semibold">{{ $s->nisn }}</span></td>
                                         <td><strong>{{ $s->name }}</strong></td>
                                         <td>
@@ -246,8 +239,8 @@
                         </p>
                         <div class="p-3 rounded bg-light mb-3" style="font-size: 13.5px;">
                             <div class="d-flex justify-content-between mb-1">
-                                <span class="text-muted">Tahun Ajaran Tujuan:</span>
-                                <strong class="text-dark">{{ $targetAcademicYear?->name }} ({{ $targetAcademicYear?->semester }})</strong>
+                                <span class="text-muted">Kelas yang Diproses:</span>
+                                <strong class="text-dark">{{ $selectedSourceClass?->name ?? '-' }}</strong>
                             </div>
                             <div class="d-flex justify-content-between">
                                 <span class="text-muted">Total Siswa Diproses:</span>
@@ -270,8 +263,84 @@
         </div>
     </div>
 
-    <!-- Script Interaktif untuk Dropdown Status, Dynamic Counter, & Auto Scroll Tab -->
+    <!-- Script Interaktif untuk Dropdown Status, Dynamic Counter, Auto Scroll Tab, & Fitur Urutkan -->
     <script>
+        let currentSortField = 'name';
+        let currentSortOrder = 'asc';
+
+        function sortPromotionTable(criteria) {
+            const tbody = document.getElementById('promotionTableBody');
+            if (!tbody) return;
+
+            const parts = criteria.split('_');
+            const field = parts[0];
+            const order = parts[1] || 'asc';
+            currentSortField = field;
+            currentSortOrder = order;
+
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            if (rows.length === 0) return;
+
+            rows.sort((a, b) => {
+                const valA = field === 'name' ? (a.dataset.name || '') : (a.dataset.nisn || '');
+                const valB = field === 'name' ? (b.dataset.name || '') : (b.dataset.nisn || '');
+
+                if (field === 'nisn') {
+                    return order === 'asc'
+                        ? valA.localeCompare(valB, undefined, { numeric: true })
+                        : valB.localeCompare(valA, undefined, { numeric: true });
+                } else {
+                    return order === 'asc'
+                        ? valA.localeCompare(valB)
+                        : valB.localeCompare(valA);
+                }
+            });
+
+            rows.forEach(r => tbody.appendChild(r));
+
+            const sortSelect = document.getElementById('sortPromotion');
+            if (sortSelect && sortSelect.value !== criteria) {
+                sortSelect.value = criteria;
+            }
+
+            updateSortIcons();
+        }
+
+        function togglePromotionSort(field) {
+            if (currentSortField === field) {
+                currentSortOrder = currentSortOrder === 'asc' ? 'desc' : 'asc';
+            } else {
+                currentSortField = field;
+                currentSortOrder = 'asc';
+            }
+            sortPromotionTable(`${currentSortField}_${currentSortOrder}`);
+        }
+
+        function updateSortIcons() {
+            const iconName = document.getElementById('sortIconName');
+            const iconNisn = document.getElementById('sortIconNisn');
+
+            if (iconName) {
+                if (currentSortField === 'name') {
+                    iconName.className = `bx ${currentSortOrder === 'asc' ? 'bx-chevron-up' : 'bx-chevron-down'} text-primary ms-1`;
+                } else {
+                    iconName.className = 'bx bx-sort text-muted ms-1';
+                }
+                iconName.style.fontSize = '11px';
+                iconName.style.verticalAlign = 'middle';
+            }
+
+            if (iconNisn) {
+                if (currentSortField === 'nisn') {
+                    iconNisn.className = `bx ${currentSortOrder === 'asc' ? 'bx-chevron-up' : 'bx-chevron-down'} text-primary ms-1`;
+                } else {
+                    iconNisn.className = 'bx bx-sort text-muted ms-1';
+                }
+                iconNisn.style.fontSize = '11px';
+                iconNisn.style.verticalAlign = 'middle';
+            }
+        }
+
         function updateSelectedCount() {
             const checkedBoxes = document.querySelectorAll('.promote-checkbox:checked');
             const countSpan = document.getElementById('modalTotalSelectedSiswa');
@@ -289,18 +358,6 @@
                 alert('Silakan pilih minimal 1 siswa untuk diproses kenaikan kelasnya.');
                 return;
             }
-
-            // Pastikan switch status target tahun aktif ikut terkirim di form
-            const switchActive = document.getElementById('setTargetAsActive');
-            let hiddenActive = document.getElementById('hidden_set_target_as_active');
-            if (!hiddenActive) {
-                hiddenActive = document.createElement('input');
-                hiddenActive.type = 'hidden';
-                hiddenActive.name = 'set_target_as_active';
-                hiddenActive.id = 'hidden_set_target_as_active';
-                form.appendChild(hiddenActive);
-            }
-            hiddenActive.value = (switchActive && switchActive.checked) ? '1' : '0';
 
             form.submit();
         }

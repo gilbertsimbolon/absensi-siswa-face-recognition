@@ -7,18 +7,24 @@
         <!-- Notifikasi -->
         @if (session('success'))
             <div class="alert alert-success alert-dismissible fade show flex-shrink-0" role="alert">
+                <i class="icon-base bx bx-check-circle me-1"></i>
                 {{ session('success') }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        @endif
+
+        @if (session('error'))
+            <div class="alert alert-danger alert-dismissible fade show flex-shrink-0" role="alert">
+                <i class="icon-base bx bx-error-circle me-1"></i>
+                {{ session('error') }}
                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
             </div>
         @endif
 
         @if ($errors->any())
             <div class="alert alert-danger alert-dismissible fade show flex-shrink-0" role="alert">
-                <ul class="mb-0">
-                    @foreach ($errors->all() as $error)
-                        <li>{{ $error }}</li>
-                    @endforeach
-                </ul>
+                <i class="icon-base bx bx-error-circle me-1"></i>
+                Gagal
                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
             </div>
         @endif
@@ -37,14 +43,28 @@
 
                 <!-- Filter & Pencarian -->
                 <form method="GET" action="{{ route('admin.student.index') }}" class="d-flex align-items-center gap-2 m-0 flex-nowrap">
-                    <!-- Filter Kelas -->
-                    <select name="class_id" class="form-select form-select-sm" style="width: 150px;" onchange="this.form.submit()">
-                        <option value="">Semua Kelas</option>
-                        @foreach ($classes as $kelas)
-                            <option value="{{ $kelas->id }}" {{ request('class_id') == $kelas->id ? 'selected' : '' }}>
-                                {{ $kelas->name }}
-                            </option>
-                        @endforeach
+                    @if (isset($isTeacher) && $isTeacher)
+                        <span class="badge bg-label-primary py-2 px-3">
+                            <i class="icon-base bx bx-door-open me-1"></i> Kelas {{ $myClass ? $myClass->name : 'Belum Ada' }}
+                        </span>
+                    @else
+                        <!-- Filter Kelas -->
+                        <select name="class_id" class="form-select form-select-sm" style="width: 150px;" onchange="this.form.submit()">
+                            <option value="">Semua Kelas</option>
+                            @foreach ($classes as $kelas)
+                                <option value="{{ $kelas->id }}" {{ request('class_id') == $kelas->id ? 'selected' : '' }}>
+                                    {{ $kelas->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                    @endif
+
+                    <!-- Urutkan -->
+                    <select name="sort" class="form-select form-select-sm" style="width: 140px;" onchange="this.form.submit()">
+                        <option value="name_asc" {{ request('sort', 'name_asc') == 'name_asc' ? 'selected' : '' }}>Nama (A - Z)</option>
+                        <option value="name_desc" {{ request('sort') == 'name_desc' ? 'selected' : '' }}>Nama (Z - A)</option>
+                        <option value="nisn_asc" {{ request('sort') == 'nisn_asc' ? 'selected' : '' }}>NISN (Terkecil)</option>
+                        <option value="nisn_desc" {{ request('sort') == 'nisn_desc' ? 'selected' : '' }}>NISN (Terbesar)</option>
                     </select>
 
                     <!-- Input Search -->
@@ -56,7 +76,7 @@
                         </button>
                     </div>
 
-                    @if (request()->hasAny(['search', 'class_id']) && (request('search') || request('class_id')))
+                    @if (request()->hasAny(['search', 'class_id', 'sort']) && (request('search') || request('class_id') || request('sort') !== 'name_asc'))
                         <a href="{{ route('admin.student.index') }}" class="btn btn-sm btn-secondary" title="Reset Filter">
                             <i class="icon-base bx bx-reset"></i>
                         </a>
@@ -130,21 +150,21 @@
                                         <button type="button" class="btn btn-sm btn-icon p-0 text-success"
                                             data-bs-toggle="modal" data-bs-target="#modalDetailFotoSiswa{{ $siswa->id }}"
                                             title="Detail Foto">
-                                            <i class="icon-base bx bx-image fs-5"></i>
+                                            <i class="icon-base bx bx-image fs-6"></i>
                                         </button>
 
                                         <!-- Tombol Edit Modal (Kuning) -->
                                         <button type="button" class="btn btn-sm btn-icon p-0 text-warning"
                                             data-bs-toggle="modal" data-bs-target="#modalUbahSiswa{{ $siswa->id }}"
                                             title="Edit Data Siswa">
-                                            <i class="icon-base bx bx-edit-alt fs-5"></i>
+                                            <i class="icon-base bx bx-edit-alt fs-6"></i>
                                         </button>
 
                                         <!-- Tombol Hapus Modal (Merah) -->
                                         <button type="button" class="btn btn-sm btn-icon p-0 text-danger"
                                             data-bs-toggle="modal" data-bs-target="#modalHapusSiswa{{ $siswa->id }}"
                                             title="Hapus Siswa">
-                                            <i class="icon-base bx bx-trash fs-5"></i>
+                                            <i class="icon-base bx bx-trash fs-6"></i>
                                         </button>
                                     </div>
 
