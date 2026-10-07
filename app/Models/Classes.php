@@ -38,4 +38,10 @@ class Classes extends Model
     {
         return $this->hasMany(StudentClassHistory::class, 'class_id');
     }
+
+    // relasi ke data absensi
+    public function attendances()
+    {
+        return $this->hasMany(Attendance::class, 'class_id');
+    }
 }

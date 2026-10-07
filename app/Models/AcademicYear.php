@@ -28,6 +28,14 @@ class AcademicYear extends Model
     }
 
     /**
+     * Relasi ke data absensi siswa.
+     */
+    public function attendances()
+    {
+        return $this->hasMany(Attendance::class);
+    }
+
+    /**
      * Dapatkan tahun ajaran yang sedang aktif.
      */
     public static function getActive(): ?self

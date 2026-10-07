@@ -105,32 +105,24 @@
             <span class="menu-header-text">Absensi</span>
         </li>
 
-        <li class="menu-item">
+        <li class="menu-item {{ request()->routeIs('admin.attendance.*') ? 'active open' : '' }}">
             <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon tf-icons bx bx-calendar-check"></i>
                 <div>Absensi</div>
             </a>
 
             <ul class="menu-sub">
-
-                <li class="menu-item">
-                    <a href="#" class="menu-link">
-                        <div>Absensi Siswa</div>
+                <li class="menu-item {{ request()->routeIs('admin.attendance.index') ? 'active' : '' }}">
+                    <a href="{{ route('admin.attendance.index') }}" class="menu-link">
+                        <div>Absensi Harian</div>
                     </a>
                 </li>
 
-                <li class="menu-item">
-                    <a href="#" class="menu-link">
-                        <div>Riwayat Absensi</div>
-                    </a>
-                </li>
-
-                <li class="menu-item">
-                    <a href="#" class="menu-link">
+                <li class="menu-item {{ request()->routeIs('admin.attendance.recap*') ? 'active' : '' }}">
+                    <a href="{{ route('admin.attendance.recap') }}" class="menu-link">
                         <div>Rekap Kehadiran</div>
                     </a>
                 </li>
-
             </ul>
         </li>
 

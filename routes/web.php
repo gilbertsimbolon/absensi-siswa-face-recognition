@@ -1,6 +1,6 @@
 <?php
 
-// use App\Http\Controllers\AuthController;
+use App\Http\Controllers\Admin\AttendanceController;
 use App\Http\Controllers\Admin\ClassesController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\StudentController;
@@ -50,4 +50,13 @@ Route::middleware(['auth', 'role:admin|teacher'])->prefix('admin')->group(functi
     Route::post('/data-siswa', [StudentController::class, 'store'])->name('admin.student.store');
     Route::put('/data-siswa/{student}', [StudentController::class, 'update'])->name('admin.student.update');
     Route::delete('/data-siswa/{student}', [StudentController::class, 'destroy'])->name('admin.student.destroy');
+
+    // Route Absensi & Rekapitulasi (Admin & Guru Wali Kelas)
+    Route::get('/absensi', [AttendanceController::class, 'index'])->name('admin.attendance.index');
+    Route::post('/absensi', [AttendanceController::class, 'storeOrUpdate'])->name('admin.attendance.store');
+    Route::post('/absensi/bulk', [AttendanceController::class, 'bulkMark'])->name('admin.attendance.bulk');
+    Route::delete('/absensi/{attendance}', [AttendanceController::class, 'destroy'])->name('admin.attendance.destroy');
+
+    Route::get('/rekapitulasi', [AttendanceController::class, 'recap'])->name('admin.attendance.recap');
+    Route::get('/rekapitulasi/cetak', [AttendanceController::class, 'printRecap'])->name('admin.attendance.print');
 });

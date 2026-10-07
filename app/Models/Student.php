@@ -44,4 +44,10 @@ class Student extends Model
     {
         return $this->hasMany(StudentClassHistory::class);
     }
+
+    // relasi ke absensi siswa
+    public function attendances()
+    {
+        return $this->hasMany(Attendance::class);
+    }
 }
