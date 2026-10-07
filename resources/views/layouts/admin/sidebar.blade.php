@@ -80,50 +80,23 @@
             </a>
         </li>
 
-        <!-- PERANGKAT -->
-        <li class="menu-header small text-uppercase">
-            <span class="menu-header-text">Perangkat</span>
-        </li>
-
-        <li class="menu-item">
-            <a href="javascript:void(0);" class="menu-link menu-toggle">
-                <i class="menu-icon tf-icons bx bx-camera"></i>
-                <div>Perangkat</div>
-            </a>
-
-            <ul class="menu-sub">
-                <li class="menu-item">
-                    <a href="#" class="menu-link">
-                        <div>Hubungkan Device</div>
-                    </a>
-                </li>
-            </ul>
-        </li>
-
         <!-- ABSENSI -->
         <li class="menu-header small text-uppercase">
             <span class="menu-header-text">Absensi</span>
         </li>
 
-        <li class="menu-item {{ request()->routeIs('admin.attendance.*') ? 'active open' : '' }}">
-            <a href="javascript:void(0);" class="menu-link menu-toggle">
+        <li class="menu-item {{ request()->routeIs('admin.attendance.index') ? 'active' : '' }}">
+            <a href="{{ route('admin.attendance.index') }}" class="menu-link">
                 <i class="menu-icon tf-icons bx bx-calendar-check"></i>
-                <div>Absensi</div>
+                <div>Absensi Harian</div>
             </a>
+        </li>
 
-            <ul class="menu-sub">
-                <li class="menu-item {{ request()->routeIs('admin.attendance.index') ? 'active' : '' }}">
-                    <a href="{{ route('admin.attendance.index') }}" class="menu-link">
-                        <div>Absensi Harian</div>
-                    </a>
-                </li>
-
-                <li class="menu-item {{ request()->routeIs('admin.attendance.recap*') ? 'active' : '' }}">
-                    <a href="{{ route('admin.attendance.recap') }}" class="menu-link">
-                        <div>Rekap Kehadiran</div>
-                    </a>
-                </li>
-            </ul>
+        <li class="menu-item {{ request()->routeIs('admin.attendance.recap*') ? 'active' : '' }}">
+            <a href="{{ route('admin.attendance.recap') }}" class="menu-link">
+                <i class="menu-icon tf-icons bx bx-calendar"></i>
+                <div>Rekap Kehadiran</div>
+            </a>
         </li>
 
         <!-- LAPORAN -->
