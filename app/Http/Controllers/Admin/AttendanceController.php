@@ -14,7 +14,6 @@ use Illuminate\Support\Facades\Validator;
 
 class AttendanceController extends Controller
 {
-    //
     /**
      * Dapatkan daftar kelas yang berhak diakses oleh user (Admin: semua, Guru: hanya kelas binaannya).
      */
@@ -52,17 +51,25 @@ class AttendanceController extends Controller
         $activeYear = AcademicYear::getActive() ?? AcademicYear::first();
         $classes = $this->getAccessibleClasses();
 
-        // Tentukan kelas yang dipilih
-        $selectedClassId = $request->query('class_id', $classes->first()?->id);
+        // Tentukan kelas yang dipilih (dukung 'kelas' dan 'class_id')
+        $selectedClassId = $request->query('kelas', $request->query('class_id', $classes->first()?->id));
         $selectedClass = $classes->firstWhere('id', (int) $selectedClassId);
 
-        // Tentukan tanggal yang dipilih (default: hari ini)
-        $selectedDate = $request->query('date', now()->format('Y-m-d'));
+        // Tentukan tanggal yang dipilih (dukung 'tanggal' dan 'date', default: hari ini)
+        $selectedDate = $request->query('tanggal', $request->query('date', now()->format('Y-m-d')));
 
-        // Parameter sorting dan filter status
-        $sortBy = $request->query('sort_by', 'name');
-        $sortDir = strtolower($request->query('sort_dir', 'asc')) === 'desc' ? 'desc' : 'asc';
-        $statusFilter = $request->query('status', 'all');
+        // Parameter sorting dan filter status (dukung Bahasa Indonesia dan Inggris)
+        $sortBy = $request->query('urutkan', $request->query('sort_by', 'nama'));
+        if ($sortBy === 'name') {
+            $sortBy = 'nama';
+        }
+
+        $sortDir = strtolower($request->query('arah', $request->query('sort_dir', 'asc'))) === 'desc' ? 'desc' : 'asc';
+
+        $statusFilter = $request->query('status', 'semua');
+        if ($statusFilter === 'all') {
+            $statusFilter = 'semua';
+        }
 
         $studentsData = collect();
         $summary = [
@@ -111,13 +118,13 @@ class AttendanceController extends Controller
                 $student->daily_status = $status;
 
                 // Terapkan filter status jika ada
-                if ($statusFilter === 'all' || $statusFilter === $status) {
+                if ($statusFilter === 'semua' || $statusFilter === 'all' || $statusFilter === $status) {
                     $studentsData->push($student);
                 }
             }
         }
 
-        return view('admin.attendance.index', compact(
+        return view('admin.absensi.index', compact(
             'activeYear',
             'classes',
             'selectedClass',
@@ -138,18 +145,26 @@ class AttendanceController extends Controller
         $activeYear = AcademicYear::getActive() ?? AcademicYear::first();
         $classes = $this->getAccessibleClasses();
 
-        $selectedClassId = $request->query('class_id', $classes->first()?->id);
+        $selectedClassId = $request->query('kelas', $request->query('class_id', $classes->first()?->id));
         $selectedClass = $classes->firstWhere('id', (int) $selectedClassId);
 
-        // Periode: 'weekly' (default), 'monthly', 'yearly'
-        $period = $request->query('period', 'weekly');
-        if (! in_array($period, ['weekly', 'monthly', 'yearly'])) {
-            $period = 'weekly';
+        // Periode: 'mingguan' (default), 'bulanan', 'tahunan' (juga dukung 'weekly', 'monthly', 'yearly')
+        $period = $request->query('periode', $request->query('period', 'mingguan'));
+        if ($period === 'weekly') {
+            $period = 'mingguan';
+        } elseif ($period === 'monthly') {
+            $period = 'bulanan';
+        } elseif ($period === 'yearly') {
+            $period = 'tahunan';
         }
 
-        $selectedDate = $request->query('date', now()->format('Y-m-d'));
-        $selectedMonth = (int) $request->query('month', now()->month);
-        $selectedYear = (int) $request->query('year', now()->year);
+        if (! in_array($period, ['mingguan', 'bulanan', 'tahunan'])) {
+            $period = 'mingguan';
+        }
+
+        $selectedDate = $request->query('tanggal', $request->query('date', now()->format('Y-m-d')));
+        $selectedMonth = (int) $request->query('bulan', $request->query('month', now()->month));
+        $selectedYear = (int) $request->query('tahun', $request->query('year', now()->year));
 
         $monthNames = [
             1 => 'Januari',
@@ -173,7 +188,7 @@ class AttendanceController extends Controller
         $weekStart = null;
         $weekEnd = null;
 
-        if ($period === 'weekly') {
+        if ($period === 'mingguan') {
             // Mode Mingguan: Tampilkan minggu yang sedang berjalan (Senin s/d Sabtu)
             $refCarbon = Carbon::parse($selectedDate);
             $weekStart = $refCarbon->copy()->startOfWeek(Carbon::MONDAY);
@@ -196,7 +211,7 @@ class AttendanceController extends Controller
                     'is_past' => $isPastOrToday,
                 ];
             }
-        } elseif ($period === 'monthly') {
+        } elseif ($period === 'bulanan') {
             // Mode Bulanan: Tampilkan hari-hari dalam bulan yang dipilih
             $monthCarbon = Carbon::createFromDate($selectedYear, $selectedMonth, 1);
             $daysInMonth = $monthCarbon->daysInMonth;
@@ -244,9 +259,9 @@ class AttendanceController extends Controller
 
             $attendancesQuery = Attendance::where('class_id', $selectedClass->id);
 
-            if ($period === 'weekly') {
+            if ($period === 'mingguan') {
                 $attendancesQuery->whereBetween('date', [$weekStart->format('Y-m-d'), $weekEnd->format('Y-m-d')]);
-            } elseif ($period === 'monthly') {
+            } elseif ($period === 'bulanan') {
                 $attendancesQuery->whereYear('date', $selectedYear)->whereMonth('date', $selectedMonth);
             } else {
                 $attendancesQuery->whereYear('date', $selectedYear);
@@ -264,7 +279,7 @@ class AttendanceController extends Controller
                 $i = 0;
                 $a = 0;
 
-                if ($period === 'weekly' || $period === 'monthly') {
+                if ($period === 'mingguan' || $period === 'bulanan') {
                     foreach ($studentAtts as $att) {
                         $dateStr = Carbon::parse($att->date)->format('Y-m-d');
                         $matrix[$dateStr] = $att;
@@ -299,11 +314,11 @@ class AttendanceController extends Controller
 
                 $totalPresence = $h + $t;
                 $percent = 0;
-                if ($period === 'weekly' && $effectiveDaysCount > 0) {
+                if ($period === 'mingguan' && $effectiveDaysCount > 0) {
                     $percent = round(($totalPresence / $effectiveDaysCount) * 100, 1);
-                } elseif ($period === 'monthly' && $effectiveDaysCount > 0) {
+                } elseif ($period === 'bulanan' && $effectiveDaysCount > 0) {
                     $percent = round(($totalPresence / $effectiveDaysCount) * 100, 1);
-                } elseif ($period === 'yearly') {
+                } elseif ($period === 'tahunan') {
                     $totalRecords = $h + $t + $s + $i + $a;
                     $percent = $totalRecords > 0 ? round(($totalPresence / $totalRecords) * 100, 1) : 0;
                 }
@@ -331,7 +346,7 @@ class AttendanceController extends Controller
             ? round($recapStudents->avg('presence_percent'), 1)
             : 0;
 
-        return view('admin.attendance.recap', compact(
+        return view('admin.absensi.rekapitulasi', compact(
             'activeYear',
             'classes',
             'selectedClass',
@@ -363,19 +378,27 @@ class AttendanceController extends Controller
         $activeYear = AcademicYear::getActive() ?? AcademicYear::first();
         $classes = $this->getAccessibleClasses();
 
-        $selectedClassId = $request->query('class_id', $classes->first()?->id);
+        $selectedClassId = $request->query('kelas', $request->query('class_id', $classes->first()?->id));
         $selectedClass = $classes->firstWhere('id', (int) $selectedClassId);
 
         abort_if(! $selectedClass, 404, 'Kelas tidak ditemukan.');
 
-        $period = $request->query('period', 'weekly');
-        if (! in_array($period, ['weekly', 'monthly', 'yearly'])) {
-            $period = 'weekly';
+        $period = $request->query('periode', $request->query('period', 'mingguan'));
+        if ($period === 'weekly') {
+            $period = 'mingguan';
+        } elseif ($period === 'monthly') {
+            $period = 'bulanan';
+        } elseif ($period === 'yearly') {
+            $period = 'tahunan';
         }
 
-        $selectedDate = $request->query('date', now()->format('Y-m-d'));
-        $selectedMonth = (int) $request->query('month', now()->month);
-        $selectedYear = (int) $request->query('year', now()->year);
+        if (! in_array($period, ['mingguan', 'bulanan', 'tahunan'])) {
+            $period = 'mingguan';
+        }
+
+        $selectedDate = $request->query('tanggal', $request->query('date', now()->format('Y-m-d')));
+        $selectedMonth = (int) $request->query('bulan', $request->query('month', now()->month));
+        $selectedYear = (int) $request->query('tahun', $request->query('year', now()->year));
 
         $monthNames = [
             1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
@@ -390,7 +413,7 @@ class AttendanceController extends Controller
         $weekStart = null;
         $weekEnd = null;
 
-        if ($period === 'weekly') {
+        if ($period === 'mingguan') {
             $refCarbon = Carbon::parse($selectedDate);
             $weekStart = $refCarbon->copy()->startOfWeek(Carbon::MONDAY);
             $weekEnd = $refCarbon->copy()->startOfWeek(Carbon::MONDAY)->addDays(5);
@@ -409,7 +432,7 @@ class AttendanceController extends Controller
                     'short_label' => $curDate->locale('id')->translatedFormat('d M'),
                 ];
             }
-        } elseif ($period === 'monthly') {
+        } elseif ($period === 'bulanan') {
             $monthCarbon = Carbon::createFromDate($selectedYear, $selectedMonth, 1);
             $daysInMonth = $monthCarbon->daysInMonth;
 
@@ -443,9 +466,9 @@ class AttendanceController extends Controller
             ->get();
 
         $attendancesQuery = Attendance::where('class_id', $selectedClass->id);
-        if ($period === 'weekly') {
+        if ($period === 'mingguan') {
             $attendancesQuery->whereBetween('date', [$weekStart->format('Y-m-d'), $weekEnd->format('Y-m-d')]);
-        } elseif ($period === 'monthly') {
+        } elseif ($period === 'bulanan') {
             $attendancesQuery->whereYear('date', $selectedYear)->whereMonth('date', $selectedMonth);
         } else {
             $attendancesQuery->whereYear('date', $selectedYear);
@@ -464,7 +487,7 @@ class AttendanceController extends Controller
             $i = 0;
             $a = 0;
 
-            if ($period === 'weekly' || $period === 'monthly') {
+            if ($period === 'mingguan' || $period === 'bulanan') {
                 foreach ($studentAtts as $att) {
                     $dateStr = Carbon::parse($att->date)->format('Y-m-d');
                     $matrix[$dateStr] = $att;
@@ -499,11 +522,11 @@ class AttendanceController extends Controller
 
             $totalPresence = $h + $t;
             $percent = 0;
-            if ($period === 'weekly' && $effectiveDaysCount > 0) {
+            if ($period === 'mingguan' && $effectiveDaysCount > 0) {
                 $percent = round(($totalPresence / $effectiveDaysCount) * 100, 1);
-            } elseif ($period === 'monthly' && $effectiveDaysCount > 0) {
+            } elseif ($period === 'bulanan' && $effectiveDaysCount > 0) {
                 $percent = round(($totalPresence / $effectiveDaysCount) * 100, 1);
-            } elseif ($period === 'yearly') {
+            } elseif ($period === 'tahunan') {
                 $totalRecords = $h + $t + $s + $i + $a;
                 $percent = $totalRecords > 0 ? round(($totalPresence / $totalRecords) * 100, 1) : 0;
             }
@@ -520,7 +543,7 @@ class AttendanceController extends Controller
             $recapStudents->push($student);
         }
 
-        return view('admin.attendance.print-recap', compact(
+        return view('admin.absensi.cetak-rekapitulasi', compact(
             'activeYear',
             'selectedClass',
             'period',

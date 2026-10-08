@@ -35,28 +35,29 @@ class StudentController extends Controller
                 $classes = collect();
             }
         } else {
-            // Filter berdasarkan kelas
-            if ($request->filled('class_id')) {
-                $query->where('class_id', $request->class_id);
+            // Filter berdasarkan kelas (dukung 'kelas' dan 'class_id')
+            $filterClassId = $request->input('kelas', $request->input('class_id'));
+            if (! empty($filterClassId)) {
+                $query->where('class_id', $filterClassId);
             }
             $classes = Classes::orderBy('grade_level')->orderBy('name')->get();
         }
 
-        // Filter pencarian nama atau NISN
-        if ($request->filled('search')) {
-            $search = $request->search;
+        // Filter pencarian nama atau NISN (dukung 'cari' dan 'search')
+        $search = $request->input('cari', $request->input('search'));
+        if (! empty($search)) {
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
                     ->orWhere('nisn', 'like', "%{$search}%");
             });
         }
 
-        $sort = $request->query('sort', 'name_asc');
+        $sort = $request->query('urutkan', $request->query('sort', 'nama_asc'));
         match ($sort) {
-            'name_desc' => $query->orderByDesc('name'),
+            'nama_desc', 'name_desc' => $query->orderByDesc('name'),
             'nisn_asc' => $query->orderBy('nisn'),
             'nisn_desc' => $query->orderByDesc('nisn'),
-            'latest' => $query->latest(),
+            'terbaru', 'latest' => $query->latest(),
             default => $query->orderBy('name'),
         };
 

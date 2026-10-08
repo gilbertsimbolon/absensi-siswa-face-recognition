@@ -49,10 +49,10 @@
                         </span>
                     @else
                         <!-- Filter Kelas -->
-                        <select name="class_id" class="form-select form-select-sm" style="width: 150px;" onchange="this.form.submit()">
+                        <select name="kelas" class="form-select form-select-sm" style="width: 150px;" onchange="this.form.submit()">
                             <option value="">Semua Kelas</option>
                             @foreach ($classes as $kelas)
-                                <option value="{{ $kelas->id }}" {{ request('class_id') == $kelas->id ? 'selected' : '' }}>
+                                <option value="{{ $kelas->id }}" {{ request('kelas', request('class_id')) == $kelas->id ? 'selected' : '' }}>
                                     {{ $kelas->name }}
                                 </option>
                             @endforeach
@@ -60,23 +60,23 @@
                     @endif
 
                     <!-- Urutkan -->
-                    <select name="sort" class="form-select form-select-sm" style="width: 140px;" onchange="this.form.submit()">
-                        <option value="name_asc" {{ request('sort', 'name_asc') == 'name_asc' ? 'selected' : '' }}>Nama (A - Z)</option>
-                        <option value="name_desc" {{ request('sort') == 'name_desc' ? 'selected' : '' }}>Nama (Z - A)</option>
-                        <option value="nisn_asc" {{ request('sort') == 'nisn_asc' ? 'selected' : '' }}>NISN (Terkecil)</option>
-                        <option value="nisn_desc" {{ request('sort') == 'nisn_desc' ? 'selected' : '' }}>NISN (Terbesar)</option>
+                    <select name="urutkan" class="form-select form-select-sm" style="width: 140px;" onchange="this.form.submit()">
+                        <option value="nama_asc" {{ in_array(request('urutkan', request('sort', 'nama_asc')), ['nama_asc', 'name_asc']) ? 'selected' : '' }}>Nama (A - Z)</option>
+                        <option value="nama_desc" {{ in_array(request('urutkan', request('sort')), ['nama_desc', 'name_desc']) ? 'selected' : '' }}>Nama (Z - A)</option>
+                        <option value="nisn_asc" {{ request('urutkan', request('sort')) == 'nisn_asc' ? 'selected' : '' }}>NISN (Terkecil)</option>
+                        <option value="nisn_desc" {{ request('urutkan', request('sort')) == 'nisn_desc' ? 'selected' : '' }}>NISN (Terbesar)</option>
                     </select>
 
                     <!-- Input Search -->
                     <div class="input-group input-group-sm" style="width: 220px;">
-                        <input type="text" name="search" class="form-control" placeholder="Cari nama / NISN..."
-                            value="{{ request('search') }}">
+                        <input type="text" name="cari" class="form-control" placeholder="Cari nama / NISN..."
+                            value="{{ request('cari', request('search')) }}">
                         <button class="btn btn-secondary" type="submit" title="Cari">
                             <i class="icon-base bx bx-search"></i>
                         </button>
                     </div>
 
-                    @if (request()->hasAny(['search', 'class_id', 'sort']) && (request('search') || request('class_id') || request('sort') !== 'name_asc'))
+                    @if (request()->hasAny(['cari', 'search', 'kelas', 'class_id', 'urutkan', 'sort']) && (request('cari') || request('search') || request('kelas') || request('class_id') || !in_array(request('urutkan', request('sort', 'nama_asc')), ['nama_asc', 'name_asc'])))
                         <a href="{{ route('admin.student.index') }}" class="btn btn-sm btn-secondary" title="Reset Filter">
                             <i class="icon-base bx bx-reset"></i>
                         </a>

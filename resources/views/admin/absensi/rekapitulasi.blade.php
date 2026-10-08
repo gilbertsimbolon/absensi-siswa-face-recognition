@@ -100,9 +100,9 @@
                 <h4 class="fw-bold mb-0">Rekapitulasi Kehadiran</h4>
                 <span class="text-muted small">
                     Kelas: <strong>{{ $selectedClass ? $selectedClass->name : '-' }}</strong> | 
-                    @if ($period === 'weekly')
+                    @if (in_array($period, ['mingguan', 'weekly']))
                         Minggu Berjalan: <strong>{{ $weekStart ? $weekStart->locale('id')->translatedFormat('d M Y') : '' }} s/d {{ $weekEnd ? $weekEnd->locale('id')->translatedFormat('d M Y') : '' }}</strong>
-                    @elseif ($period === 'monthly')
+                    @elseif (in_array($period, ['bulanan', 'monthly']))
                         Periode: <strong>{{ $monthNames[$selectedMonth] ?? '' }} {{ $selectedYear }}</strong>
                     @else
                         Periode: <strong>Tahun {{ $selectedYear }} (1 Tahun Penuh)</strong>
@@ -111,7 +111,18 @@
             </div>
             <div class="d-flex gap-2">
                 @if ($selectedClass)
-                    <a href="{{ route('admin.attendance.print', ['class_id' => $selectedClass->id, 'period' => $period, 'date' => $selectedDate, 'month' => $selectedMonth, 'year' => $selectedYear]) }}" 
+                    @php
+                        $printParams = ['kelas' => $selectedClass->id, 'periode' => in_array($period, ['mingguan', 'weekly']) ? 'mingguan' : (in_array($period, ['bulanan', 'monthly']) ? 'bulanan' : 'tahunan')];
+                        if (in_array($period, ['mingguan', 'weekly'])) {
+                            $printParams['tanggal'] = $selectedDate;
+                        } elseif (in_array($period, ['bulanan', 'monthly'])) {
+                            $printParams['bulan'] = $selectedMonth;
+                            $printParams['tahun'] = $selectedYear;
+                        } else {
+                            $printParams['tahun'] = $selectedYear;
+                        }
+                    @endphp
+                    <a href="{{ route('admin.attendance.print', $printParams) }}" 
                        target="_blank" 
                        class="btn btn-outline-secondary btn-sm">
                         <i class="icon-base bx bx-printer me-1"></i> Cetak Rekap
@@ -127,9 +138,20 @@
                 <div class="d-flex align-items-center px-3 pt-2">
                     <ul class="nav nav-tabs card-header-tabs m-0 flex-nowrap" role="tablist" style="overflow-x: auto;">
                         @forelse ($classes as $cls)
+                            @php
+                                $tabParams = ['kelas' => $cls->id, 'periode' => in_array($period, ['mingguan', 'weekly']) ? 'mingguan' : (in_array($period, ['bulanan', 'monthly']) ? 'bulanan' : 'tahunan')];
+                                if (in_array($period, ['mingguan', 'weekly'])) {
+                                    $tabParams['tanggal'] = $selectedDate;
+                                } elseif (in_array($period, ['bulanan', 'monthly'])) {
+                                    $tabParams['bulan'] = $selectedMonth;
+                                    $tabParams['tahun'] = $selectedYear;
+                                } else {
+                                    $tabParams['tahun'] = $selectedYear;
+                                }
+                            @endphp
                             <li class="nav-item">
                                 <a class="nav-link {{ $selectedClass && $selectedClass->id == $cls->id ? 'active fw-bold' : '' }}"
-                                    href="{{ route('admin.attendance.recap', ['class_id' => $cls->id, 'period' => $period, 'date' => $selectedDate, 'month' => $selectedMonth, 'year' => $selectedYear]) }}">
+                                    href="{{ route('admin.attendance.recap', $tabParams) }}">
                                     {{ $cls->name }}
                                 </a>
                             </li>
@@ -153,50 +175,50 @@
                 <!-- Pilihan Mode Periode & Navigasi Tanggal (di sebelah kanan) -->
                 <div class="d-flex align-items-center gap-2 flex-wrap ms-auto">
                     <div class="d-inline-flex gap-1">
-                        <a href="{{ route('admin.attendance.recap', ['class_id' => $selectedClass?->id, 'period' => 'weekly', 'date' => now()->format('Y-m-d')]) }}" 
-                           class="period-btn {{ $period === 'weekly' ? 'active' : '' }}">
+                        <a href="{{ route('admin.attendance.recap', ['kelas' => $selectedClass?->id, 'periode' => 'mingguan', 'tanggal' => now()->format('Y-m-d')]) }}" 
+                           class="period-btn {{ in_array($period, ['mingguan', 'weekly']) ? 'active' : '' }}">
                             Minggu Ini
                         </a>
-                        <a href="{{ route('admin.attendance.recap', ['class_id' => $selectedClass?->id, 'period' => 'monthly', 'month' => now()->month, 'year' => now()->year]) }}" 
-                           class="period-btn {{ $period === 'monthly' ? 'active' : '' }}">
+                        <a href="{{ route('admin.attendance.recap', ['kelas' => $selectedClass?->id, 'periode' => 'bulanan', 'bulan' => now()->month, 'tahun' => now()->year]) }}" 
+                           class="period-btn {{ in_array($period, ['bulanan', 'monthly']) ? 'active' : '' }}">
                             Bulanan
                         </a>
-                        <a href="{{ route('admin.attendance.recap', ['class_id' => $selectedClass?->id, 'period' => 'yearly', 'year' => now()->year]) }}" 
-                           class="period-btn {{ $period === 'yearly' ? 'active' : '' }}">
+                        <a href="{{ route('admin.attendance.recap', ['kelas' => $selectedClass?->id, 'periode' => 'tahunan', 'tahun' => now()->year]) }}" 
+                           class="period-btn {{ in_array($period, ['tahunan', 'yearly']) ? 'active' : '' }}">
                             1 Tahun
                         </a>
                     </div>
 
                     <!-- Filter Spesifik per Mode -->
                     <form action="{{ route('admin.attendance.recap') }}" method="GET" class="d-flex align-items-center gap-2 m-0 ms-2">
-                        <input type="hidden" name="class_id" value="{{ $selectedClass?->id }}">
-                        <input type="hidden" name="period" value="{{ $period }}">
+                        <input type="hidden" name="kelas" value="{{ $selectedClass?->id }}">
+                        <input type="hidden" name="periode" value="{{ in_array($period, ['mingguan', 'weekly']) ? 'mingguan' : (in_array($period, ['bulanan', 'monthly']) ? 'bulanan' : 'tahunan') }}">
 
-                        @if ($period === 'weekly')
+                        @if (in_array($period, ['mingguan', 'weekly']))
                             <!-- Navigasi Minggu -->
                             @php
                                 $prevWeek = \Carbon\Carbon::parse($selectedDate)->subWeek()->format('Y-m-d');
                                 $nextWeek = \Carbon\Carbon::parse($selectedDate)->addWeek()->format('Y-m-d');
                             @endphp
                             <div class="d-flex align-items-center gap-1">
-                                <a href="{{ route('admin.attendance.recap', ['class_id' => $selectedClass?->id, 'period' => 'weekly', 'date' => $prevWeek]) }}" 
+                                <a href="{{ route('admin.attendance.recap', ['kelas' => $selectedClass?->id, 'periode' => 'mingguan', 'tanggal' => $prevWeek]) }}" 
                                    class="btn btn-sm btn-outline-secondary py-1 px-2" title="Minggu Sebelumnya">
                                     <i class="bx bx-chevron-left"></i>
                                 </a>
-                                <input type="date" name="date" class="form-control form-control-sm" style="width: 135px;" value="{{ $selectedDate }}" onchange="this.form.submit()">
-                                <a href="{{ route('admin.attendance.recap', ['class_id' => $selectedClass?->id, 'period' => 'weekly', 'date' => $nextWeek]) }}" 
+                                <input type="date" name="tanggal" class="form-control form-control-sm" style="width: 135px;" value="{{ $selectedDate }}" onchange="this.form.submit()">
+                                <a href="{{ route('admin.attendance.recap', ['kelas' => $selectedClass?->id, 'periode' => 'mingguan', 'tanggal' => $nextWeek]) }}" 
                                    class="btn btn-sm btn-outline-secondary py-1 px-2" title="Minggu Berikutnya">
                                     <i class="bx bx-chevron-right"></i>
                                 </a>
                             </div>
-                        @elseif ($period === 'monthly')
+                        @elseif (in_array($period, ['bulanan', 'monthly']))
                             <div class="d-flex align-items-center gap-1">
-                                <select name="month" class="form-select form-select-sm" style="width: 125px;" onchange="this.form.submit()">
+                                <select name="bulan" class="form-select form-select-sm" style="width: 125px;" onchange="this.form.submit()">
                                     @foreach ($monthNames as $num => $name)
                                         <option value="{{ $num }}" {{ $selectedMonth == $num ? 'selected' : '' }}>{{ $name }}</option>
                                     @endforeach
                                 </select>
-                                <select name="year" class="form-select form-select-sm" style="width: 85px;" onchange="this.form.submit()">
+                                <select name="tahun" class="form-select form-select-sm" style="width: 85px;" onchange="this.form.submit()">
                                     @for ($y = now()->year - 2; $y <= now()->year + 1; $y++)
                                         <option value="{{ $y }}" {{ $selectedYear == $y ? 'selected' : '' }}>{{ $y }}</option>
                                     @endfor
@@ -204,7 +226,7 @@
                             </div>
                         @else
                             <div class="d-flex align-items-center gap-1">
-                                <select name="year" class="form-select form-select-sm" style="width: 95px;" onchange="this.form.submit()">
+                                <select name="tahun" class="form-select form-select-sm" style="width: 95px;" onchange="this.form.submit()">
                                     @for ($y = now()->year - 2; $y <= now()->year + 1; $y++)
                                         <option value="{{ $y }}" {{ $selectedYear == $y ? 'selected' : '' }}>{{ $y }}</option>
                                     @endfor
@@ -217,7 +239,7 @@
 
             <!-- 3. Tabel Rekapitulasi (Scrollable) -->
             <div class="table-responsive flex-grow-1" style="min-height: 0; overflow: auto;">
-                <table class="table mb-0 recap-table" style="{{ $period === 'monthly' ? 'min-width: 1700px;' : ($period === 'yearly' ? 'min-width: 1300px;' : 'min-width: 100%;') }}">
+                <table class="table mb-0 recap-table" style="{{ in_array($period, ['bulanan', 'monthly']) ? 'min-width: 1700px;' : (in_array($period, ['tahunan', 'yearly']) ? 'min-width: 1300px;' : 'min-width: 100%;') }}">
                     <thead>
                         <tr>
                             <!-- Kolom Sticky Kiri -->
@@ -225,7 +247,7 @@
                             <th class="sticky-col-name">Nama Siswa</th>
                             <th style="width: 45px; min-width: 45px;">L/P</th>
 
-                            @if ($period === 'weekly')
+                            @if (in_array($period, ['mingguan', 'weekly']))
                                 <!-- Kolom Hari Lengkap (Senin s/d Sabtu) -->
                                 @foreach ($daysInfo as $day)
                                     <th style="min-width: 130px; width: 14%;" class="{{ $day['is_today'] ? 'col-today' : '' }}">
@@ -237,7 +259,7 @@
                                         </div>
                                     </th>
                                 @endforeach
-                            @elseif ($period === 'monthly')
+                            @elseif (in_array($period, ['bulanan', 'monthly']))
                                 <!-- Kolom Tanggal Bulanan (Nama Hari Lengkap di Baris Atas) -->
                                 @foreach ($daysInfo as $day)
                                     <th style="min-width: 90px;" class="{{ $day['is_today'] ? 'col-today' : '' }}">
@@ -281,7 +303,7 @@
                                     {{ $st->gender }}
                                 </td>
 
-                                @if ($period === 'weekly')
+                                @if (in_array($period, ['mingguan', 'weekly']))
                                     <!-- Sel Presensi Mingguan Polos -->
                                     @foreach ($daysInfo as $day)
                                         @php
@@ -309,7 +331,7 @@
                                             @endif
                                         </td>
                                     @endforeach
-                                @elseif ($period === 'monthly')
+                                @elseif (in_array($period, ['bulanan', 'monthly']))
                                     <!-- Sel Presensi Bulanan Polos -->
                                     @foreach ($daysInfo as $day)
                                         @php

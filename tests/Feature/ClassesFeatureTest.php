@@ -41,7 +41,7 @@ test('admin can access master data kelas page and see tabs and selected class de
     $response = $this->actingAs($this->admin)->get(route('admin.classes.index'));
 
     $response->assertStatus(200);
-    $response->assertViewIs('admin.master-data.classes');
+    $response->assertViewIs('admin.master-data.data-kelas');
     $response->assertViewHas('classes');
     $response->assertViewHas('selectedClass');
     $response->assertViewHas('activeYear');
@@ -153,7 +153,7 @@ test('admin can access promotion preview page via dedicated route and see sideba
     ]));
 
     $response->assertStatus(200);
-    $response->assertViewIs('admin.master-data.classes-promotion');
+    $response->assertViewIs('admin.master-data.kenaikan-kelas');
     $response->assertSee('Kenaikan Kelas');
     $response->assertSee($class->name);
     $response->assertSee('Akademik');

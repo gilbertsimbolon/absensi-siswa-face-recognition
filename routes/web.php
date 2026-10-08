@@ -8,14 +8,21 @@ use App\Http\Controllers\Admin\TeacherController;
 use App\Http\Controllers\AuthController;
 use Illuminate\Support\Facades\Route;
 
+// Otentikasi Masuk & Keluar
 Route::get('/', [AuthController::class, 'index'])->name('login.index');
-Route::post('/login', [AuthController::class, 'login'])->name('login.store');
-Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+Route::get('/masuk', [AuthController::class, 'index'])->name('masuk.index');
+Route::post('/masuk', [AuthController::class, 'login'])->name('login.store');
+Route::post('/login', [AuthController::class, 'login']);
+Route::get('/login', fn () => redirect()->route('login.index'));
+
+Route::post('/keluar', [AuthController::class, 'logout'])->name('logout');
+Route::post('/logout', [AuthController::class, 'logout']);
 
 // Route Admin & Guru (Role-based access)
 Route::middleware(['auth', 'role:admin|teacher'])->prefix('admin')->group(function () {
-    // Route Dashboard
-    Route::get('/dashboard', [DashboardController::class, 'index'])->name('admin.dashboard.index');
+    // Route Beranda (Bahasa Indonesia)
+    Route::get('/beranda', [DashboardController::class, 'index'])->name('admin.dashboard.index');
+    Route::get('/dashboard', fn () => redirect()->route('admin.dashboard.index'));
 
     // Route Khusus Admin (Kelola Guru & Struktur Kelas Global)
     Route::middleware('role:admin')->group(function () {
@@ -54,7 +61,8 @@ Route::middleware(['auth', 'role:admin|teacher'])->prefix('admin')->group(functi
     // Route Absensi & Rekapitulasi (Admin & Guru Wali Kelas)
     Route::get('/absensi', [AttendanceController::class, 'index'])->name('admin.attendance.index');
     Route::post('/absensi', [AttendanceController::class, 'storeOrUpdate'])->name('admin.attendance.store');
-    Route::post('/absensi/bulk', [AttendanceController::class, 'bulkMark'])->name('admin.attendance.bulk');
+    Route::post('/absensi/massal', [AttendanceController::class, 'bulkMark'])->name('admin.attendance.bulk');
+    Route::post('/absensi/bulk', [AttendanceController::class, 'bulkMark']);
     Route::delete('/absensi/{attendance}', [AttendanceController::class, 'destroy'])->name('admin.attendance.destroy');
 
     Route::get('/rekapitulasi', [AttendanceController::class, 'recap'])->name('admin.attendance.recap');

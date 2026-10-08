@@ -57,7 +57,7 @@
                         @forelse ($classes as $cls)
                             <li class="nav-item">
                                 <a class="nav-link {{ $sourceClassId == $cls->id ? 'active fw-bold' : '' }}"
-                                    href="{{ route('admin.promotion.index', ['source_class_id' => $cls->id]) }}">
+                                    href="{{ route('admin.promotion.index', ['kelas_asal' => $cls->id]) }}">
                                     {{ $cls->name }}
                                 </a>
                             </li>

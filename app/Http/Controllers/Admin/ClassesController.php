@@ -62,8 +62,8 @@ class ClassesController extends Controller
 
         $classes = $classesQuery->get();
 
-        // Tentukan kelas yang sedang aktif/dipilih
-        $selectedClassId = $request->query('class_id');
+        // Tentukan kelas yang sedang aktif/dipilih (dukung 'kelas' dan 'class_id')
+        $selectedClassId = $request->query('kelas', $request->query('class_id'));
         $selectedClass = null;
 
         if ($isTeacher) {
@@ -85,8 +85,8 @@ class ClassesController extends Controller
             $queryStudents = Student::with(['faces'])
                 ->where('class_id', $selectedClass->id);
 
-            if ($request->filled('search_student')) {
-                $search = $request->search_student;
+            $search = $request->input('cari_siswa', $request->input('search_student', $request->input('cari')));
+            if (! empty($search)) {
                 $queryStudents->where(function ($q) use ($search) {
                     $q->where('name', 'like', "%{$search}%")
                         ->orWhere('nisn', 'like', "%{$search}%");
@@ -109,7 +109,7 @@ class ClassesController extends Controller
             $availableStudents = $availableStudentsQuery->orderBy('name')->get();
         }
 
-        return view('admin.master-data.classes', compact(
+        return view('admin.master-data.data-kelas', compact(
             'classes',
             'selectedClass',
             'students',
@@ -394,7 +394,7 @@ class ClassesController extends Controller
                 ->orderBy('name')
                 ->get();
 
-            $sourceClassId = $request->query('source_class_id');
+            $sourceClassId = $request->query('kelas_asal', $request->query('source_class_id', $request->query('kelas')));
             // Jika tidak ada atau bukan ID kelas yang valid, selalu default ke kelas pertama (per kelas)
             if (! $sourceClassId || $sourceClassId === 'all' || ! $classes->contains('id', $sourceClassId)) {
                 $sourceClassId = $classes->first()?->id;
@@ -403,7 +403,7 @@ class ClassesController extends Controller
 
         $selectedSourceClass = $classes->firstWhere('id', $sourceClassId);
 
-        $targetAcademicYearId = $request->query('target_academic_year_id');
+        $targetAcademicYearId = $request->query('tahun_ajaran_tujuan', $request->query('target_academic_year_id'));
         $targetAcademicYear = null;
         if ($targetAcademicYearId) {
             $targetAcademicYear = AcademicYear::find($targetAcademicYearId);
@@ -469,7 +469,7 @@ class ClassesController extends Controller
             ];
         });
 
-        return view('admin.master-data.classes-promotion', compact(
+        return view('admin.master-data.kenaikan-kelas', compact(
             'activeYear',
             'academicYears',
             'targetAcademicYear',

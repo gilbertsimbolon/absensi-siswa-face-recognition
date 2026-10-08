@@ -34,7 +34,7 @@
                 <div class="col-lg-6 d-flex flex-column justify-content-center align-items-center"
                     data-aos="fade-down-right" data-aos-duration="2000">
                     <h4 class="fw-bold">Sistem Kehadiran Pintar</h4>
-                    <p>Silahkan login terlebih dahulu.</p>
+                    <p>Silakan masuk terlebih dahulu.</p>
 
                     <form action="{{ route('login.store') }}" method="POST">
                         @csrf

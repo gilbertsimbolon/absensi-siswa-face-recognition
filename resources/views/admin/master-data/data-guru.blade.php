@@ -156,22 +156,22 @@
                 <!-- Filter & Pencarian -->
                 <form method="GET" action="{{ route('admin.teacher.index') }}" class="d-flex align-items-center gap-2 m-0 flex-nowrap">
                     <!-- Urutkan -->
-                    <select name="sort" class="form-select form-select-sm" style="width: 140px;" onchange="this.form.submit()">
-                        <option value="name_asc" {{ request('sort', 'name_asc') == 'name_asc' ? 'selected' : '' }}>Nama (A - Z)</option>
-                        <option value="name_desc" {{ request('sort') == 'name_desc' ? 'selected' : '' }}>Nama (Z - A)</option>
-                        <option value="nip_asc" {{ request('sort') == 'nip_asc' ? 'selected' : '' }}>NIP (Terkecil)</option>
-                        <option value="nip_desc" {{ request('sort') == 'nip_desc' ? 'selected' : '' }}>NIP (Terbesar)</option>
+                    <select name="urutkan" class="form-select form-select-sm" style="width: 140px;" onchange="this.form.submit()">
+                        <option value="nama_asc" {{ in_array(request('urutkan', request('sort', 'nama_asc')), ['nama_asc', 'name_asc']) ? 'selected' : '' }}>Nama (A - Z)</option>
+                        <option value="nama_desc" {{ in_array(request('urutkan', request('sort')), ['nama_desc', 'name_desc']) ? 'selected' : '' }}>Nama (Z - A)</option>
+                        <option value="nip_asc" {{ request('urutkan', request('sort')) == 'nip_asc' ? 'selected' : '' }}>NIP (Terkecil)</option>
+                        <option value="nip_desc" {{ request('urutkan', request('sort')) == 'nip_desc' ? 'selected' : '' }}>NIP (Terbesar)</option>
                     </select>
 
                     <div class="input-group input-group-sm" style="width: 240px;">
-                        <input type="text" name="search" class="form-control" placeholder="Cari nama, NIP, atau email..."
-                            value="{{ request('search') }}">
+                        <input type="text" name="cari" class="form-control" placeholder="Cari nama, NIP, atau email..."
+                            value="{{ request('cari', request('search')) }}">
                         <button class="btn btn-secondary" type="submit" title="Cari">
                             <i class="icon-base bx bx-search"></i>
                         </button>
                     </div>
 
-                    @if (request()->hasAny(['search', 'sort']) && (request('search') || request('sort') !== 'name_asc'))
+                    @if (request()->hasAny(['cari', 'search', 'urutkan', 'sort']) && (request('cari') || request('search') || !in_array(request('urutkan', request('sort', 'nama_asc')), ['nama_asc', 'name_asc'])))
                         <a href="{{ route('admin.teacher.index') }}" class="btn btn-sm btn-secondary" title="Reset Filter">
                             <i class="icon-base bx bx-reset"></i>
                         </a>

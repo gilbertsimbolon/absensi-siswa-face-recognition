@@ -21,8 +21,8 @@ class TeacherController extends Controller
     {
         $query = Teacher::with(['user', 'classes', 'faces']);
 
-        if ($request->filled('search')) {
-            $search = $request->search;
+        $search = $request->input('cari', $request->input('search'));
+        if (! empty($search)) {
             $query->where(function ($q) use ($search) {
                 $q->where('nip', 'like', "%{$search}%")
                     ->orWhere('phone', 'like', "%{$search}%")
@@ -33,10 +33,10 @@ class TeacherController extends Controller
             });
         }
 
-        $sort = $request->query('sort', 'name_asc');
-        if ($sort === 'name_asc') {
+        $sort = $request->query('urutkan', $request->query('sort', 'nama_asc'));
+        if ($sort === 'nama_asc' || $sort === 'name_asc') {
             $query->join('users', 'teachers.user_id', '=', 'users.id')->orderBy('users.name')->select('teachers.*');
-        } elseif ($sort === 'name_desc') {
+        } elseif ($sort === 'nama_desc' || $sort === 'name_desc') {
             $query->join('users', 'teachers.user_id', '=', 'users.id')->orderByDesc('users.name')->select('teachers.*');
         } elseif ($sort === 'nip_asc') {
             $query->orderBy('nip');

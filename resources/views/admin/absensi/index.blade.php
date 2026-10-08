@@ -36,7 +36,7 @@
                         <i class="icon-base bx bx-check-double me-1"></i> Tandai Massal
                     </button>
                 @endif
-                <a href="{{ route('admin.attendance.recap', ['class_id' => $selectedClass?->id]) }}" class="btn btn-outline-secondary btn-sm">
+                <a href="{{ route('admin.attendance.recap', ['kelas' => $selectedClass?->id]) }}" class="btn btn-outline-secondary btn-sm">
                     <i class="icon-base bx bx-bar-chart-alt-2 me-1"></i> Rekap Kehadiran
                 </a>
             </div>
@@ -51,7 +51,7 @@
                         @forelse ($classes as $cls)
                             <li class="nav-item">
                                 <a class="nav-link {{ $selectedClass && $selectedClass->id == $cls->id ? 'active fw-bold' : '' }}"
-                                    href="{{ route('admin.attendance.index', ['class_id' => $cls->id, 'date' => $selectedDate, 'status' => $statusFilter, 'sort_by' => $sortBy, 'sort_dir' => $sortDir]) }}">
+                                    href="{{ route('admin.attendance.index', ['kelas' => $cls->id, 'tanggal' => $selectedDate, 'status' => $statusFilter, 'urutkan' => $sortBy, 'arah' => $sortDir]) }}">
                                     {{ $cls->name }}
                                 </a>
                             </li>
@@ -68,19 +68,19 @@
             <div class="d-flex flex-wrap justify-content-between align-items-center px-3 py-2 border-bottom flex-shrink-0 gap-2 bg-white">
                 <!-- Filter Form -->
                 <form id="filterForm" action="{{ route('admin.attendance.index') }}" method="GET" class="d-flex align-items-center gap-2 m-0 flex-wrap">
-                    <input type="hidden" name="class_id" value="{{ $selectedClass?->id }}">
-                    <input type="hidden" name="sort_by" id="sortByInput" value="{{ $sortBy }}">
-                    <input type="hidden" name="sort_dir" id="sortDirInput" value="{{ $sortDir }}">
+                    <input type="hidden" name="kelas" value="{{ $selectedClass?->id }}">
+                    <input type="hidden" name="urutkan" id="sortByInput" value="{{ $sortBy }}">
+                    <input type="hidden" name="arah" id="sortDirInput" value="{{ $sortDir }}">
 
                     <div class="d-flex align-items-center gap-1">
                         <label class="form-label small mb-0 text-muted fw-semibold">Tanggal:</label>
-                        <input type="date" name="date" class="form-control form-control-sm" style="width: 135px;" value="{{ $selectedDate }}" onchange="document.getElementById('filterForm').submit();">
+                        <input type="date" name="tanggal" class="form-control form-control-sm" style="width: 135px;" value="{{ $selectedDate }}" onchange="document.getElementById('filterForm').submit();">
                     </div>
 
                     <div class="d-flex align-items-center gap-1">
                         <label class="form-label small mb-0 text-muted fw-semibold">Status:</label>
                         <select name="status" class="form-select form-select-sm" style="width: 125px;" onchange="document.getElementById('filterForm').submit();">
-                            <option value="all" {{ $statusFilter === 'all' ? 'selected' : '' }}>Semua</option>
+                            <option value="semua" {{ in_array($statusFilter, ['semua', 'all']) ? 'selected' : '' }}>Semua</option>
                             <option value="hadir" {{ $statusFilter === 'hadir' ? 'selected' : '' }}>Hadir</option>
                             <option value="terlambat" {{ $statusFilter === 'terlambat' ? 'selected' : '' }}>Terlambat</option>
                             <option value="sakit" {{ $statusFilter === 'sakit' ? 'selected' : '' }}>Sakit</option>
@@ -126,12 +126,12 @@
                             </th>
 
                             <!-- Sorting Nama Siswa -->
-                            <th style="width: 25%; cursor: pointer; user-select: none;" onclick="toggleDailySort('name')" title="Klik untuk mengurutkan Nama">
+                            <th style="width: 25%; cursor: pointer; user-select: none;" onclick="toggleDailySort('nama')" title="Klik untuk mengurutkan Nama">
                                 <div class="d-flex align-items-center gap-1">
                                     <span>Nama Siswa</span>
                                     <span class="d-inline-flex flex-column justify-content-center text-muted" style="line-height: 0.7;">
-                                        <i class="bx bxs-chevron-up {{ $sortBy === 'name' && $sortDir === 'asc' ? 'text-primary' : 'opacity-25' }}" style="font-size: 11px;"></i>
-                                        <i class="bx bxs-chevron-down {{ $sortBy === 'name' && $sortDir === 'desc' ? 'text-primary' : 'opacity-25' }}" style="font-size: 11px; margin-top: -3px;"></i>
+                                        <i class="bx bxs-chevron-up {{ in_array($sortBy, ['nama', 'name']) && $sortDir === 'asc' ? 'text-primary' : 'opacity-25' }}" style="font-size: 11px;"></i>
+                                        <i class="bx bxs-chevron-down {{ in_array($sortBy, ['nama', 'name']) && $sortDir === 'desc' ? 'text-primary' : 'opacity-25' }}" style="font-size: 11px; margin-top: -3px;"></i>
                                     </span>
                                 </div>
                             </th>
@@ -343,7 +343,7 @@
 
     <script>
         function toggleDailySort(column) {
-            const currentSortBy = '{{ $sortBy }}';
+            const currentSortBy = '{{ in_array($sortBy, ["nama", "name"]) ? "nama" : $sortBy }}';
             const currentSortDir = '{{ $sortDir }}';
             let newDir = 'asc';
 

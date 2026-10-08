@@ -41,7 +41,7 @@ test('admin can access daily attendance page and see students', function () {
     $response = $this->actingAs($this->admin)->get(route('admin.attendance.index', ['class_id' => $class->id]));
 
     $response->assertStatus(200);
-    $response->assertViewIs('admin.attendance.index');
+    $response->assertViewIs('admin.absensi.index');
     $response->assertSee('Absensi Harian');
     $response->assertSee('Budi Santoso');
     $response->assertSee('1234567890');
@@ -70,7 +70,7 @@ test('admin can access monthly attendance recapitulation page and see matrix', f
     ]));
 
     $response->assertStatus(200);
-    $response->assertViewIs('admin.attendance.recap');
+    $response->assertViewIs('admin.absensi.rekapitulasi');
     $response->assertSee('Rekapitulasi Kehadiran');
     $response->assertSee('Siti Nurhaliza');
 });
@@ -90,7 +90,7 @@ test('admin can access print recap page', function () {
     ]));
 
     $response->assertStatus(200);
-    $response->assertViewIs('admin.attendance.print-recap');
+    $response->assertViewIs('admin.absensi.cetak-rekapitulasi');
     $response->assertSee('REKAPITULASI KEHADIRAN SISWA');
     $response->assertSee('Ahmad Dahlan');
 });
@@ -168,4 +168,47 @@ test('teacher can only see their own class in attendance and recap', function ()
     $response->assertStatus(200);
     $response->assertSee('Kelas Guru');
     $response->assertDontSee('Kelas Lain');
+});
+
+test('admin can access recap with pure Indonesian query parameters for yearly mode', function () {
+    $class = Classes::factory()->create(['name' => 'XII-IPA 2', 'grade_level' => 'XII']);
+    $student = Student::factory()->create([
+        'class_id' => $class->id,
+        'name' => 'Michael Jordan',
+        'status' => 'aktif',
+    ]);
+
+    $response = $this->actingAs($this->admin)->get(route('admin.attendance.recap', [
+        'kelas' => $class->id,
+        'periode' => 'tahunan',
+        'tahun' => 2026,
+    ]));
+
+    $response->assertStatus(200);
+    $response->assertViewIs('admin.absensi.rekapitulasi');
+    $response->assertSee('Michael Jordan');
+    $response->assertSee('Tahun 2026');
+});
+
+test('admin can access daily attendance with pure Indonesian query parameters', function () {
+    $class = Classes::factory()->create(['name' => 'XI-IPS 1', 'grade_level' => 'XI']);
+    $student = Student::factory()->create([
+        'class_id' => $class->id,
+        'name' => 'Dewi Lestari',
+        'nisn' => '9876543210',
+        'status' => 'aktif',
+    ]);
+
+    $response = $this->actingAs($this->admin)->get(route('admin.attendance.index', [
+        'kelas' => $class->id,
+        'tanggal' => now()->format('Y-m-d'),
+        'status' => 'semua',
+        'urutkan' => 'nama',
+        'arah' => 'asc',
+    ]));
+
+    $response->assertStatus(200);
+    $response->assertViewIs('admin.absensi.index');
+    $response->assertSee('Dewi Lestari');
+    $response->assertSee('9876543210');
 });

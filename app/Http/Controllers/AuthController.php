@@ -11,7 +11,7 @@ class AuthController extends Controller
     // fungsi index
     public function index()
     {
-        return view('login');
+        return view('masuk');
     }
 
     // fungsi login

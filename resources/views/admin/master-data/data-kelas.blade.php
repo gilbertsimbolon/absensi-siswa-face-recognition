@@ -53,7 +53,7 @@
                         @forelse ($classes as $cls)
                             <li class="nav-item">
                                 <a class="nav-link {{ $selectedClass && $selectedClass->id == $cls->id ? 'active fw-bold' : '' }}"
-                                    href="{{ route('admin.classes.index', ['class_id' => $cls->id]) }}">
+                                    href="{{ route('admin.classes.index', ['kelas' => $cls->id]) }}">
                                     {{ $cls->name }}
                                 </a>
                             </li>
@@ -106,16 +106,16 @@
 
                         <!-- Pencarian Siswa -->
                         <form method="GET" action="{{ route('admin.classes.index') }}" class="d-flex align-items-center m-0">
-                            <input type="hidden" name="class_id" value="{{ $selectedClass->id }}">
+                            <input type="hidden" name="kelas" value="{{ $selectedClass->id }}">
                             <div class="input-group input-group-sm" style="width: 180px;">
-                                <input type="text" name="search_student" class="form-control" placeholder="Cari siswa..."
-                                    value="{{ request('search_student') }}">
+                                <input type="text" name="cari_siswa" class="form-control" placeholder="Cari siswa..."
+                                    value="{{ request('cari_siswa', request('search_student')) }}">
                                 <button class="btn btn-secondary" type="submit" title="Cari">
                                     <i class="icon-base bx bx-search"></i>
                                 </button>
                             </div>
-                            @if (request('search_student'))
-                                <a href="{{ route('admin.classes.index', ['class_id' => $selectedClass->id]) }}" class="btn btn-sm btn-secondary ms-1" title="Reset">
+                            @if (request('cari_siswa') || request('search_student'))
+                                <a href="{{ route('admin.classes.index', ['kelas' => $selectedClass->id]) }}" class="btn btn-sm btn-secondary ms-1" title="Reset">
                                     <i class="icon-base bx bx-reset"></i>
                                 </a>
                             @endif
@@ -125,7 +125,7 @@
                             <i class="icon-base bx bx-user-plus me-1"></i> Masukkan Siswa
                         </button>
 
-                        <a href="{{ route('admin.promotion.index', ['source_class_id' => $selectedClass->id]) }}" class="btn btn-sm btn-outline-primary" title="Kenaikan Kelas {{ $selectedClass->name }}">
+                        <a href="{{ route('admin.promotion.index', ['kelas_asal' => $selectedClass->id]) }}" class="btn btn-sm btn-outline-primary" title="Kenaikan Kelas {{ $selectedClass->name }}">
                             <i class="icon-base bx bx-trending-up me-1"></i> Kenaikan Kelas
                         </a>
 

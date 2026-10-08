@@ -32,11 +32,11 @@
 
     <ul class="menu-inner py-1 flex-grow-1 overflow-auto" style="overflow-y: auto !important; height: calc(100vh - 150px);">
 
-        <!-- Dashboard -->
+        <!-- Beranda -->
         <li class="menu-item {{ request()->routeIs('admin.dashboard.*') ? 'active' : '' }}">
             <a href="{{ route('admin.dashboard.index') }}" class="menu-link">
                 <i class="menu-icon tf-icons bx bx-home-circle"></i>
-                <div>Dashboard</div>
+                <div>Beranda</div>
             </a>
         </li>
 

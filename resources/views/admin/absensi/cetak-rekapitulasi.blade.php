@@ -78,9 +78,9 @@
     <div class="text-center mb-3">
         <h6 class="fw-bold text-uppercase mb-1" style="letter-spacing: 0.5px;">
             REKAPITULASI KEHADIRAN SISWA
-            @if ($period === 'weekly')
+            @if (in_array($period, ['mingguan', 'weekly']))
                 (MINGGUAN)
-            @elseif ($period === 'monthly')
+            @elseif (in_array($period, ['bulanan', 'monthly']))
                 (BULANAN)
             @else
                 (TAHUNAN)
@@ -89,9 +89,9 @@
         <div class="small">
             Kelas: <strong>{{ $selectedClass->name }}</strong> &nbsp;|&nbsp; 
             Wali Kelas: <strong>{{ $selectedClass->teacher?->user?->name ?? '-' }}</strong> &nbsp;|&nbsp; 
-            @if ($period === 'weekly')
+            @if (in_array($period, ['mingguan', 'weekly']))
                 Periode: <strong>{{ $weekStart ? $weekStart->locale('id')->translatedFormat('d M Y') : '' }} s/d {{ $weekEnd ? $weekEnd->locale('id')->translatedFormat('d M Y') : '' }}</strong>
-            @elseif ($period === 'monthly')
+            @elseif (in_array($period, ['bulanan', 'monthly']))
                 Periode: <strong>{{ $monthNames[$selectedMonth] ?? '' }} {{ $selectedYear }}</strong>
             @else
                 Periode: <strong>Tahun {{ $selectedYear }} (1 Tahun Penuh)</strong>
@@ -109,7 +109,7 @@
                 <th rowspan="2" class="text-start ps-2" style="min-width: 170px;">Nama Siswa</th>
                 <th rowspan="2" style="width: 30px;">L/P</th>
 
-                @if ($period === 'yearly')
+                @if (in_array($period, ['tahunan', 'yearly']))
                     <th colspan="{{ count($monthsInfo) }}">Bulan</th>
                 @else
                     <th colspan="{{ count($daysInfo) }}">Tanggal</th>
@@ -118,14 +118,14 @@
                 <th colspan="6">Rekapitulasi Kehadiran</th>
             </tr>
             <tr style="background-color: #f7f7f7;">
-                @if ($period === 'weekly')
+                @if (in_array($period, ['mingguan', 'weekly']))
                     @foreach ($daysInfo as $day)
                         <th style="min-width: 80px;">
                             <div class="fw-bold">{{ $day['day_name'] }}</div>
                             <div style="font-size: 9px; font-weight: normal;">{{ $day['short_label'] }}</div>
                         </th>
                     @endforeach
-                @elseif ($period === 'monthly')
+                @elseif (in_array($period, ['bulanan', 'monthly']))
                     @foreach ($daysInfo as $day)
                         <th style="min-width: 28px;">
                             <div style="font-size: 8px;">{{ $day['day_name'] }}</div>
@@ -154,7 +154,7 @@
                     <td class="text-start ps-2 fw-semibold">{{ $st->name }}</td>
                     <td>{{ $st->gender }}</td>
 
-                    @if ($period === 'weekly')
+                    @if (in_array($period, ['mingguan', 'weekly']))
                         @foreach ($daysInfo as $day)
                             @php
                                 $att = $st->matrix[$day['key']] ?? null;
@@ -177,7 +177,7 @@
                                 @endif
                             </td>
                         @endforeach
-                    @elseif ($period === 'monthly')
+                    @elseif (in_array($period, ['bulanan', 'monthly']))
                         @foreach ($daysInfo as $day)
                             @php
                                 $att = $st->matrix[$day['key']] ?? null;
