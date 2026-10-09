@@ -85,6 +85,13 @@
             <span class="menu-header-text">Absensi</span>
         </li>
 
+        <li class="menu-item {{ request()->routeIs('admin.attendance.pindai*') ? 'active' : '' }}">
+            <a href="{{ route('admin.attendance.pindai') }}" class="menu-link">
+                <i class="menu-icon tf-icons bx bx-scan text-primary"></i>
+                <div class="fw-semibold">Pindai Wajah</div>
+            </a>
+        </li>
+
         <li class="menu-item {{ request()->routeIs('admin.attendance.index') ? 'active' : '' }}">
             <a href="{{ route('admin.attendance.index') }}" class="menu-link">
                 <i class="menu-icon tf-icons bx bx-calendar-check"></i>

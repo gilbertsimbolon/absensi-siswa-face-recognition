@@ -6,6 +6,7 @@ use App\Models\Classes;
 use App\Models\Student;
 use App\Models\Teacher;
 use App\Models\User;
+use App\Services\PythonServiceManager;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\Models\Role;
 
@@ -211,4 +212,75 @@ test('admin can access daily attendance with pure Indonesian query parameters', 
     $response->assertViewIs('admin.absensi.index');
     $response->assertSee('Dewi Lestari');
     $response->assertSee('9876543210');
+});
+
+test('admin can access attendance scanner page', function () {
+    $response = $this->actingAs($this->admin)->get(route('admin.attendance.pindai'));
+
+    $response->assertStatus(200);
+    $response->assertViewIs('admin.absensi.pindai');
+    $response->assertSee('Pindai Wajah Presensi Otomatis');
+});
+
+test('proses pindai can record student attendance by nisn', function () {
+    $class = Classes::factory()->create(['name' => 'X-1', 'grade_level' => 'X']);
+    $student = Student::factory()->create([
+        'class_id' => $class->id,
+        'name' => 'Aditya Pratama',
+        'nisn' => '0011223344',
+        'status' => 'aktif',
+    ]);
+
+    $response = $this->actingAs($this->admin)->postJson(route('admin.attendance.proses-pindai'), [
+        'nisn' => '0011223344',
+        'skor_akurasi' => 0.95,
+    ]);
+
+    $response->assertStatus(200);
+    $response->assertJson([
+        'status' => 'sukses',
+        'tipe' => 'masuk',
+        'siswa' => [
+            'nama' => 'Aditya Pratama',
+            'nisn' => '0011223344',
+        ],
+    ]);
+
+    $this->assertDatabaseHas('attendances', [
+        'student_id' => $student->id,
+        'method' => Attendance::METHOD_FACE,
+    ]);
+});
+
+test('attendance scanner page does not contain any javascript script tags and renders native mjpeg stream structure', function () {
+    $response = $this->actingAs($this->admin)->get(route('admin.attendance.pindai'));
+
+    $response->assertStatus(200);
+    $response->assertViewIs('admin.absensi.pindai');
+    $response->assertSee('Pindai Wajah Presensi Otomatis');
+
+    // Pastikan berkas Blade pindai tidak mengandung tag <script> sama sekali
+    $viewContent = file_get_contents(resource_path('views/admin/absensi/pindai.blade.php'));
+    expect($viewContent)->not->toContain('<script')
+        ->not->toContain('getUserMedia')
+        ->not->toContain('status-scanner')
+        ->toContain('id="opencv-feed"')
+        ->toContain('/video_feed');
+});
+
+test('ganti kamera route changes camera and redirects back without javascript', function () {
+    $response = $this->actingAs($this->admin)
+        ->from(route('admin.attendance.pindai'))
+        ->post(route('admin.attendance.pindai.kamera'), [
+            'sumber' => 0,
+        ]);
+
+    $response->assertRedirect(route('admin.attendance.pindai'));
+});
+
+test('python service manager provides structured status and handles state cleanly', function () {
+    $status = PythonServiceManager::getStatus();
+
+    expect($status)->toBeArray()
+        ->toHaveKeys(['online', 'fps', 'camera_source', 'latest_result', 'message']);
 });

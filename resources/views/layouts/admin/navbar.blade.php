@@ -18,7 +18,7 @@
                     </span>
 
                     <small class="text-muted">
-                        {{ ucfirst(Auth::user()->getRoleNames()->first()) }}
+                        {{ ucfirst(Auth::user()?->getRoleNames()?->first() ?? 'Pengguna') }}
                     </small>
 
                 </a>

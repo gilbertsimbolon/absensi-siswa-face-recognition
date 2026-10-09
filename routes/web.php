@@ -11,9 +11,9 @@ use Illuminate\Support\Facades\Route;
 // Otentikasi Masuk & Keluar
 Route::get('/', [AuthController::class, 'index'])->name('login.index');
 Route::get('/masuk', [AuthController::class, 'index'])->name('masuk.index');
+Route::get('/login', [AuthController::class, 'index'])->name('login');
 Route::post('/masuk', [AuthController::class, 'login'])->name('login.store');
 Route::post('/login', [AuthController::class, 'login']);
-Route::get('/login', fn () => redirect()->route('login.index'));
 
 Route::post('/keluar', [AuthController::class, 'logout'])->name('logout');
 Route::post('/logout', [AuthController::class, 'logout']);
@@ -65,6 +65,19 @@ Route::middleware(['auth', 'role:admin|teacher'])->prefix('admin')->group(functi
     Route::post('/absensi/bulk', [AttendanceController::class, 'bulkMark']);
     Route::delete('/absensi/{attendance}', [AttendanceController::class, 'destroy'])->name('admin.attendance.destroy');
 
+    // Route Pindai Wajah Otomatis (Scanner HP / Desktop)
+    Route::get('/absensi/pindai', [AttendanceController::class, 'pindai'])->name('admin.attendance.pindai');
+    Route::post('/absensi/pindai/kamera', [AttendanceController::class, 'gantiKamera'])->name('admin.attendance.pindai.kamera');
+
     Route::get('/rekapitulasi', [AttendanceController::class, 'recap'])->name('admin.attendance.recap');
     Route::get('/rekapitulasi/cetak', [AttendanceController::class, 'printRecap'])->name('admin.attendance.print');
 });
+
+// Endpoint Proses Presensi Pindai Wajah (Akses Web Scanner & Kiosk / AI)
+Route::post('/admin/absensi/proses-pindai', [AttendanceController::class, 'prosesPindai'])->name('admin.attendance.proses-pindai');
+Route::post('/api/presensi/pindai-wajah', [AttendanceController::class, 'prosesPindai'])->name('api.presensi.pindai-wajah');
+Route::get('/api/presensi/daftar-siswa', [AttendanceController::class, 'daftarSiswa'])->name('api.presensi.daftar-siswa');
+
+// Shortcut URL Pindai untuk Akses Cepat di HP / Kiosk (Dapat diakses langsung)
+Route::get('/pindai', [AttendanceController::class, 'pindai'])->name('attendance.pindai');
+Route::post('/pindai/kamera', [AttendanceController::class, 'gantiKamera'])->name('attendance.pindai.kamera');

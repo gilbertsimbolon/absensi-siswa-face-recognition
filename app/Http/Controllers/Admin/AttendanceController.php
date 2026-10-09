@@ -7,9 +7,12 @@ use App\Models\AcademicYear;
 use App\Models\Attendance;
 use App\Models\Classes;
 use App\Models\Student;
+use App\Services\PythonServiceManager;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 
 class AttendanceController extends Controller
@@ -698,5 +701,296 @@ class AttendanceController extends Controller
         $attendance->delete();
 
         return redirect()->back()->with('success', 'Berhasil');
+    }
+
+    /**
+     * Halaman Pindai Wajah Otomatis (Scanner HP / Desktop).
+     */
+    public function pindai(Request $request)
+    {
+        $activeYear = AcademicYear::getActive() ?? AcademicYear::first();
+        $classes = $this->getAccessibleClasses();
+        $selectedClassId = $request->query('kelas', $request->query('class_id'));
+        $selectedClass = $selectedClassId ? $classes->firstWhere('id', (int) $selectedClassId) : null;
+
+        $today = Carbon::today()->format('Y-m-d');
+
+        // Riwayat scan presensi hari ini
+        $riwayatPindaiQuery = Attendance::with(['student.classes', 'student.faces'])
+            ->whereDate('date', $today)
+            ->where('method', Attendance::METHOD_FACE);
+
+        if ($selectedClass) {
+            $riwayatPindaiQuery->where('class_id', $selectedClass->id);
+        }
+
+        $riwayatPindai = $riwayatPindaiQuery->latest('updated_at')->take(10)->get();
+
+        $stats = [
+            'total_hadir' => Attendance::whereDate('date', $today)->whereIn('status', [Attendance::STATUS_HADIR, Attendance::STATUS_TERLAMBAT])->count(),
+            'tepat_waktu' => Attendance::whereDate('date', $today)->where('status', Attendance::STATUS_HADIR)->count(),
+            'terlambat' => Attendance::whereDate('date', $today)->where('status', Attendance::STATUS_TERLAMBAT)->count(),
+        ];
+
+        $hideLayout = ! Auth::check();
+
+        // Jalankan dan periksa status layanan Python secara otomatis
+        $launchResult = PythonServiceManager::ensureRunning();
+        $pythonStatus = PythonServiceManager::getStatus();
+        if (! $pythonStatus['online'] && isset($launchResult['message'])) {
+            $pythonStatus['message'] = $launchResult['message'];
+        }
+
+        return view('admin.absensi.pindai', compact('activeYear', 'classes', 'selectedClass', 'riwayatPindai', 'stats', 'hideLayout', 'pythonStatus'));
+    }
+
+    /**
+     * Ganti sumber kamera pada layanan Python secara native tanpa JavaScript.
+     */
+    public function gantiKamera(Request $request)
+    {
+        $sumber = $request->input('sumber', 0);
+        $result = PythonServiceManager::changeCamera($sumber);
+
+        $pesan = $result['pesan'] ?? 'Sumber kamera berhasil diubah.';
+        $tipe = ($result['status'] ?? 'error') === 'sukses' ? 'success' : 'warning';
+
+        return back()->with($tipe, $pesan);
+    }
+
+    /**
+     * Proses hasil pindai kamera (penerima data pengenalan wajah).
+     */
+    public function prosesPindai(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'nisn' => 'nullable|string',
+            'gambar' => 'nullable|string',
+            'skor_akurasi' => 'nullable|numeric',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => 'error',
+                'pesan' => 'Parameter tidak valid.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $nisn = $request->input('nisn');
+        $skorAkurasi = $request->input('skor_akurasi');
+        $gambarBase64 = $request->input('gambar');
+        $frameAnnotated = null;
+
+        // Jika NISN belum ada tetapi ada gambar, teruskan ke microservice Python DeepFace & OpenCV
+        if (! $nisn && $gambarBase64) {
+            try {
+                $pythonUrl = config('services.deepface.url', 'http://127.0.0.1:5000/proses-frame');
+                $response = Http::timeout(8)->post($pythonUrl, [
+                    'gambar' => $gambarBase64,
+                ]);
+
+                if ($response->successful()) {
+                    $aiData = $response->json();
+                    $frameAnnotated = $aiData['frame_annotated'] ?? null;
+                    $hasil = $aiData['hasil'] ?? [];
+
+                    if (($aiData['status'] ?? '') === 'sukses' && ! empty($hasil['nisn'] ?? $aiData['nisn'] ?? null)) {
+                        $nisn = $hasil['nisn'] ?? $aiData['nisn'];
+                        $skorAkurasi = $hasil['akurasi'] ?? $aiData['skor_akurasi'] ?? null;
+                    } elseif (($aiData['status'] ?? '') === 'tidak_ada_wajah') {
+                        return response()->json([
+                            'status' => 'tidak_ada_wajah',
+                            'pesan' => 'Wajah tidak terdeteksi pada kamera.',
+                            'frame_annotated' => $frameAnnotated,
+                        ], 200);
+                    } else {
+                        return response()->json([
+                            'status' => 'tidak_dikenali',
+                            'pesan' => $hasil['pesan'] ?? $aiData['pesan'] ?? 'Wajah tidak cocok dengan data siswa terdaftar.',
+                            'frame_annotated' => $frameAnnotated,
+                        ], 200);
+                    }
+                } else {
+                    return response()->json([
+                        'status' => 'error_ai',
+                        'pesan' => 'Layanan AI pengenalan wajah sedang bermasalah.',
+                    ], 502);
+                }
+            } catch (\Exception $e) {
+                return response()->json([
+                    'status' => 'error_ai',
+                    'pesan' => 'Tidak dapat terhubung ke server AI DeepFace: '.$e->getMessage(),
+                ], 503);
+            }
+        }
+
+        if (! $nisn) {
+            return response()->json([
+                'status' => 'error',
+                'pesan' => 'NISN atau data wajah wajib disertakan.',
+            ], 400);
+        }
+
+        $student = Student::with(['classes', 'faces'])->where('nisn', $nisn)->first();
+
+        if (! $student) {
+            return response()->json([
+                'status' => 'tidak_ditemukan',
+                'pesan' => "Data siswa dengan NISN {$nisn} tidak ditemukan di sistem.",
+            ], 404);
+        }
+
+        // Validasi hak akses guru
+        $user = Auth::user();
+        if ($user && $user->hasRole('teacher') && ! $user->hasRole('admin')) {
+            $teacher = $user->teacher;
+            $class = Classes::where('teacher_id', $teacher?->id)->first();
+            if (! $class || $student->class_id !== $class->id) {
+                return response()->json([
+                    'status' => 'akses_ditolak',
+                    'pesan' => "Siswa {$student->name} bukan anggota kelas binaan Anda.",
+                ], 403);
+            }
+        }
+
+        $activeYear = AcademicYear::getActive() ?? AcademicYear::first();
+        $now = Carbon::now();
+        $today = Carbon::today()->format('Y-m-d');
+
+        // Tentukan batas jam sekolah (07:15)
+        $jamBatasMasuk = Carbon::today()->setTime(7, 15, 0);
+        $statusKehadiran = $now->greaterThan($jamBatasMasuk) ? Attendance::STATUS_TERLAMBAT : Attendance::STATUS_HADIR;
+
+        // Simpan snapshot jika dikirimkan
+        $snapshotPath = null;
+        if ($gambarBase64 && str_contains($gambarBase64, ',')) {
+            try {
+                $imageParts = explode(';base64,', $gambarBase64);
+                $imageData = base64_decode($imageParts[1]);
+                $filename = "snapshots/{$today}/{$student->nisn}_".time().'.jpg';
+                Storage::disk('public')->put($filename, $imageData);
+                $snapshotPath = $filename;
+            } catch (\Exception $e) {
+                // Lanjut jika penyimpanan snapshot gagal
+            }
+        }
+
+        // Cek data presensi hari ini
+        $attendance = Attendance::where('student_id', $student->id)
+            ->whereDate('date', $today)
+            ->first();
+
+        // Skenario Pulang jika sudah lewat pukul 12:00 dan sudah absen masuk
+        if ($attendance && $now->hour >= 12) {
+            if (! $attendance->check_out_time) {
+                $attendance->update([
+                    'check_out_time' => $now->format('H:i:s'),
+                ]);
+
+                return response()->json([
+                    'status' => 'sukses',
+                    'tipe' => 'pulang',
+                    'pesan' => "Presensi pulang berhasil dicatat untuk {$student->name}!",
+                    'frame_annotated' => $frameAnnotated,
+                    'siswa' => [
+                        'id' => $student->id,
+                        'nama' => $student->name,
+                        'nisn' => $student->nisn,
+                        'kelas' => $student->classes?->name ?? '-',
+                        'status' => $attendance->status_label,
+                        'status_kode' => $attendance->status,
+                        'jam' => $now->format('H:i:s'),
+                        'foto' => $student->faces->first()?->file_path ? asset('storage/'.$student->faces->first()->file_path) : null,
+                    ],
+                ]);
+            }
+
+            return response()->json([
+                'status' => 'sudah_absen',
+                'tipe' => 'sudah_pulang',
+                'pesan' => "{$student->name} sudah melakukan presensi pulang hari ini.",
+                'frame_annotated' => $frameAnnotated,
+                'siswa' => [
+                    'id' => $student->id,
+                    'nama' => $student->name,
+                    'nisn' => $student->nisn,
+                    'kelas' => $student->classes?->name ?? '-',
+                    'status' => $attendance->status_label,
+                    'status_kode' => $attendance->status,
+                    'jam' => Carbon::parse($attendance->check_out_time)->format('H:i:s'),
+                    'foto' => $student->faces->first()?->file_path ? asset('storage/'.$student->faces->first()->file_path) : null,
+                ],
+            ]);
+        }
+
+        // Skenario Masuk jika sudah absen sebelumnya hari ini
+        if ($attendance) {
+            return response()->json([
+                'status' => 'sudah_absen',
+                'tipe' => 'sudah_masuk',
+                'pesan' => "{$student->name} sudah tercatat presensi masuk pukul ".Carbon::parse($attendance->check_in_time)->format('H:i').' WIB.',
+                'frame_annotated' => $frameAnnotated,
+                'siswa' => [
+                    'id' => $student->id,
+                    'nama' => $student->name,
+                    'nisn' => $student->nisn,
+                    'kelas' => $student->classes?->name ?? '-',
+                    'status' => $attendance->status_label,
+                    'status_kode' => $attendance->status,
+                    'jam' => Carbon::parse($attendance->check_in_time)->format('H:i:s'),
+                    'foto' => $student->faces->first()?->file_path ? asset('storage/'.$student->faces->first()->file_path) : null,
+                ],
+            ]);
+        }
+
+        // Simpan Presensi Masuk Baru
+        $attendance = Attendance::create([
+            'student_id' => $student->id,
+            'class_id' => $student->class_id,
+            'academic_year_id' => $activeYear?->id,
+            'date' => $today,
+            'check_in_time' => $now->format('H:i:s'),
+            'status' => $statusKehadiran,
+            'method' => Attendance::METHOD_FACE,
+            'confidence_score' => $skorAkurasi ? (float) $skorAkurasi : null,
+            'snapshot_path' => $snapshotPath,
+            'notes' => 'Presensi otomatis melalui pindai wajah',
+        ]);
+
+        return response()->json([
+            'status' => 'sukses',
+            'tipe' => 'masuk',
+            'pesan' => "Presensi masuk berhasil dicatat! Status: {$attendance->status_label}.",
+            'frame_annotated' => $frameAnnotated,
+            'siswa' => [
+                'id' => $student->id,
+                'nama' => $student->name,
+                'nisn' => $student->nisn,
+                'kelas' => $student->classes?->name ?? '-',
+                'status' => $attendance->status_label,
+                'status_kode' => $attendance->status,
+                'jam' => $now->format('H:i:s'),
+                'foto' => $student->faces->first()?->file_path ? asset('storage/'.$student->faces->first()->file_path) : null,
+            ],
+        ]);
+    }
+
+    /**
+     * Dapatkan peta seluruh data siswa (NISN => Nama & Kelas) untuk layanan AI Scanner.
+     */
+    public function daftarSiswa()
+    {
+        $students = Student::with('classes')->get()->mapWithKeys(function ($student) {
+            return [
+                $student->nisn => [
+                    'id' => $student->id,
+                    'nama' => $student->name,
+                    'kelas' => $student->classes?->name ?? '-',
+                ],
+            ];
+        });
+
+        return response()->json($students);
     }
 }

@@ -35,4 +35,10 @@ return [
         ],
     ],
 
+    'deepface' => [
+        'url' => env('DEEPFACE_SERVICE_URL', 'http://127.0.0.1:5000/kenali-wajah'),
+        'base_url' => env('PYTHON_SERVICE_BASE_URL', 'http://127.0.0.1:5000'),
+        'python_binary' => env('PYTHON_BINARY', 'python'),
+    ],
+
 ];
