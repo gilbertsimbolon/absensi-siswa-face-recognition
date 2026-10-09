@@ -106,101 +106,47 @@
             </a>
         </li>
 
-        <!-- LAPORAN -->
-        <li class="menu-header small text-uppercase">
-            <span class="menu-header-text">Laporan</span>
-        </li>
-
-        <li class="menu-item">
-            <a href="javascript:void(0);" class="menu-link menu-toggle">
-                <i class="menu-icon tf-icons bx bx-bar-chart-alt-2"></i>
-                <div>Laporan</div>
-            </a>
-
-            <ul class="menu-sub">
-
-                <li class="menu-item">
-                    <a href="#" class="menu-link">
-                        <div>Laporan Harian</div>
-                    </a>
-                </li>
-
-                <li class="menu-item">
-                    <a href="#" class="menu-link">
-                        <div>Laporan Bulanan</div>
-                    </a>
-                </li>
-
-                <li class="menu-item">
-                    <a href="#" class="menu-link">
-                        <div>Laporan per Kelas</div>
-                    </a>
-                </li>
-
-            </ul>
-        </li>
-
         <!-- MANAJEMEN USER -->
-        <li class="menu-header small text-uppercase">
-            <span class="menu-header-text">Manajemen</span>
-        </li>
+        @if (!auth()->check() || auth()->user()->hasRole('admin'))
+            <li class="menu-header small text-uppercase">
+                <span class="menu-header-text">Manajemen</span>
+            </li>
 
-        <li class="menu-item">
-            <a href="javascript:void(0);" class="menu-link menu-toggle">
-                <i class="menu-icon tf-icons bx bx-user"></i>
-                <div>Manajemen User</div>
-            </a>
+            <li class="menu-item {{ request()->routeIs('admin.users.*') ? 'active' : '' }}">
+                <a href="javascript:void(0);" class="menu-link">
+                    <i class="menu-icon tf-icons bx bx-user"></i>
+                    <div>Manajemen User</div>
+                </a>
+            </li>
 
-            <ul class="menu-sub">
+            <!-- PENGATURAN -->
+            <li class="menu-header small text-uppercase">
+                <span class="menu-header-text">Pengaturan</span>
+            </li>
 
-                <li class="menu-item">
-                    <a href="#" class="menu-link">
-                        <div>Data User</div>
-                    </a>
-                </li>
+            <li class="menu-item">
+                <a href="javascript:void(0);" class="menu-link menu-toggle">
+                    <i class="menu-icon tf-icons bx bx-cog"></i>
+                    <div>Pengaturan</div>
+                </a>
 
-                <li class="menu-item">
-                    <a href="#" class="menu-link">
-                        <div>Role & Hak Akses</div>
-                    </a>
-                </li>
+                <ul class="menu-sub">
 
-            </ul>
-        </li>
+                    <li class="menu-item">
+                        <a href="javascript:void(0);" class="menu-link">
+                            <div>Jam Sekolah</div>
+                        </a>
+                    </li>
 
-        <!-- PENGATURAN -->
-        <li class="menu-header small text-uppercase">
-            <span class="menu-header-text">Pengaturan</span>
-        </li>
+                    <li class="menu-item">
+                        <a href="javascript:void(0);" class="menu-link">
+                            <div>Backup Database</div>
+                        </a>
+                    </li>
 
-        <li class="menu-item">
-            <a href="javascript:void(0);" class="menu-link menu-toggle">
-                <i class="menu-icon tf-icons bx bx-cog"></i>
-                <div>Pengaturan</div>
-            </a>
-
-            <ul class="menu-sub">
-
-                <li class="menu-item">
-                    <a href="#" class="menu-link">
-                        <div>Profil Sekolah</div>
-                    </a>
-                </li>
-
-                <li class="menu-item">
-                    <a href="#" class="menu-link">
-                        <div>Jam Sekolah</div>
-                    </a>
-                </li>
-
-                <li class="menu-item">
-                    <a href="#" class="menu-link">
-                        <div>Backup Database</div>
-                    </a>
-                </li>
-
-            </ul>
-        </li>
+                </ul>
+            </li>
+        @endif
 
     </ul>
 
