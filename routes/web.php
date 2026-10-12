@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\AttendanceController;
 use App\Http\Controllers\Admin\ClassesController;
 use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\NotificationSettingController;
 use App\Http\Controllers\Admin\StudentController;
 use App\Http\Controllers\Admin\TeacherController;
 use App\Http\Controllers\Admin\UserController;
@@ -46,6 +47,12 @@ Route::middleware(['auth', 'role:admin|teacher'])->prefix('admin')->group(functi
         Route::put('/data-kelas/{class}/wali-kelas', [ClassesController::class, 'updateTeacher'])->name('admin.classes.teacher.update');
         Route::post('/data-kelas/tahun-ajaran', [ClassesController::class, 'storeAcademicYear'])->name('admin.classes.academic-year.store');
         Route::put('/data-kelas/tahun-ajaran/{academicYear}/aktifkan', [ClassesController::class, 'setActiveAcademicYear'])->name('admin.classes.academic-year.set-active');
+
+        // Pengaturan Notifikasi WhatsApp (Baileys)
+        Route::get('/pengaturan/notifikasi', [NotificationSettingController::class, 'index'])->name('admin.settings.notification');
+        Route::post('/pengaturan/notifikasi', [NotificationSettingController::class, 'update'])->name('admin.settings.notification.update');
+        Route::post('/pengaturan/notifikasi/uji-coba', [NotificationSettingController::class, 'testSend'])->name('admin.settings.notification.test');
+        Route::get('/pengaturan/notifikasi/status-gateway', [NotificationSettingController::class, 'status'])->name('admin.settings.notification.status');
     });
 
     // Route Data Kelas (Bisa diakses Admin & Guru Wali Kelas)

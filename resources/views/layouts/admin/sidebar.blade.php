@@ -124,13 +124,19 @@
                 <span class="menu-header-text">Pengaturan</span>
             </li>
 
-            <li class="menu-item">
+            <li class="menu-item {{ request()->routeIs('admin.settings.*') ? 'active open' : '' }}">
                 <a href="javascript:void(0);" class="menu-link menu-toggle">
                     <i class="menu-icon tf-icons bx bx-cog"></i>
                     <div>Pengaturan</div>
                 </a>
 
                 <ul class="menu-sub">
+
+                    <li class="menu-item {{ request()->routeIs('admin.settings.notification*') ? 'active' : '' }}">
+                        <a href="{{ route('admin.settings.notification') }}" class="menu-link">
+                            <div>Notifikasi WA</div>
+                        </a>
+                    </li>
 
                     <li class="menu-item">
                         <a href="javascript:void(0);" class="menu-link">

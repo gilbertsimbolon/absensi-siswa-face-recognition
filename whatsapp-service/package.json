@@ -1,0 +1,21 @@
+{
+  "name": "whatsapp-service-baileys",
+  "version": "1.0.0",
+  "description": "WhatsApp Baileys Gateway Service untuk Presensi SMAN 2 Tondano",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "pm2:start": "pm2 start server.js --name wa-service",
+    "pm2:stop": "pm2 stop wa-service",
+    "pm2:restart": "pm2 restart wa-service",
+    "pm2:logs": "pm2 logs wa-service"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.13",
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "pino": "^9.6.0",
+    "qrcode": "^1.5.4"
+  }
+}

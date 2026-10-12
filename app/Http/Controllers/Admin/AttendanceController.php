@@ -8,6 +8,7 @@ use App\Models\Attendance;
 use App\Models\Classes;
 use App\Models\Student;
 use App\Services\PythonServiceManager;
+use App\Services\WhatsAppService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -607,7 +608,7 @@ class AttendanceController extends Controller
 
         $targetDate = Carbon::parse($request->date)->format('Y-m-d');
 
-        Attendance::updateOrCreate(
+        $attendance = Attendance::updateOrCreate(
             [
                 'student_id' => $student->id,
                 'date' => $targetDate,
@@ -622,6 +623,13 @@ class AttendanceController extends Controller
                 'notes' => $request->notes,
             ]
         );
+
+        // Kirim notifikasi WhatsApp otomatis jika status hadir / terlambat
+        try {
+            WhatsAppService::sendAttendanceNotification($attendance);
+        } catch (\Exception $e) {
+            // Abaikan error agar proses penyimpanan tidak terganggu
+        }
 
         return redirect()->back()->with('success', 'Berhasil');
     }
@@ -976,6 +984,13 @@ class AttendanceController extends Controller
             'snapshot_path' => $snapshotPath,
             'notes' => 'Presensi otomatis melalui pindai wajah',
         ]);
+
+        // Kirim notifikasi WhatsApp otomatis ke orang tua / siswa
+        try {
+            WhatsAppService::sendAttendanceNotification($attendance);
+        } catch (\Exception $e) {
+            // Jangan gagalkan respons scanner jika pengiriman WhatsApp bermasalah
+        }
 
         return response()->json([
             'status' => 'sukses',
