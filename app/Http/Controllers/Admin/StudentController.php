@@ -9,6 +9,8 @@ use App\Models\StudentFace;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 
@@ -198,6 +200,14 @@ class StudentController extends Controller
             File::deleteDirectory($pythonDatasetPath);
         }
 
+        // Hapus embedding di memori dan cache Python DeepFace FaceNet
+        try {
+            $pythonUrl = config('services.deepface.base_url', 'http://127.0.0.1:5000').'/hapus-siswa/'.$student->nisn;
+            Http::timeout(5)->delete($pythonUrl);
+        } catch (\Throwable $e) {
+            Log::warning("Gagal menghapus embedding FaceNet di Python untuk {$student->nisn}: ".$e->getMessage());
+        }
+
         // 4. Hapus relasi record student_faces di database
         $student->faces()->delete();
 
@@ -224,8 +234,11 @@ class StudentController extends Controller
             File::makeDirectory($pythonDatasetDir, 0755, true);
         }
 
+        $anyPhotoUploaded = false;
+
         foreach ($photoInputs as $inputKey => $label) {
             if ($request->hasFile($inputKey)) {
+                $anyPhotoUploaded = true;
                 $file = $request->file($inputKey);
                 $fileName = time().'_'.$inputKey.'.'.$file->getClientOriginalExtension();
                 $path = $file->storeAs('faces/'.$student->nisn, $fileName, 'public');
@@ -249,6 +262,18 @@ class StudentController extends Controller
                     'file_path' => $path,
                     'label' => $label,
                 ]);
+            }
+        }
+
+        // Otomatis sinkronisasi dan ekstraksi embedding DeepFace FaceNet di microservice Python
+        if ($anyPhotoUploaded || File::exists($pythonDatasetDir)) {
+            try {
+                $pythonUrl = config('services.deepface.base_url', 'http://127.0.0.1:5000').'/sinkronisasi-siswa/'.$student->nisn;
+                Http::timeout(15)->post($pythonUrl, [
+                    'nama' => $student->name,
+                ]);
+            } catch (\Throwable $e) {
+                Log::warning("Gagal memicu ekstraksi embedding FaceNet untuk {$student->nisn}: ".$e->getMessage());
             }
         }
     }

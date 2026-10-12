@@ -52,6 +52,9 @@ class LayananWajah:
         # 2. Muat data nama siswa dari Laravel
         self.muat_data_siswa()
 
+        # 3. Sinkronisasi otomatis dataset baru dari disk yang belum ada di cache
+        self.sinkronisasi_dataset_baru()
+
     def muat_data_siswa(self):
         """Memuat daftar siswa (NISN => Nama, Kelas) dari backend Laravel."""
         try:
@@ -307,8 +310,9 @@ class LayananWajah:
                     best_match = self.embeddings_db[best_idx]
                     nisn = best_match["label"]
 
-                    skor_akurasi = max(0.0, min(1.0, 1.0 - (min_dist / self.threshold)))
-                    persentase_skor = f"{int(skor_akurasi * 100)}%"
+                    # Hitung skor kemiripan kosinus (Cosine Similarity: 1.0 - distance)
+                    skor_akurasi = max(0.0, min(1.0, 1.0 - min_dist))
+                    persentase_skor = f"{int(round(skor_akurasi * 100))}%"
 
                     # Ambil nama siswa dari cache data siswa
                     siswa_data = self.data_siswa.get(nisn, {})
@@ -417,3 +421,124 @@ class LayananWajah:
         if res.get("hasil"):
             return res["hasil"]
         return res
+
+    def sinkronisasi_dataset_baru(self):
+        """Memeriksa folder dataset di disk dan mengekstrak wajah baru yang belum ada di cache FaceNet."""
+        folders_to_scan = []
+        if os.path.exists(self.dataset_path):
+            folders_to_scan.append(self.dataset_path)
+        if os.path.exists(self.storage_path):
+            folders_to_scan.append(self.storage_path)
+
+        indexed_labels = set(str(item.get("label")) for item in self.embeddings_db)
+        missing_labels = []
+
+        for base_folder in folders_to_scan:
+            if not os.path.isdir(base_folder):
+                continue
+            for item in os.listdir(base_folder):
+                item_path = os.path.join(base_folder, item)
+                if os.path.isdir(item_path):
+                    if item not in indexed_labels and item not in missing_labels:
+                        missing_labels.append(item)
+
+        if missing_labels:
+            print(f"[*] Ditemukan {len(missing_labels)} dataset siswa baru yang belum terindeks FaceNet: {missing_labels}")
+            total_added = 0
+            for label in missing_labels:
+                res = self.ekstrak_dan_sinkronisasi_siswa(label, simpan_cache=False)
+                if res.get("status") == "sukses":
+                    total_added += res.get("total_embedding", 0)
+
+            if total_added > 0:
+                try:
+                    with open(self.cache_file, "wb") as f:
+                        pickle.dump(self.embeddings_db, f)
+                    print(f"[+] Sinkronisasi startup selesai! {total_added} embedding FaceNet baru berhasil disimpan ke cache.")
+                except Exception as e:
+                    print(f"[!] Gagal menyimpan cache setelah sinkronisasi: {e}")
+
+    def ekstrak_dan_sinkronisasi_siswa(self, nisn, nama="", simpan_cache=True):
+        """
+        Mengekstrak fitur citra wajah (face embedding 128-dimensi FaceNet)
+        dari foto yang diunggah ke folder dataset siswa.
+        Dipanggil otomatis oleh Laravel saat Admin menambah atau memperbarui foto siswa.
+        """
+        nisn = str(nisn).strip()
+        folder_siswa = os.path.join(self.dataset_path, nisn)
+        if not os.path.exists(folder_siswa):
+            folder_siswa = os.path.join(self.storage_path, nisn)
+
+        if not os.path.exists(folder_siswa) or not os.path.isdir(folder_siswa):
+            return {"status": "error", "pesan": f"Folder dataset untuk NISN {nisn} tidak ditemukan."}
+
+        foto_files = [f for f in os.listdir(folder_siswa) if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
+        if not foto_files:
+            return {"status": "error", "pesan": f"Tidak ada berkas foto di folder dataset NISN {nisn}."}
+
+        new_embeddings = []
+        for file_name in foto_files:
+            img_path = os.path.join(folder_siswa, file_name)
+            try:
+                representations = DeepFace.represent(
+                    img_path=img_path,
+                    model_name=self.model_name,
+                    detector_backend=self.detector_backend,
+                    enforce_detection=False
+                )
+                if representations and len(representations) > 0:
+                    emb = np.array(representations[0]["embedding"], dtype=np.float32)
+                    norm = np.linalg.norm(emb)
+                    if norm > 0:
+                        emb = emb / norm
+                    new_embeddings.append({
+                        "label": nisn,
+                        "embedding": emb,
+                        "path": img_path
+                    })
+            except Exception as e:
+                print(f"[!] Gagal mengekstrak fitur foto {img_path}: {e}")
+
+        if not new_embeddings:
+            return {"status": "error", "pesan": f"Wajah tidak terdeteksi pada berkas foto NISN {nisn}."}
+
+        # Perbarui basis data embedding di memori
+        self.embeddings_db = [item for item in self.embeddings_db if str(item.get("label")) != nisn]
+        self.embeddings_db.extend(new_embeddings)
+
+        if nama:
+            self.data_siswa[nisn] = {"nama": nama, "kelas": self.data_siswa.get(nisn, {}).get("kelas", "-")}
+
+        if simpan_cache:
+            try:
+                with open(self.cache_file, "wb") as f:
+                    pickle.dump(self.embeddings_db, f)
+                print(f"[+] Cache FaceNet berhasil diperbarui untuk NISN {nisn} ({len(new_embeddings)} embedding).")
+            except Exception as e:
+                print(f"[!] Gagal menyimpan cache: {e}")
+
+        self.is_ready = True
+        return {
+            "status": "sukses",
+            "pesan": f"Berhasil mengekstrak {len(new_embeddings)} vektor embedding FaceNet untuk NISN {nisn}.",
+            "total_embedding": len(new_embeddings)
+        }
+
+    def hapus_embedding_siswa(self, nisn):
+        """Menghapus embedding siswa dari database memori dan cache saat siswa dihapus di Laravel."""
+        nisn = str(nisn).strip()
+        sebelum = len(self.embeddings_db)
+        self.embeddings_db = [item for item in self.embeddings_db if str(item.get("label")) != nisn]
+        sesudah = len(self.embeddings_db)
+
+        if self.data_siswa and nisn in self.data_siswa:
+            del self.data_siswa[nisn]
+
+        try:
+            with open(self.cache_file, "wb") as f:
+                pickle.dump(self.embeddings_db, f)
+            print(f"[+] Embedding untuk NISN {nisn} dihapus dari cache ({sebelum - sesudah} data).")
+        except Exception as e:
+            print(f"[!] Gagal memperbarui cache: {e}")
+
+        return {"status": "sukses", "pesan": f"Embedding untuk NISN {nisn} berhasil dihapus."}

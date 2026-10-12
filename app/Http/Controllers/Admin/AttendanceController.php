@@ -734,14 +734,29 @@ class AttendanceController extends Controller
 
         $hideLayout = ! Auth::check();
 
-        // Jalankan dan periksa status layanan Python secara otomatis
-        $launchResult = PythonServiceManager::ensureRunning();
+        // 1. Periksa ketersediaan layanan Python tanpa menjalankan proses secara otomatis
+        $isOnline = PythonServiceManager::isRunning();
         $pythonStatus = PythonServiceManager::getStatus();
-        if (! $pythonStatus['online'] && isset($launchResult['message'])) {
-            $pythonStatus['message'] = $launchResult['message'];
+
+        // 2. Hasilkan token otentikasi HMAC terenkripsi untuk akses aman ke layanan Flask
+        $authToken = PythonServiceManager::generateAuthToken(Auth::user());
+        $authCookie = cookie('scanner_auth_token', $authToken, 120, '/', null, false, false, false, 'Lax');
+
+        $scannerUrl = PythonServiceManager::getScannerUrl();
+        $streamUrl = PythonServiceManager::getStreamUrl();
+        $statusPollUrl = PythonServiceManager::getStatusPollUrl();
+
+        // Jika layanan offline, tampilkan informasi penanganan kegagalan yang jelas
+        if (! $isOnline) {
+            $pythonStatus['message'] = 'Layanan kamera & AI Flask sedang tidak aktif. Harap jalankan layanan secara terpisah di server.';
         }
 
-        return view('admin.absensi.pindai', compact('activeYear', 'classes', 'selectedClass', 'riwayatPindai', 'stats', 'hideLayout', 'pythonStatus'));
+        return response()
+            ->view('admin.absensi.pindai', compact(
+                'activeYear', 'classes', 'selectedClass', 'riwayatPindai', 'stats',
+                'hideLayout', 'pythonStatus', 'scannerUrl', 'streamUrl', 'statusPollUrl', 'authToken'
+            ))
+            ->withCookie($authCookie);
     }
 
     /**
@@ -751,6 +766,10 @@ class AttendanceController extends Controller
     {
         $sumber = $request->input('sumber', 0);
         $result = PythonServiceManager::changeCamera($sumber);
+
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json($result);
+        }
 
         $pesan = $result['pesan'] ?? 'Sumber kamera berhasil diubah.';
         $tipe = ($result['status'] ?? 'error') === 'sukses' ? 'success' : 'warning';

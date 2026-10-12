@@ -2,9 +2,9 @@
 
 namespace App\Services;
 
-use Illuminate\Support\Facades\Cache;
+use App\Models\User;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 
 class PythonServiceManager
 {
@@ -14,6 +14,49 @@ class PythonServiceManager
     public static function getBaseUrl(): string
     {
         return config('services.deepface.base_url', 'http://127.0.0.1:5000');
+    }
+
+    /**
+     * Dapatkan target URL halaman pemindai Flask (melalui reverse proxy atau domain utama).
+     */
+    public static function getScannerUrl(): string
+    {
+        return config('services.deepface.scanner_url', '/scanner/');
+    }
+
+    /**
+     * Dapatkan URL streaming MJPEG video kamera OpenCV.
+     */
+    public static function getStreamUrl(): string
+    {
+        $scannerUrl = self::getScannerUrl();
+        if (str_starts_with($scannerUrl, 'http://') || str_starts_with($scannerUrl, 'https://')) {
+            return rtrim($scannerUrl, '/').'/video_feed';
+        }
+
+        // Jika environment lokal tanpa reverse proxy Nginx (port 8000, 8080, dsb.)
+        if (app()->environment('local') && in_array((int) request()->getPort(), [8000, 8080, 3000])) {
+            return rtrim(self::getBaseUrl(), '/').'/video_feed';
+        }
+
+        return rtrim($scannerUrl, '/').'/video_feed';
+    }
+
+    /**
+     * Dapatkan URL polling status pemindai OpenCV secara real-time.
+     */
+    public static function getStatusPollUrl(): string
+    {
+        $scannerUrl = self::getScannerUrl();
+        if (str_starts_with($scannerUrl, 'http://') || str_starts_with($scannerUrl, 'https://')) {
+            return rtrim($scannerUrl, '/').'/status-scanner';
+        }
+
+        if (app()->environment('local') && in_array((int) request()->getPort(), [8000, 8080, 3000])) {
+            return rtrim(self::getBaseUrl(), '/').'/status-scanner';
+        }
+
+        return rtrim($scannerUrl, '/').'/status-scanner';
     }
 
     /**
@@ -44,8 +87,8 @@ class PythonServiceManager
     }
 
     /**
-     * Pastikan layanan Python berjalan secara otomatis di latar belakang.
-     * Mencegah proses ganda dengan atomic cache lock.
+     * Periksa ketersediaan layanan Python tanpa menjalankan proses secara otomatis.
+     * Sesuai ketentuan: proses Python harus dijalankan secara terpisah dari Laravel.
      *
      * @return array{running: bool, status: string, message: string}
      */
@@ -59,104 +102,41 @@ class PythonServiceManager
             ];
         }
 
-        // Kunci atomik selama 25 detik untuk mencegah peluncuran proses ganda
-        $lock = Cache::lock('python_service_autolaunch', 25);
-
-        if (! $lock->get()) {
-            return [
-                'running' => false,
-                'status' => 'starting',
-                'message' => 'Layanan Python sedang dalam proses inisialisasi di latar belakang. Silakan tunggu sejenak...',
-            ];
-        }
-
-        try {
-            self::launchProcess();
-
-            // Berikan jeda singkat 1 detik lalu periksa apakah port sudah terbuka
-            sleep(1);
-            if (self::isRunning()) {
-                return [
-                    'running' => true,
-                    'status' => 'online',
-                    'message' => 'Layanan Python berhasil dinyalakan otomatis.',
-                ];
-            }
-
-            return [
-                'running' => false,
-                'status' => 'starting',
-                'message' => 'Layanan Python sedang dinyalakan otomatis (memuat model AI Facenet). Halaman akan menyegarkan otomatis...',
-            ];
-        } catch (\Throwable $e) {
-            Log::error('Gagal menjalankan layanan Python otomatis: '.$e->getMessage());
-
-            return [
-                'running' => false,
-                'status' => 'error',
-                'message' => 'Gagal menyalakan layanan Python: '.$e->getMessage(),
-            ];
-        }
+        return [
+            'running' => false,
+            'status' => 'offline',
+            'message' => 'Layanan pemindai wajah (Flask) sedang tidak aktif. Harap jalankan layanan Python secara terpisah di server.',
+        ];
     }
 
     /**
-     * Tentukan executable binary python yang valid di sistem.
+     * Hasilkan token otentikasi terenkripsi HMAC untuk akses aman ke layanan Flask.
+     * Memastikan hanya user Laravel yang sah (admin/guru) yang dapat mengakses scanner Flask.
      */
-    private static function resolvePythonBinary(): string
+    public static function generateAuthToken(?User $user = null): string
     {
-        $configured = config('services.deepface.python_binary');
-        if (! empty($configured) && $configured !== 'python' && file_exists($configured)) {
-            return $configured;
+        $user = $user ?? Auth::user();
+        if (! $user) {
+            return '';
         }
 
-        // Deteksi path python terpasang di Windows
-        if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
-            $localAppData = getenv('LOCALAPPDATA') ?: '';
-            $candidates = [
-                $localAppData.'\\Programs\\Python\\Python311\\python.exe',
-                $localAppData.'\\Programs\\Python\\Python312\\python.exe',
-                $localAppData.'\\Programs\\Python\\Python310\\python.exe',
-                'C:\\Python311\\python.exe',
-                'C:\\Python312\\python.exe',
-            ];
+        $userId = $user->id;
+        $role = $user->roles->first()?->name ?? 'user';
+        $expires = time() + (2 * 3600); // 2 jam masa berlaku
+        $payload = base64_encode(json_encode([
+            'uid' => $userId,
+            'role' => $role,
+            'exp' => $expires,
+        ]));
 
-            foreach ($candidates as $candidate) {
-                if ($candidate && file_exists($candidate)) {
-                    return $candidate;
-                }
-            }
+        $key = config('app.key');
+        if (str_starts_with($key, 'base64:')) {
+            $key = base64_decode(substr($key, 7));
         }
 
-        return 'python';
-    }
+        $sig = hash_hmac('sha256', $payload, $key);
 
-    /**
-     * Luncurkan proses Python di latar belakang sesuai lingkungan sistem operasi.
-     */
-    private static function launchProcess(): void
-    {
-        $pythonBinary = self::resolvePythonBinary();
-        $pythonDir = base_path('python-service');
-        $logFile = storage_path('logs/python-service.log');
-
-        if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
-            // Lingkungan Windows: Jalankan proses terpisah tanpa blocking menggunakan PowerShell Start-Process
-            $cmd = sprintf(
-                'powershell -WindowStyle Hidden -Command "Start-Process \'%s\' -ArgumentList \'main.py\' -WorkingDirectory \'%s\' -WindowStyle Hidden"',
-                $pythonBinary,
-                $pythonDir
-            );
-            @exec($cmd);
-        } else {
-            // Lingkungan Linux/Unix
-            $cmd = sprintf(
-                'cd %s && nohup %s main.py > %s 2>&1 &',
-                escapeshellarg($pythonDir),
-                escapeshellarg($pythonBinary),
-                escapeshellarg($logFile)
-            );
-            @exec($cmd);
-        }
+        return "{$payload}.{$sig}";
     }
 
     /**
@@ -211,8 +191,6 @@ class PythonServiceManager
      */
     public static function changeCamera(int|string $source): array
     {
-        self::ensureRunning();
-
         try {
             $baseUrl = self::getBaseUrl();
             $response = Http::timeout(4)->post("{$baseUrl}/ganti-kamera", [

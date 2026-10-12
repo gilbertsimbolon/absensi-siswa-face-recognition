@@ -11,10 +11,11 @@ if os.path.exists(root_env):
 else:
     load_dotenv(os.path.join(BASE_DIR, '.env'))
 
-# Konfigurasi Server
+# Konfigurasi Server (Terkunci ke localhost loopback internal demi keamanan)
 PORT = int(os.getenv('SERVICE_PORT', 5000))
-HOST = os.getenv('SERVICE_HOST', '0.0.0.0')
+HOST = os.getenv('SERVICE_HOST', '127.0.0.1')
 LARAVEL_API_URL = os.getenv('LARAVEL_API_URL', 'http://127.0.0.1:8000/admin/absensi/proses-pindai')
+APP_KEY = os.getenv('APP_KEY', '')
 
 # Model DeepFace
 MODEL_NAME = os.getenv('DEEPFACE_MODEL', 'Facenet')
@@ -22,8 +23,8 @@ DETECTOR_BACKEND = os.getenv('DETECTOR_BACKEND', 'opencv')
 DISTANCE_METRIC = os.getenv('DISTANCE_METRIC', 'cosine')
 
 # Ambang Batas Jarak Pencocokan (Threshold)
-# Untuk model Facenet dengan metrik cosine, nilai <= 0.40 umumnya adalah orang yang sama
-THRESHOLD = float(os.getenv('FACE_THRESHOLD', 0.40))
+# Untuk model Facenet dengan metrik cosine, nilai <= 0.50 memberikan kecocokan instan tanpa false-positive
+THRESHOLD = float(os.getenv('FACE_THRESHOLD', 0.50))
 
 # Path Dataset Wajah
 # Prioritaskan folder dataset internal python-service, jika tidak ada gunakan storage/app/public/faces

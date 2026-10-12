@@ -3,199 +3,480 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Scanner Presensi Wajah OpenCV - SMAN 2 Tondano</title>
-    
+    <title>Presensi Wajah Siswa - SMAN 2 Tondano</title>
+
     <!-- Bootstrap 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Boxicons -->
     <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
     <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 
     <style>
+        * {
+            box-sizing: border-box;
+        }
+
         body {
-            background-color: #0b1120;
-            color: #f3f4f6;
+            background-color: #ffffff;
+            color: #1e293b;
             font-family: 'Plus Jakarta Sans', sans-serif;
             min-height: 100vh;
             margin: 0;
-            padding: 1rem;
+            padding: 1.5rem 1rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
         }
 
-        .mono {
-            font-family: 'JetBrains Mono', monospace;
+        /* Pembungkus Halaman */
+        .scanner-page {
+            width: 100%;
+            max-width: 920px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
         }
 
-        .feed-card {
-            background: #020617;
-            border: 1px solid rgba(255, 255, 255, 0.1);
+        /* Bar Navigasi Atas */
+        .scanner-nav {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 4px 0 10px 0;
+            min-height: 60px;
+        }
+
+        .btn-kembali {
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            background: #f1f5f9;
+            color: #334155;
+            border: 1px solid #cbd5e1;
+            padding: 6px 14px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s ease;
+        }
+
+        .btn-kembali:hover {
+            background: #e2e8f0;
+            color: #0f172a;
+        }
+
+        .sekolah-info {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+        }
+
+        .sekolah-logo {
+            height: 48px;
+            width: auto;
+            margin-bottom: 4px;
+        }
+
+        .sekolah-nama {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: #0f172a;
+            margin: 0;
+            line-height: 1.2;
+        }
+
+        .sekolah-sub {
+            font-size: 0.78rem;
+            color: #64748b;
+            margin: 2px 0 0 0;
+        }
+
+        .jam-badge {
+            position: absolute;
+            right: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            color: #0284c7;
+            padding: 6px 14px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        /* 1 Frame Kamera Presensi */
+        .camera-container {
+            width: 100%;
+            position: relative;
+            background: #000000;
+            border: 3.5px solid #0284c7;
             border-radius: 16px;
             overflow: hidden;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 10px 25px -5px rgba(2, 132, 199, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+            aspect-ratio: 16 / 10;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
-        .video-stream-img {
+        @media (max-height: 750px) {
+            .camera-container {
+                max-height: 75vh;
+            }
+        }
+
+        /* Video Feed MJPEG */
+        .video-feed {
             width: 100%;
-            height: auto;
-            max-height: 540px;
-            object-fit: contain;
+            height: 100%;
+            object-fit: cover;
             display: block;
             background: #000;
         }
 
-        .panel-card {
-            background: #111827;
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 14px;
-            padding: 1.25rem;
+        /* Notifikasi Status Absensi di Dalam Frame Kamera */
+        .notification-overlay {
+            position: absolute;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 40;
+            width: 90%;
+            max-width: 480px;
+            pointer-events: none;
+        }
+
+        /* Kondisi Standby */
+        .notif-standby {
+            background: rgba(255, 255, 255, 0.95);
+            color: #334155;
+            border: 1px solid #cbd5e1;
+            padding: 10px 20px;
+            border-radius: 30px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+        }
+
+        .titik-biru {
+            width: 8px;
+            height: 8px;
+            background-color: #0284c7;
+            border-radius: 50%;
+        }
+
+        /* Kondisi Sukses Absen */
+        .notif-sukses {
+            background: rgba(255, 255, 255, 0.98);
+            border-left: 5px solid #16a34a;
+            border-radius: 12px;
+            padding: 12px 18px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            text-align: left;
+        }
+
+        .notif-sukses .icon-box {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #dcfce7;
+            color: #16a34a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.4rem;
+            flex-shrink: 0;
+        }
+
+        .notif-warning {
+            background: rgba(255, 255, 255, 0.98);
+            border-left: 5px solid #ca8a04;
+            border-radius: 12px;
+            padding: 12px 18px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            text-align: left;
+        }
+
+        .notif-warning .icon-box {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #fef9c3;
+            color: #ca8a04;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.4rem;
+            flex-shrink: 0;
+        }
+
+        .notif-konten {
+            flex-grow: 1;
+            min-width: 0;
+        }
+
+        .notif-nama-siswa {
+            font-size: 1rem;
+            font-weight: 700;
+            color: #0f172a;
+            margin: 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .notif-keterangan {
+            font-size: 0.8rem;
+            color: #64748b;
+            margin: 2px 0 0 0;
+        }
+
+        .notif-badge-label {
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            flex-shrink: 0;
+            text-align: center;
+        }
+
+        .badge-hadir {
+            background: #dcfce7;
+            color: #15803d;
+        }
+
+        .badge-terlambat {
+            background: #fef9c3;
+            color: #854d0e;
+        }
+
+        .badge-tidak-dikenal {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        /* Pilihan Kamera di Bawah Frame */
+        .camera-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 2px 4px;
+        }
+
+        .camera-options {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .camera-options-label {
+            font-size: 0.82rem;
+            color: #64748b;
+            font-weight: 600;
+        }
+
+        .btn-kamera-pilihan {
+            background: #f1f5f9;
+            border: 1px solid #cbd5e1;
+            color: #475569;
+            font-size: 0.8rem;
+            font-weight: 600;
+            padding: 5px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-kamera-pilihan:hover {
+            background: #e2e8f0;
+            color: #0f172a;
+        }
+
+        .btn-kamera-pilihan.active {
+            background: #0284c7;
+            border-color: #0284c7;
+            color: #ffffff;
         }
     </style>
 </head>
 <body>
 
-    <div class="container-fluid max-w-7xl">
-        <!-- Header -->
-        <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 pb-2 border-bottom border-secondary border-opacity-25 gap-2">
-            <div class="d-flex align-items-center gap-2">
-                <span class="badge bg-success p-2 fs-5"><i class="bx bx-camera"></i></span>
-                <div>
-                    <h5 class="fw-bold mb-0 text-white">Scanner OpenCV - SMAN 2 Tondano</h5>
-                    <small class="text-white-50 mono">Mesin: Python OpenCV (cv2) • Model: {{ model_name }} • {{ total_wajah }} Wajah</small>
-                </div>
+    <div class="scanner-page">
+
+        <!-- Bar Navigasi Atas -->
+        <div class="scanner-nav">
+            <a href="/admin/beranda" class="btn-kembali">
+                <i class="bx bx-arrow-back"></i> Kembali
+            </a>
+
+            <div class="sekolah-info">
+                <img src="/img/logo.png" alt="Logo Sekolah" class="sekolah-logo">
+                <h1 class="sekolah-nama">SMAN 2 Tondano</h1>
+                <p class="sekolah-sub">Presensi Wajah Siswa</p>
             </div>
-            <div>
-                <span class="badge bg-dark border border-secondary px-3 py-2 mono text-success" id="jam-digital">--:--:--</span>
+
+            <div class="jam-badge" id="jam-digital">
+                --:-- WITA
+            </div>
+        </div>
+
+        <!-- 1 Frame Kamera Presensi -->
+        <div class="camera-container">
+
+            <!-- Tampilan Kamera -->
+            <img id="opencv-feed" 
+                 src="video_feed" 
+                 alt="Kamera Presensi Siswa" 
+                 class="video-feed"
+                 onerror="handleStreamError()">
+
+        </div>
+
+        <!-- Pilihan Kamera di Bawah Frame -->
+        <div class="camera-footer">
+            <div class="camera-options">
+                <span class="camera-options-label"><i class="bx bx-camera me-1"></i> Pilihan Kamera:</span>
+
+                <button type="button" class="btn-kamera-pilihan {{ 'active' if kamera_aktif == 0 else '' }}" onclick="gantiKamera(0, this)">
+                    Laptop
+                </button>
+                <button type="button" class="btn-kamera-pilihan {{ 'active' if kamera_aktif == 1 else '' }}" onclick="gantiKamera(1, this)">
+                    iPhone USB
+                </button>
+                <button type="button" class="btn-kamera-pilihan {{ 'active' if kamera_aktif == 2 else '' }}" onclick="gantiKamera(2, this)">
+                    Kamera Tambahan (USB)
+                </button>
             </div>
         </div>
 
-        <div class="row g-3">
-            <!-- Kolom Video Feed OpenCV -->
-            <div class="col-lg-8 col-md-12">
-                <div class="feed-card">
-                    <div class="p-2 bg-dark d-flex justify-content-between align-items-center border-bottom border-secondary border-opacity-25">
-                        <span class="small fw-bold text-success d-flex align-items-center gap-1">
-                            <span class="spinner-grow spinner-grow-sm text-success" role="status"></span>
-                            Live Feed Kamera OpenCV
-                        </span>
-                        <span class="badge bg-secondary small mono" id="badge-fps">OpenCV Active</span>
-                    </div>
-
-                    <!-- STREAM VIDEO ASLI OPENCV (NATIV TANPA JAVASCRIPT SCANNER) -->
-                    <img src="/video_feed" alt="Menghubungkan Kamera OpenCV..." class="video-stream-img" id="opencv-stream" onerror="this.onerror=null; setTimeout(() => { this.src = '/video_feed?' + Date.now(); }, 2000);">
-
-                    <div class="p-2 bg-dark bg-opacity-75 small text-white-50 d-flex justify-content-between align-items-center">
-                        <span><i class="bx bx-check-shield text-success me-1"></i> Kotak wajah diproses langsung oleh Python cv2</span>
-                        <span class="mono" id="label-kamera">Sumber: Kamera {{ kamera_aktif }}</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Kolom Pengaturan Kamera & Status Presensi -->
-            <div class="col-lg-4 col-md-12">
-                <!-- Status Hasil Deteksi Terakhir -->
-                <div class="panel-card mb-3">
-                    <h6 class="fw-bold text-white mb-2"><i class="bx bx-scan text-success me-1"></i> Status Deteksi Terakhir</h6>
-                    <div id="detection-status-box" class="p-3 rounded-3 bg-dark border border-secondary border-opacity-25 text-center">
-                        <h5 class="fw-bold text-light mb-1" id="res-nama">Menunggu Wajah...</h5>
-                        <p class="text-white-50 small mb-2 mono" id="res-nisn">Arahkan wajah ke depan kamera</p>
-                        <span class="badge bg-secondary px-3 py-1" id="res-status">SIAP</span>
-                    </div>
-                </div>
-
-                <!-- Pengaturan Sumber Kamera (Webcam Laptop vs Kamera HP) -->
-                <div class="panel-card">
-                    <h6 class="fw-bold text-white mb-2"><i class="bx bx-cog text-primary me-1"></i> Pilih Sumber Kamera OpenCV</h6>
-                    <p class="text-white-50 small mb-3">
-                        Gunakan webcam bawaan laptop, atau gunakan kamera HP secara nirkabel (aplikasi <b>IP Webcam</b> di HP).
-                    </p>
-
-                    <div class="mb-3">
-                        <label class="form-label small text-white-50 fw-semibold">Pilih Preset Kamera:</label>
-                        <div class="d-flex flex-wrap gap-2">
-                            <button class="btn btn-outline-success btn-sm flex-fill" onclick="pilihKamera(0)">
-                                <i class="bx bx-laptop me-1"></i> Laptop (0)
-                            </button>
-                            <button class="btn btn-outline-primary btn-sm flex-fill" onclick="pilihKamera(1)">
-                                <i class="bx bxl-apple me-1"></i> iPhone / USB (1)
-                            </button>
-                            <button class="btn btn-outline-secondary btn-sm flex-fill" onclick="pilihKamera(2)">
-                                <i class="bx bx-camera me-1"></i> USB (2)
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label small text-white-50 fw-semibold">Atau Masukkan URL Kamera HP (IP Webcam):</label>
-                        <div class="input-group input-group-sm">
-                            <input type="text" id="ip-cam-url" class="form-control bg-dark text-light border-secondary mono" placeholder="http://192.168.100.38:8080/video">
-                            <button class="btn btn-primary" onclick="hubungkanIpCam()">Hubungkan</button>
-                        </div>
-                        <small class="text-white-50 mt-1 d-block" style="font-size: 0.72rem;">
-                            Tips HP: Pasang aplikasi <b>IP Webcam</b> di Play Store/App Store, tekan 'Start Server', lalu masukkan URL di atas.
-                        </small>
-                    </div>
-
-                    <div id="alert-cam" class="alert alert-info py-2 px-3 small d-none mb-0"></div>
-                </div>
-            </div>
-        </div>
     </div>
 
+    <!-- Script Jam & Notifikasi Real-Time -->
     <script>
-        // Jam digital
+        // Jam Digital
         setInterval(() => {
-            document.getElementById('jam-digital').textContent = new Date().toLocaleTimeString('id-ID');
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WITA';
+            const el = document.getElementById('jam-digital');
+            if (el) el.textContent = timeStr;
         }, 1000);
 
-        // Polling status presensi terakhir dari server Python
-        setInterval(async () => {
+        const getApiUrl = (endpoint) => {
+            const bp = window.location.pathname.replace(/\/+$/, '');
+            return (bp ? bp + '/' : '/') + endpoint.replace(/^\/+/, '');
+        };
+
+        let lastResultTimestamp = '';
+        let hideNotifTimer = null;
+
+        const notifStandby = document.getElementById('notif-standby');
+        const notifSukses = document.getElementById('notif-sukses');
+        const notifWarning = document.getElementById('notif-warning');
+        const notifNama = document.getElementById('notif-nama');
+        const notifDetail = document.getElementById('notif-detail');
+        const notifStatusBadge = document.getElementById('notif-status-badge');
+        const notifJam = document.getElementById('notif-jam');
+
+        async function periksaStatusAbsensi() {
             try {
-                const res = await fetch('/status-scanner');
+                const res = await fetch(getApiUrl('status-scanner'));
+                if (!res.ok) return;
+
                 const data = await res.json();
                 if (data.hasil_terakhir) {
                     const h = data.hasil_terakhir;
-                    document.getElementById('res-nama').textContent = h.nama || '-';
-                    document.getElementById('res-nisn').textContent = h.nisn ? `NISN: ${h.nisn} • ${h.akurasi}` : '-';
-                    const badge = document.getElementById('res-status');
-                    badge.textContent = h.status_absen || (h.status === 'sukses' ? 'TERCATAT' : 'MEMINDAI');
-                    badge.className = h.status === 'sukses' ? 'badge bg-success px-3 py-1' : 'badge bg-warning text-dark px-3 py-1';
-                }
-                if (data.fps) {
-                    document.getElementById('badge-fps').textContent = `OpenCV ${data.fps} FPS`;
-                }
-            } catch (e) {}
-        }, 1500);
+                    const resKey = `${h.timestamp || ''}_${h.nama || ''}_${h.status || ''}`;
 
-        async function pilihKamera(sumber) {
-            tampilkanPesan('Menghubungkan kamera...');
+                    if (resKey !== lastResultTimestamp) {
+                        lastResultTimestamp = resKey;
+                        tampilkanNotifikasi(h);
+                    }
+                }
+            } catch (err) {}
+        }
+
+        setInterval(periksaStatusAbsensi, 800);
+
+        function tampilkanNotifikasi(h) {
+            if (hideNotifTimer) clearTimeout(hideNotifTimer);
+
+            if (h.status === 'sukses') {
+                notifNama.textContent = h.nama || 'Siswa';
+                notifDetail.textContent = `${h.kelas || '-'} • NISN: ${h.nisn || '-'}`;
+
+                const statusLabel = h.status_absen || 'HADIR';
+                notifStatusBadge.textContent = statusLabel;
+                notifStatusBadge.className = 'notif-badge-label d-block ' + 
+                    (statusLabel.toLowerCase().includes('terlambat') ? 'badge-terlambat' : 'badge-hadir');
+
+                notifJam.textContent = (h.timestamp || '') + ' WITA';
+
+                notifStandby.classList.add('d-none');
+                notifWarning.classList.add('d-none');
+                notifSukses.classList.remove('d-none');
+
+                hideNotifTimer = setTimeout(kembaliStandby, 3500);
+            } else if (h.status === 'tidak_dikenali') {
+                notifStandby.classList.add('d-none');
+                notifSukses.classList.add('d-none');
+                notifWarning.classList.remove('d-none');
+
+                hideNotifTimer = setTimeout(kembaliStandby, 2000);
+            }
+        }
+
+        function kembaliStandby() {
+            notifSukses.classList.add('d-none');
+            notifWarning.classList.add('d-none');
+            notifStandby.classList.remove('d-none');
+        }
+
+        async function gantiKamera(sumber, btnEl) {
+            document.querySelectorAll('.btn-kamera-pilihan').forEach(b => b.classList.remove('active'));
+            if (btnEl) btnEl.classList.add('active');
+
             try {
-                const res = await fetch('/ganti-kamera', {
+                await fetch(getApiUrl('ganti-kamera'), {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ sumber: sumber })
                 });
-                const d = await res.json();
-                tampilkanPesan(d.pesan, d.status === 'sukses');
-                document.getElementById('label-kamera').textContent = 'Sumber: Kamera ' + sumber;
-                // Refresh img feed
-                document.getElementById('opencv-stream').src = '/video_feed?' + Date.now();
-            } catch (e) {
-                tampilkanPesan('Gagal mengubah kamera: ' + e, false);
+
+                const feed = document.getElementById('opencv-feed');
+                if (feed) {
+                    feed.src = getApiUrl('video_feed') + '?t=' + Date.now();
+                }
+            } catch (err) {
+                console.error(err);
             }
         }
 
-        function hubungkanIpCam() {
-            const url = document.getElementById('ip-cam-url').value.trim();
-            if (!url) return alert('Silakan masukkan URL kamera HP terlebih dahulu!');
-            pilihKamera(url);
-        }
-
-        function tampilkanPesan(msg, sukses = true) {
-            const al = document.getElementById('alert-cam');
-            al.className = 'alert py-2 px-3 small mb-0 ' + (sukses ? 'alert-success' : 'alert-danger');
-            al.textContent = msg;
-            al.classList.remove('d-none');
-            setTimeout(() => al.classList.add('d-none'), 5000);
+        function handleStreamError() {
+            const feed = document.getElementById('opencv-feed');
+            if (!feed) return;
+            setTimeout(() => {
+                feed.src = getApiUrl('video_feed') + '?t=' + Date.now();
+            }, 3000);
         }
     </script>
 </body>

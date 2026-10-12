@@ -252,18 +252,16 @@ test('proses pindai can record student attendance by nisn', function () {
     ]);
 });
 
-test('attendance scanner page does not contain any javascript script tags and renders native mjpeg stream structure', function () {
+test('attendance scanner page renders native mjpeg stream structure and not using getusermedia', function () {
     $response = $this->actingAs($this->admin)->get(route('admin.attendance.pindai'));
 
     $response->assertStatus(200);
     $response->assertViewIs('admin.absensi.pindai');
     $response->assertSee('Pindai Wajah Presensi Otomatis');
 
-    // Pastikan berkas Blade pindai tidak mengandung tag <script> sama sekali
+    // Pastikan berkas Blade pindai menggunakan OpenCV stream murni tanpa getUserMedia browser
     $viewContent = file_get_contents(resource_path('views/admin/absensi/pindai.blade.php'));
-    expect($viewContent)->not->toContain('<script')
-        ->not->toContain('getUserMedia')
-        ->not->toContain('status-scanner')
+    expect($viewContent)->not->toContain('getUserMedia')
         ->toContain('id="opencv-feed"')
         ->toContain('/video_feed');
 });
