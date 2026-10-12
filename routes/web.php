@@ -5,6 +5,7 @@ use App\Http\Controllers\Admin\ClassesController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\StudentController;
 use App\Http\Controllers\Admin\TeacherController;
+use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\AuthController;
 use Illuminate\Support\Facades\Route;
 
@@ -31,6 +32,12 @@ Route::middleware(['auth', 'role:admin|teacher'])->prefix('admin')->group(functi
         Route::post('/data-guru', [TeacherController::class, 'store'])->name('admin.teacher.store');
         Route::put('/data-guru/{teacher}', [TeacherController::class, 'update'])->name('admin.teacher.update');
         Route::delete('/data-guru/{teacher}', [TeacherController::class, 'destroy'])->name('admin.teacher.destroy');
+
+        // Route Manajemen User
+        Route::get('/manajemen-user', [UserController::class, 'index'])->name('admin.users.index');
+        Route::post('/manajemen-user', [UserController::class, 'store'])->name('admin.users.store');
+        Route::put('/manajemen-user/{user}', [UserController::class, 'update'])->name('admin.users.update');
+        Route::delete('/manajemen-user/{user}', [UserController::class, 'destroy'])->name('admin.users.destroy');
 
         // Struktur Kelas & Tahun Ajaran
         Route::post('/data-kelas', [ClassesController::class, 'store'])->name('admin.classes.store');

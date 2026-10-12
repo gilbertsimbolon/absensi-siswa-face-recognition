@@ -113,7 +113,7 @@
             </li>
 
             <li class="menu-item {{ request()->routeIs('admin.users.*') ? 'active' : '' }}">
-                <a href="javascript:void(0);" class="menu-link">
+                <a href="{{ route('admin.users.index') }}" class="menu-link">
                     <i class="menu-icon tf-icons bx bx-user"></i>
                     <div>Manajemen User</div>
                 </a>
