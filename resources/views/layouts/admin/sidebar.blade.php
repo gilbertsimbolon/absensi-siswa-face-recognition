@@ -87,22 +87,22 @@
 
         <li class="menu-item {{ request()->routeIs('admin.attendance.pindai*') ? 'active' : '' }}">
             <a href="{{ route('admin.attendance.pindai') }}" class="menu-link">
-                <i class="menu-icon tf-icons bx bx-scan text-primary"></i>
-                <div class="fw-semibold">Pindai Wajah</div>
+                <i class="menu-icon tf-icons bx bx-scan"></i>
+                <div>Pemindaian</div>
             </a>
         </li>
 
         <li class="menu-item {{ request()->routeIs('admin.attendance.index') ? 'active' : '' }}">
             <a href="{{ route('admin.attendance.index') }}" class="menu-link">
                 <i class="menu-icon tf-icons bx bx-calendar-check"></i>
-                <div>Absensi Harian</div>
+                <div>Kehadiran</div>
             </a>
         </li>
 
         <li class="menu-item {{ request()->routeIs('admin.attendance.recap*') ? 'active' : '' }}">
             <a href="{{ route('admin.attendance.recap') }}" class="menu-link">
                 <i class="menu-icon tf-icons bx bx-calendar"></i>
-                <div>Rekap Kehadiran</div>
+                <div>Rekapitulasi</div>
             </a>
         </li>
 
@@ -131,16 +131,9 @@
                 </a>
 
                 <ul class="menu-sub">
-
-                    <li class="menu-item {{ request()->routeIs('admin.settings.notification*') ? 'active' : '' }}">
-                        <a href="{{ route('admin.settings.notification') }}" class="menu-link">
-                            <div>Notifikasi WA</div>
-                        </a>
-                    </li>
-
-                    <li class="menu-item">
-                        <a href="javascript:void(0);" class="menu-link">
-                            <div>Jam Sekolah</div>
+                    <li class="menu-item {{ request()->routeIs('admin.settings.konfigurasi*') || request()->routeIs('admin.settings.jam-kelas*') ? 'active' : '' }}">
+                        <a href="{{ route('admin.settings.konfigurasi') }}" class="menu-link">
+                            <div>Konfigurasi</div>
                         </a>
                     </li>
 

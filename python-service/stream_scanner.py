@@ -305,36 +305,50 @@ class ScannerOpenCV:
 
             # Hitung skor kemiripan kosinus (Cosine Similarity: 1.0 - distance)
             skor = max(0.0, min(1.0, 1.0 - min_dist))
-            persentase = f"{int(round(skor * 100))}%"
+            persentase_skor = round(skor * 100, 2)
+            persentase_format = f"({persentase_skor:.2f}%)"
 
             siswa_data = self.layanan.data_siswa.get(nisn, {})
             nama_siswa = siswa_data.get("nama", f"Siswa {nisn}")
             kelas_siswa = siswa_data.get("kelas", "-")
 
             sekarang = time.time()
-            if min_dist <= self.layanan.threshold:
-                last_time = self.last_attendance.get(nisn, 0)
-                status_absen = "HADIR"
+            min_acc = getattr(self, 'min_face_accuracy', None) or getattr(self.layanan, 'min_face_accuracy', 70.0)
 
-                # Kirim data presensi ke Laravel di thread mandiri agar tidak menunda respons pengenalan
+            # Lolos jika jarak cosine dalam threshold dan akurasi >= batas minimum yang dikonfigurasi
+            if min_dist <= self.layanan.threshold and persentase_skor >= min_acc:
+                last_time = self.last_attendance.get(nisn, 0)
+                status_absen = getattr(self, '_last_status', {}).get(nisn, "HADIR")
+
+                # Kirim data presensi ke Laravel untuk menentukan status Hadir/Terlambat/Alpa secara dinamis
                 if (sekarang - last_time) > self.cooldown_sec:
                     self.last_attendance[nisn] = sekarang
-                    def _kirim_laravel(target_nisn):
-                        try:
-                            self.layanan.catat_presensi_ke_laravel(target_nisn)
-                        except Exception as e_api:
-                            print(f"[!] Gagal mencatat presensi: {e_api}")
-                    threading.Thread(target=_kirim_laravel, args=(nisn,), daemon=True).start()
+                    try:
+                        res_api = self.layanan.catat_presensi_ke_laravel(nisn)
+                        if res_api and isinstance(res_api, dict) and "siswa" in res_api:
+                            st = res_api["siswa"].get("status")
+                            if st:
+                                status_absen = str(st).upper()
+                                if not hasattr(self, '_last_status'):
+                                    self._last_status = {}
+                                self._last_status[nisn] = status_absen
+                    except Exception as e_api:
+                        print(f"[!] Gagal mencatat presensi: {e_api}")
+                elif hasattr(self, '_last_status') and nisn in self._last_status:
+                    status_absen = self._last_status[nisn]
 
-                # Tahan nama siswa yang dikenali agar tidak berkedip
-                self.active_name = nama_siswa
+                # Tahan nama siswa dengan format akurasi (00.00%) di atas kotak wajah
+                self.active_name = f"{nama_siswa} {persentase_format}"
                 self.name_display_until = sekarang + 5.0
 
                 self.latest_result = {
                     "nisn": nisn,
                     "nama": nama_siswa,
+                    "nama_dengan_akurasi": f"{nama_siswa} {persentase_format}",
                     "kelas": kelas_siswa,
-                    "akurasi": persentase,
+                    "akurasi": f"{persentase_skor:.2f}%",
+                    "akurasi_format": persentase_format,
+                    "akurasi_num": persentase_skor,
                     "status": "sukses",
                     "status_absen": status_absen,
                     "timestamp": dapatkan_jam_wita(),
@@ -347,9 +361,11 @@ class ScannerOpenCV:
                     self.latest_result = {
                         "nisn": None,
                         "nama": "Wajah Tidak Dikenali",
-                        "akurasi": persentase,
+                        "akurasi": f"{persentase_skor:.2f}%",
+                        "akurasi_format": persentase_format,
+                        "akurasi_num": persentase_skor,
                         "status": "tidak_dikenali",
-                        "status_absen": "TIDAK TERDAFTAR",
+                        "status_absen": "TIDAK DIKENAL",
                         "timestamp": dapatkan_jam_wita(),
                         "expire_at": sekarang + 1.5
                     }

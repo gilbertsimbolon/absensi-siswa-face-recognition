@@ -94,9 +94,9 @@
                             <th style="width: 18%;">Nama Siswa</th>
                             <th style="width: 10%;">Kelas</th>
                             <th class="text-center" style="width: 5%;">L/P</th>
-                            <th style="width: 12%;">No. WA Siswa</th>
-                            <th style="width: 14%;">Orang Tua</th>
-                            <th style="width: 12%;">No. WA Ortu</th>
+                            <th style="width: 13%;">Kontak Siswa</th>
+                            <th style="width: 13%;">Orang Tua</th>
+                            <th style="width: 13%;">Kontak Ortu</th>
                             <th class="text-center" style="width: 8%;">Aksi</th>
                         </tr>
                     </thead>
@@ -125,22 +125,24 @@
                                         {{ $siswa->gender }}
                                     </span>
                                 </td>
-                                <td class="text-nowrap">
+                                <td>
+                                    @if ($siswa->email)
+                                        <div class="small fw-semibold text-dark">{{ $siswa->email }}</div>
+                                    @endif
                                     @if ($siswa->phone)
-                                        <a href="https://wa.me/{{ preg_replace('/[^0-9]/', '', $siswa->phone) }}" target="_blank" class="text-body text-decoration-none">
-                                            {{ $siswa->phone }}
-                                        </a>
-                                    @else
+                                        <small class="text-muted d-block">{{ $siswa->phone }}</small>
+                                    @elseif (!$siswa->email)
                                         <span class="text-muted">-</span>
                                     @endif
                                 </td>
                                 <td>{{ $siswa->parent_name ?: '-' }}</td>
-                                <td class="text-nowrap">
+                                <td>
+                                    @if ($siswa->parent_email)
+                                        <div class="small fw-semibold text-dark">{{ $siswa->parent_email }}</div>
+                                    @endif
                                     @if ($siswa->parent_phone)
-                                        <a href="https://wa.me/{{ preg_replace('/[^0-9]/', '', $siswa->parent_phone) }}" target="_blank" class="text-body text-decoration-none">
-                                            {{ $siswa->parent_phone }}
-                                        </a>
-                                    @else
+                                        <small class="text-muted d-block">{{ $siswa->parent_phone }}</small>
+                                    @elseif (!$siswa->parent_email)
                                         <span class="text-muted">-</span>
                                     @endif
                                 </td>

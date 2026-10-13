@@ -68,13 +68,23 @@
                     </div>
 
                     <div class="row">
-                        <!-- Input No. WhatsApp Siswa -->
-                        <div class="col-12 mb-3">
-                            <label class="form-label" for="tambah_phone">No. Telp / WhatsApp Siswa (Untuk Notifikasi Absensi)</label>
+                        <!-- Input No. Telp Siswa -->
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label" for="tambah_phone">No. Telp Siswa</label>
                             <div class="input-group input-group-merge">
-                                <span class="input-group-text"><i class="icon-base bx bxl-whatsapp"></i></span>
+                                <span class="input-group-text"><i class="icon-base bx bx-phone"></i></span>
                                 <input type="text" class="form-control" id="tambah_phone" name="phone"
                                     placeholder="0812 3456 7890" value="{{ old('phone') }}" />
+                            </div>
+                        </div>
+
+                        <!-- Input Email Siswa -->
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label" for="tambah_email">Email Siswa (Notifikasi Presensi)</label>
+                            <div class="input-group input-group-merge">
+                                <span class="input-group-text"><i class="icon-base bx bx-envelope"></i></span>
+                                <input type="email" class="form-control" id="tambah_email" name="email"
+                                    placeholder="siswa@email.com" value="{{ old('email') }}" />
                             </div>
                         </div>
                     </div>
@@ -87,7 +97,7 @@
 
                     <div class="row">
                         <!-- Input Nama Orang Tua -->
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-4 mb-3">
                             <label class="form-label" for="tambah_nama_ortu">Nama Orang Tua / Wali</label>
                             <div class="input-group input-group-merge">
                                 <span class="input-group-text"><i class="icon-base bx bx-user"></i></span>
@@ -97,12 +107,22 @@
                         </div>
 
                         <!-- Input No Telp Orang Tua -->
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label" for="tambah_no_ortu">No. Telp / WhatsApp Orang Tua (Untuk Notifikasi Absensi)</label>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label" for="tambah_no_ortu">No. Telp Orang Tua</label>
                             <div class="input-group input-group-merge">
                                 <span class="input-group-text"><i class="icon-base bx bx-phone"></i></span>
                                 <input type="text" class="form-control" id="tambah_no_ortu" name="parent_phone"
                                     placeholder="0812 3456 7890" value="{{ old('parent_phone') }}" />
+                            </div>
+                        </div>
+
+                        <!-- Input Email Orang Tua -->
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label" for="tambah_email_ortu">Email Orang Tua (Notifikasi)</label>
+                            <div class="input-group input-group-merge">
+                                <span class="input-group-text"><i class="icon-base bx bx-envelope"></i></span>
+                                <input type="email" class="form-control" id="tambah_email_ortu" name="parent_email"
+                                    placeholder="ortu@email.com" value="{{ old('parent_email') }}" />
                             </div>
                         </div>
                     </div>

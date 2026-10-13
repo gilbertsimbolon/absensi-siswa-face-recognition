@@ -28,7 +28,7 @@ class LayananWajah:
         cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
         self.face_cascade = cv2.CascadeClassifier(cascade_path)
         
-        # Cooldown agar tidak mengirim absensi bertubi-tubi untuk siswa yang sama
+        self.min_face_accuracy = 70.0
         self.last_attendance_time = {}
         self.cooldown_seconds = 5
 
@@ -51,9 +51,22 @@ class LayananWajah:
             
         # 2. Muat data nama siswa dari Laravel
         self.muat_data_siswa()
+        self.muat_konfigurasi()
 
         # 3. Sinkronisasi otomatis dataset baru dari disk yang belum ada di cache
         self.sinkronisasi_dataset_baru()
+
+    def muat_konfigurasi(self):
+        """Memuat batas minimum akurasi dari konfigurasi Laravel."""
+        try:
+            url = f"{self.laravel_api_url}/api/presensi/konfigurasi"
+            res = requests.get(url, timeout=3)
+            if res.status_code == 200:
+                cfg = res.json()
+                self.min_face_accuracy = float(cfg.get("min_face_accuracy", 70.0))
+                print(f"[+] Batas minimum akurasi pemindaian: {self.min_face_accuracy:.2f}%")
+        except Exception as e:
+            print(f"[!] Info konfigurasi akurasi Laravel: {e}")
 
     def muat_data_siswa(self):
         """Memuat daftar siswa (NISN => Nama, Kelas) dari backend Laravel."""

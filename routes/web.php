@@ -3,7 +3,6 @@
 use App\Http\Controllers\Admin\AttendanceController;
 use App\Http\Controllers\Admin\ClassesController;
 use App\Http\Controllers\Admin\DashboardController;
-use App\Http\Controllers\Admin\NotificationSettingController;
 use App\Http\Controllers\Admin\StudentController;
 use App\Http\Controllers\Admin\TeacherController;
 use App\Http\Controllers\Admin\UserController;
@@ -48,11 +47,12 @@ Route::middleware(['auth', 'role:admin|teacher'])->prefix('admin')->group(functi
         Route::post('/data-kelas/tahun-ajaran', [ClassesController::class, 'storeAcademicYear'])->name('admin.classes.academic-year.store');
         Route::put('/data-kelas/tahun-ajaran/{academicYear}/aktifkan', [ClassesController::class, 'setActiveAcademicYear'])->name('admin.classes.academic-year.set-active');
 
-        // Pengaturan Notifikasi WhatsApp (Baileys)
-        Route::get('/pengaturan/notifikasi', [NotificationSettingController::class, 'index'])->name('admin.settings.notification');
-        Route::post('/pengaturan/notifikasi', [NotificationSettingController::class, 'update'])->name('admin.settings.notification.update');
-        Route::post('/pengaturan/notifikasi/uji-coba', [NotificationSettingController::class, 'testSend'])->name('admin.settings.notification.test');
-        Route::get('/pengaturan/notifikasi/status-gateway', [NotificationSettingController::class, 'status'])->name('admin.settings.notification.status');
+        // Pengaturan Konfigurasi (Akurasi Pemindaian & Jam Kelas)
+        Route::get('/pengaturan/konfigurasi', [ClassesController::class, 'configurationIndex'])->name('admin.settings.konfigurasi');
+        Route::post('/pengaturan/konfigurasi/akurasi', [ClassesController::class, 'updateAccuracy'])->name('admin.settings.konfigurasi.accuracy');
+        Route::get('/pengaturan/jam-kelas', [ClassesController::class, 'scheduleIndex'])->name('admin.settings.jam-kelas');
+        Route::put('/pengaturan/jam-kelas/{class}', [ClassesController::class, 'updateSchedule'])->name('admin.settings.jam-kelas.update');
+        Route::post('/pengaturan/jam-kelas/serentak', [ClassesController::class, 'updateAllSchedules'])->name('admin.settings.jam-kelas.update-all');
     });
 
     // Route Data Kelas (Bisa diakses Admin & Guru Wali Kelas)
@@ -91,6 +91,7 @@ Route::middleware(['auth', 'role:admin|teacher'])->prefix('admin')->group(functi
 Route::post('/admin/absensi/proses-pindai', [AttendanceController::class, 'prosesPindai'])->name('admin.attendance.proses-pindai');
 Route::post('/api/presensi/pindai-wajah', [AttendanceController::class, 'prosesPindai'])->name('api.presensi.pindai-wajah');
 Route::get('/api/presensi/daftar-siswa', [AttendanceController::class, 'daftarSiswa'])->name('api.presensi.daftar-siswa');
+Route::get('/api/presensi/konfigurasi', [AttendanceController::class, 'konfigurasi'])->name('api.presensi.konfigurasi');
 
 // Shortcut URL Pindai untuk Akses Cepat di HP / Kiosk (Dapat diakses langsung)
 Route::get('/pindai', [AttendanceController::class, 'pindai'])->name('attendance.pindai');

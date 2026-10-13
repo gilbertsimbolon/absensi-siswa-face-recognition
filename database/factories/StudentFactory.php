@@ -23,8 +23,10 @@ class StudentFactory extends Factory
             'class_id' => null,
             'gender' => fake()->randomElement(['L', 'P']),
             'phone' => fake()->phoneNumber(),
+            'email' => fake()->safeEmail(),
             'parent_name' => fake()->name(),
             'parent_phone' => fake()->phoneNumber(),
+            'parent_email' => fake()->safeEmail(),
             'status' => 'aktif',
         ];
     }

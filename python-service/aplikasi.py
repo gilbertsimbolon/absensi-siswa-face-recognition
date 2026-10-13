@@ -206,6 +206,23 @@ def hapus_siswa_api(nisn):
     hasil = layanan.hapus_embedding_siswa(nisn)
     return jsonify(hasil)
 
+# Endpoint Pembaruan Konfigurasi Akurasi Pemindaian (dari Laravel)
+@app.route('/update-konfigurasi', methods=['POST'])
+@app.route('/scanner/update-konfigurasi', methods=['POST'])
+def update_konfigurasi_api():
+    """Menerima pembaruan batas minimum akurasi dari Laravel secara real-time."""
+    data = request.get_json(silent=True) or {}
+    if 'min_face_accuracy' in data:
+        try:
+            val = float(data['min_face_accuracy'])
+            layanan.min_face_accuracy = val
+            scanner.min_face_accuracy = val
+            print(f"[+] Batas minimum akurasi pemindaian diperbarui ke: {val:.2f}%")
+            return jsonify({"status": "sukses", "min_face_accuracy": val})
+        except Exception as e:
+            return jsonify({"status": "error", "pesan": str(e)}), 400
+    return jsonify({"status": "error", "pesan": "Payload 'min_face_accuracy' diperlukan."}), 400
+
 if __name__ == '__main__':
     print("====================================================")
     print("  Server Scanner OpenCV Presensi Wajah SMAN 2 Tondano")

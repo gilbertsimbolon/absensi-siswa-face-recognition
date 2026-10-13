@@ -65,13 +65,23 @@ class WhatsAppService
             default => strtoupper((string) $attendance->status),
         };
 
+        $studentClass = $student?->classes;
+        $batasTerlambat = $studentClass?->batas_terlambat
+            ? Carbon::parse($studentClass->batas_terlambat)->format('H:i')
+            : '07:15';
+        $batasAlpa = $studentClass?->batas_alpa
+            ? Carbon::parse($studentClass->batas_alpa)->format('H:i')
+            : '08:30';
+
         $placeholders = [
             '{nama_siswa}' => $student?->name ?? 'Siswa',
             '{nisn}' => $student?->nisn ?? '-',
-            '{kelas}' => $student?->classes?->name ?? '-',
+            '{kelas}' => $studentClass?->name ?? '-',
             '{nama_ortu}' => ! empty($student?->parent_name) ? $student->parent_name : 'Bapak/Ibu Orang Tua / Wali',
             '{status}' => $statusText,
             '{waktu}' => $checkInTime,
+            '{batas_terlambat}' => $batasTerlambat,
+            '{batas_alpa}' => $batasAlpa,
             '{tanggal}' => $dateFormatted,
             '{sekolah}' => 'SMAN 2 Tondano',
         ];

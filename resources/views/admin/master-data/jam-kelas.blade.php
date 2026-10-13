@@ -1,0 +1,188 @@
+@extends('layouts.admin.app')
+
+@section('title', 'Jam Kelas | SMAN 2 Tondano')
+
+@section('content')
+    <div class="d-flex flex-column flex-grow-1 h-100" style="min-height: 0; overflow: hidden;">
+        <!-- Notifikasi -->
+        @if (session('success'))
+            <div class="alert alert-success alert-dismissible fade show flex-shrink-0" role="alert">
+                {{ session('success') }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        @endif
+
+        @if (session('error'))
+            <div class="alert alert-danger alert-dismissible fade show flex-shrink-0" role="alert">
+                {{ session('error') }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        @endif
+
+        @if ($errors->any())
+            <div class="alert alert-danger alert-dismissible fade show flex-shrink-0" role="alert">
+                <ul class="mb-0 ps-3">
+                    @foreach ($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        @endif
+
+        <!-- Header Halaman -->
+        <div class="d-flex justify-content-between align-items-center mb-3 flex-shrink-0">
+            <h4 class="fw-bold mb-0">Jam Kelas</h4>
+            @if (auth()->user()?->hasRole('admin'))
+                <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalAturSerentak">
+                    Atur Serentak Semua Kelas
+                </button>
+            @endif
+        </div>
+
+        <!-- Tabel Jam Kelas -->
+        <div class="card flex-grow-1 d-flex flex-column shadow-sm mb-0" style="min-height: 0; overflow: hidden;">
+            <div class="card-header py-3 flex-shrink-0">
+                <h5 class="mb-0">Daftar Aturan Jam Masuk & Batas Presensi</h5>
+            </div>
+
+            <div class="table-responsive flex-grow-1" style="overflow-y: auto; min-height: 0;">
+                <table class="table table-striped align-middle mb-0 table-sticky-header">
+                    <thead>
+                        <tr>
+                            <th class="text-center" style="width: 5%;">No.</th>
+                            <th style="width: 20%;">Kelas</th>
+                            <th style="width: 20%;">Wali Kelas</th>
+                            <th class="text-center" style="width: 15%;">Jam Masuk</th>
+                            <th class="text-center" style="width: 15%;">Batas Terlambat</th>
+                            <th class="text-center" style="width: 15%;">Batas Alpa</th>
+                            <th class="text-center" style="width: 10%;">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse ($classes as $index => $cls)
+                            <tr>
+                                <td class="text-center">{{ $index + 1 }}</td>
+                                <td>
+                                    <span class="fw-semibold text-dark">{{ $cls->name }}</span>
+                                    <small class="text-muted d-block">Tingkat {{ $cls->grade_level }}</small>
+                                </td>
+                                <td>
+                                    {{ $cls->teacher ? $cls->teacher->user->name : '-' }}
+                                </td>
+                                <td class="text-center text-nowrap">
+                                    {{ \Carbon\Carbon::parse($cls->jam_masuk ?? '07:00:00')->format('H:i') }} WITA
+                                </td>
+                                <td class="text-center text-nowrap">
+                                    {{ \Carbon\Carbon::parse($cls->batas_terlambat ?? '07:15:00')->format('H:i') }} WITA
+                                </td>
+                                <td class="text-center text-nowrap">
+                                    {{ \Carbon\Carbon::parse($cls->batas_alpa ?? '08:30:00')->format('H:i') }} WITA
+                                </td>
+                                <td class="text-center">
+                                    <button type="button" class="btn btn-sm btn-outline-primary py-1 px-2"
+                                        data-bs-toggle="modal" data-bs-target="#modalEditJam{{ $cls->id }}">
+                                        Ubah
+                                    </button>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="7" class="text-center py-4 text-muted">
+                                    Belum ada data kelas yang terdaftar.
+                                </td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Modal Atur Serentak Seluruh Kelas -->
+    <div class="modal fade" id="modalAturSerentak" tabindex="-1" aria-labelledby="modalAturSerentakLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalAturSerentakLabel">Atur Serentak Jam Seluruh Kelas</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form action="{{ route('admin.settings.jam-kelas.update-all') }}" method="POST">
+                    @csrf
+                    <div class="modal-body">
+                        <p class="text-muted small mb-3">
+                            Pengaturan ini akan diterapkan ke semua kelas secara bersamaan.
+                        </p>
+
+                        <div class="mb-3">
+                            <label class="form-label" for="all_jam_masuk">Jam Masuk <span class="text-danger">*</span></label>
+                            <input type="time" name="jam_masuk" id="all_jam_masuk" class="form-control" value="07:00" required>
+                            <small class="text-muted" style="font-size: 11px;">Waktu dimulainya jam kehadiran sekolah.</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label" for="all_batas_terlambat">Batas Terlambat <span class="text-danger">*</span></label>
+                            <input type="time" name="batas_terlambat" id="all_batas_terlambat" class="form-control" value="07:15" required>
+                            <small class="text-muted" style="font-size: 11px;">Siswa yang scan setelah jam ini akan berstatus <strong>TERLAMBAT</strong>.</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label" for="all_batas_alpa">Batas Alpa <span class="text-danger">*</span></label>
+                            <input type="time" name="batas_alpa" id="all_batas_alpa" class="form-control" value="08:30" required>
+                            <small class="text-muted" style="font-size: 11px;">Siswa yang scan setelah jam ini otomatis berstatus <strong>ALPA</strong>.</small>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                        <button type="submit" class="btn btn-success">Terapkan ke Semua Kelas</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Edit Jam Per Kelas -->
+    @foreach ($classes as $cls)
+        <div class="modal fade" id="modalEditJam{{ $cls->id }}" tabindex="-1" aria-labelledby="modalEditJamLabel{{ $cls->id }}" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="modalEditJamLabel{{ $cls->id }}">Ubah Jam Kelas: {{ $cls->name }}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <form action="{{ route('admin.settings.jam-kelas.update', $cls->id) }}" method="POST">
+                        @csrf
+                        @method('PUT')
+                        <div class="modal-body">
+                            <div class="mb-3">
+                                <label class="form-label" for="jam_masuk_{{ $cls->id }}">Jam Masuk <span class="text-danger">*</span></label>
+                                <input type="time" name="jam_masuk" id="jam_masuk_{{ $cls->id }}" class="form-control"
+                                    value="{{ \Carbon\Carbon::parse($cls->jam_masuk ?? '07:00:00')->format('H:i') }}" required>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label" for="batas_terlambat_{{ $cls->id }}">Batas Terlambat <span class="text-danger">*</span></label>
+                                <input type="time" name="batas_terlambat" id="batas_terlambat_{{ $cls->id }}" class="form-control"
+                                    value="{{ \Carbon\Carbon::parse($cls->batas_terlambat ?? '07:15:00')->format('H:i') }}" required>
+                                <small class="text-muted" style="font-size: 11px;">Scan setelah jam ini berstatus Terlambat.</small>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label" for="batas_alpa_{{ $cls->id }}">Batas Alpa <span class="text-danger">*</span></label>
+                                <input type="time" name="batas_alpa" id="batas_alpa_{{ $cls->id }}" class="form-control"
+                                    value="{{ \Carbon\Carbon::parse($cls->batas_alpa ?? '08:30:00')->format('H:i') }}" required>
+                                <small class="text-muted" style="font-size: 11px;">Scan setelah jam ini berstatus Alpa.</small>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                            <button type="submit" class="btn btn-primary">Simpan Perubahan</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    @endforeach
+@endsection
+

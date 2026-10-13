@@ -89,8 +89,10 @@ class StudentController extends Controller
             'class_id' => 'required|exists:classes,id',
             'gender' => 'required|in:L,P',
             'phone' => 'nullable|string|max:30',
+            'email' => 'nullable|email|max:255',
             'parent_name' => 'nullable|string|max:255',
             'parent_phone' => 'nullable|string|max:30',
+            'parent_email' => 'nullable|email|max:255',
             'photo_depan' => 'required|image|mimes:jpeg,jpg,png|max:5120',
             'photo_kanan' => 'required|image|mimes:jpeg,jpg,png|max:5120',
             'photo_kiri' => 'required|image|mimes:jpeg,jpg,png|max:5120',
@@ -110,8 +112,10 @@ class StudentController extends Controller
             'class_id' => $request->class_id,
             'gender' => $request->gender,
             'phone' => $request->phone,
+            'email' => $request->email,
             'parent_name' => $request->parent_name,
             'parent_phone' => $request->parent_phone,
+            'parent_email' => $request->parent_email,
         ]);
 
         // Simpan 3 sampel foto wajah
@@ -141,8 +145,10 @@ class StudentController extends Controller
             'class_id' => 'required|exists:classes,id',
             'gender' => 'required|in:L,P',
             'phone' => 'nullable|string|max:30',
+            'email' => 'nullable|email|max:255',
             'parent_name' => 'nullable|string|max:255',
             'parent_phone' => 'nullable|string|max:30',
+            'parent_email' => 'nullable|email|max:255',
             'photo_depan' => 'nullable|image|mimes:jpeg,jpg,png|max:5120',
             'photo_kanan' => 'nullable|image|mimes:jpeg,jpg,png|max:5120',
             'photo_kiri' => 'nullable|image|mimes:jpeg,jpg,png|max:5120',
@@ -158,8 +164,10 @@ class StudentController extends Controller
             'class_id' => $request->class_id,
             'gender' => $request->gender,
             'phone' => $request->phone,
+            'email' => $request->email,
             'parent_name' => $request->parent_name,
             'parent_phone' => $request->parent_phone,
+            'parent_email' => $request->parent_email,
         ]);
 
         // Update foto jika diunggah baru

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\AcademicYear;
+use App\Models\AppSetting;
 use App\Models\Classes;
 use App\Models\Student;
 use App\Models\StudentClassHistory;
@@ -11,6 +12,7 @@ use App\Models\Teacher;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 
@@ -636,5 +638,112 @@ class ClassesController extends Controller
 
         return redirect($redirectRoute)
             ->with('success', 'Berhasil');
+    }
+
+    /**
+     * Tampilkan halaman pengelolaan Konfigurasi (Akurasi Pemindaian Wajah & Jam Kelas).
+     */
+    public function configurationIndex()
+    {
+        $classes = Classes::with('teacher.user')
+            ->withCount(['students' => function ($q) {
+                $q->where('status', 'aktif');
+            }])
+            ->orderByRaw("CASE
+                WHEN grade_level = 'X' THEN 1
+                WHEN grade_level = 'XI' THEN 2
+                WHEN grade_level = 'XII' THEN 3
+                ELSE 4 END")
+            ->orderBy('name')
+            ->get();
+
+        $appSetting = AppSetting::getSettings();
+
+        return view('admin.master-data.konfigurasi', compact('classes', 'appSetting'));
+    }
+
+    /**
+     * Alias method untuk backwards compatibility jam kelas.
+     */
+    public function scheduleIndex()
+    {
+        return $this->configurationIndex();
+    }
+
+    /**
+     * Perbarui batas minimum akurasi pemindaian wajah.
+     */
+    public function updateAccuracy(Request $request)
+    {
+        $validated = $request->validate([
+            'min_face_accuracy' => 'required|numeric|min:30|max:99.99',
+        ], [
+            'min_face_accuracy.required' => 'Batas minimum akurasi wajib diisi.',
+            'min_face_accuracy.numeric' => 'Batas minimum akurasi harus berupa angka.',
+            'min_face_accuracy.min' => 'Batas minimum akurasi minimal 30%.',
+            'min_face_accuracy.max' => 'Batas minimum akurasi maksimal 99.99%.',
+        ]);
+
+        $setting = AppSetting::getSettings();
+        $setting->update([
+            'min_face_accuracy' => round((float) $validated['min_face_accuracy'], 2),
+        ]);
+
+        // Beritahu layanan Python jika aktif di localhost
+        try {
+            Http::timeout(2)->post('http://127.0.0.1:5000/update-konfigurasi', [
+                'min_face_accuracy' => $setting->min_face_accuracy,
+            ]);
+        } catch (\Exception $e) {
+            // Lanjut jika background service python offline
+        }
+
+        return redirect()->back()->with('success', 'Minimum akurasi pemindaian berhasil diperbarui menjadi '.number_format($setting->min_face_accuracy, 2).'%');
+    }
+
+    /**
+     * Perbarui jam kelas untuk kelas tertentu.
+     */
+    public function updateSchedule(Request $request, Classes $class)
+    {
+        $validated = $request->validate([
+            'jam_masuk' => 'required|date_format:H:i',
+            'batas_terlambat' => 'required|date_format:H:i|after:jam_masuk',
+            'batas_alpa' => 'required|date_format:H:i|after:batas_terlambat',
+        ], [
+            'batas_terlambat.after' => 'Batas terlambat harus setelah jam masuk.',
+            'batas_alpa.after' => 'Batas alpa harus setelah batas terlambat.',
+        ]);
+
+        $class->update([
+            'jam_masuk' => $validated['jam_masuk'].':00',
+            'batas_terlambat' => $validated['batas_terlambat'].':00',
+            'batas_alpa' => $validated['batas_alpa'].':00',
+        ]);
+
+        return redirect()->back()->with('success', "Jam kelas untuk {$class->name} berhasil diperbarui.");
+    }
+
+    /**
+     * Terapkan jam kelas serentak ke seluruh kelas.
+     */
+    public function updateAllSchedules(Request $request)
+    {
+        $validated = $request->validate([
+            'jam_masuk' => 'required|date_format:H:i',
+            'batas_terlambat' => 'required|date_format:H:i|after:jam_masuk',
+            'batas_alpa' => 'required|date_format:H:i|after:batas_terlambat',
+        ], [
+            'batas_terlambat.after' => 'Batas terlambat harus setelah jam masuk.',
+            'batas_alpa.after' => 'Batas alpa harus setelah batas terlambat.',
+        ]);
+
+        Classes::query()->update([
+            'jam_masuk' => $validated['jam_masuk'].':00',
+            'batas_terlambat' => $validated['batas_terlambat'].':00',
+            'batas_alpa' => $validated['batas_alpa'].':00',
+        ]);
+
+        return redirect()->back()->with('success', 'Jam masuk, batas terlambat, dan batas alpa berhasil diterapkan ke seluruh kelas.');
     }
 }

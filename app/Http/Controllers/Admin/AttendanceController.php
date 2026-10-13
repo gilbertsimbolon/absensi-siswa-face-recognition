@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\AcademicYear;
+use App\Models\AppSetting;
 use App\Models\Attendance;
 use App\Models\Classes;
 use App\Models\Student;
+use App\Services\EmailNotificationService;
 use App\Services\PythonServiceManager;
 use App\Services\WhatsAppService;
 use Carbon\Carbon;
@@ -885,9 +887,21 @@ class AttendanceController extends Controller
         $now = Carbon::now();
         $today = Carbon::today()->format('Y-m-d');
 
-        // Tentukan batas jam sekolah (07:15)
-        $jamBatasMasuk = Carbon::today()->setTime(7, 15, 0);
-        $statusKehadiran = $now->greaterThan($jamBatasMasuk) ? Attendance::STATUS_TERLAMBAT : Attendance::STATUS_HADIR;
+        // Tentukan status kehadiran berdasarkan jam kelas siswa (Hadir, Terlambat, Alpa)
+        $studentClass = $student->classes;
+        $strBatasTerlambat = $studentClass?->batas_terlambat ?? '07:15:00';
+        $strBatasAlpa = $studentClass?->batas_alpa ?? '08:30:00';
+
+        $jamBatasTerlambat = Carbon::today()->setTimeFromTimeString($strBatasTerlambat);
+        $jamBatasAlpa = Carbon::today()->setTimeFromTimeString($strBatasAlpa);
+
+        if ($now->lte($jamBatasTerlambat)) {
+            $statusKehadiran = Attendance::STATUS_HADIR;
+        } elseif ($now->lte($jamBatasAlpa)) {
+            $statusKehadiran = Attendance::STATUS_TERLAMBAT;
+        } else {
+            $statusKehadiran = Attendance::STATUS_ALPA;
+        }
 
         // Simpan snapshot jika dikirimkan
         $snapshotPath = null;
@@ -956,7 +970,7 @@ class AttendanceController extends Controller
             return response()->json([
                 'status' => 'sudah_absen',
                 'tipe' => 'sudah_masuk',
-                'pesan' => "{$student->name} sudah tercatat presensi masuk pukul ".Carbon::parse($attendance->check_in_time)->format('H:i').' WIB.',
+                'pesan' => "{$student->name} sudah tercatat presensi masuk pukul ".Carbon::parse($attendance->check_in_time)->format('H:i').' WITA.',
                 'frame_annotated' => $frameAnnotated,
                 'siswa' => [
                     'id' => $student->id,
@@ -985,11 +999,11 @@ class AttendanceController extends Controller
             'notes' => 'Presensi otomatis melalui pindai wajah',
         ]);
 
-        // Kirim notifikasi WhatsApp otomatis ke orang tua / siswa
+        // Kirim notifikasi email otomatis ke orang tua / siswa
         try {
-            WhatsAppService::sendAttendanceNotification($attendance);
+            EmailNotificationService::sendAttendanceNotification($attendance);
         } catch (\Exception $e) {
-            // Jangan gagalkan respons scanner jika pengiriman WhatsApp bermasalah
+            // Jangan gagalkan respons scanner jika pengiriman email bermasalah
         }
 
         return response()->json([
@@ -1026,5 +1040,15 @@ class AttendanceController extends Controller
         });
 
         return response()->json($students);
+    }
+
+    /**
+     * Dapatkan konfigurasi presensi untuk layanan AI Scanner.
+     */
+    public function konfigurasi()
+    {
+        return response()->json([
+            'min_face_accuracy' => AppSetting::getMinFaceAccuracy(),
+        ]);
     }
 }

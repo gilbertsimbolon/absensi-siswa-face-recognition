@@ -13,6 +13,9 @@ class Classes extends Model
         'teacher_id',
         'name',
         'grade_level',
+        'jam_masuk',
+        'batas_terlambat',
+        'batas_alpa',
     ];
 
     // relasi ke teacher

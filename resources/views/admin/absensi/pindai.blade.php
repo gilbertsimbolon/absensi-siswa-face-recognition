@@ -274,6 +274,11 @@
             color: #854d0e;
         }
 
+        .badge-alpa {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
         .badge-tidak-dikenal {
             background: #fee2e2;
             color: #991b1b;
@@ -543,20 +548,34 @@
         function tampilkanDetailPresensi(h) {
             if (hideNotifTimer) clearTimeout(hideNotifTimer);
 
-            const akurasiStr = h.akurasi ? (String(h.akurasi).includes('%') ? h.akurasi : h.akurasi + '%') : '-';
+            // Format akurasi dengan format (00.00%)
+            let akurasiRaw = h.akurasi_num;
+            if (akurasiRaw === undefined || akurasiRaw === null) {
+                akurasiRaw = parseFloat(String(h.akurasi || '0').replace(/[^0-9.]/g, '')) || 0;
+            }
+            const akurasiFormatted = `(${Number(akurasiRaw).toFixed(2)}%)`;
 
-            if (notifNama) notifNama.textContent = h.nama || 'Siswa';
+            if (notifNama) {
+                const namaSiswa = h.nama || 'Siswa';
+                notifNama.innerHTML = `${namaSiswa} <span class="ms-1 text-primary fw-semibold" style="font-size: 0.9rem;">${akurasiFormatted}</span>`;
+            }
             if (notifDetail) notifDetail.textContent = `${h.kelas || '-'} • NISN: ${h.nisn || '-'}`;
 
             const statusLabel = h.status_absen || 'HADIR';
             if (notifStatusBadge) {
                 notifStatusBadge.textContent = statusLabel;
-                notifStatusBadge.className = 'notif-badge-label ' + 
-                    (statusLabel.toLowerCase().includes('terlambat') ? 'badge-terlambat' : 'badge-hadir');
+                let badgeClass = 'badge-hadir';
+                const lower = statusLabel.toLowerCase();
+                if (lower.includes('terlambat')) {
+                    badgeClass = 'badge-terlambat';
+                } else if (lower.includes('alpa')) {
+                    badgeClass = 'badge-alpa';
+                }
+                notifStatusBadge.className = 'notif-badge-label ' + badgeClass;
             }
 
             if (notifAkurasiBadge) {
-                notifAkurasiBadge.textContent = 'Akurasi: ' + akurasiStr;
+                notifAkurasiBadge.textContent = 'Akurasi: ' + akurasiFormatted;
             }
 
             if (notifJam) notifJam.textContent = (h.timestamp || '') + ' WITA';
