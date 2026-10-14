@@ -100,7 +100,7 @@
                             <div class="row">
                                 <!-- Input No. Handphone -->
                                 <div class="col-12 mb-3">
-                                    <label class="form-label" for="tambah_phone">No. Telp / WhatsApp</label>
+                                    <label class="form-label" for="tambah_phone">No. Telepon</label>
                                     <div class="input-group input-group-merge">
                                         <span class="input-group-text"><i class="icon-base bx bx-phone"></i></span>
                                         <input type="text" id="tambah_phone" name="phone" class="form-control"
@@ -216,8 +216,8 @@
                                 <td class="text-nowrap">{{ $teacher->classes ? $teacher->classes->name : '-' }}</td>
                                 <td class="text-nowrap">
                                     @if ($teacher->phone)
-                                        <a href="https://wa.me/{{ preg_replace('/[^0-9]/', '', $teacher->phone) }}" target="_blank" class="text-body text-decoration-none">
-                                            {{ $teacher->phone }}
+                                        <a href="tel:{{ preg_replace('/[^0-9+]/', '', $teacher->phone) }}" class="text-body text-decoration-none">
+                                            <i class="icon-base bx bx-phone text-muted me-1"></i>{{ $teacher->phone }}
                                         </a>
                                     @else
                                         <span class="text-muted">-</span>

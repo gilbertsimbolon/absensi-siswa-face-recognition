@@ -169,4 +169,3 @@ test('sendTestEmail sends email successfully', function () {
 
     expect($result['status'])->toBe('sukses');
 });
-

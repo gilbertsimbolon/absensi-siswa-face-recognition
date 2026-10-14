@@ -17,6 +17,8 @@ return new class extends Migration
             $table->string('file_path');
             $table->string('label')->nullable();
             $table->timestamps();
+
+            $table->index('teacher_id');
         });
     }
 

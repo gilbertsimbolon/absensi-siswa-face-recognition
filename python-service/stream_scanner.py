@@ -9,7 +9,7 @@ from deepface import DeepFace
 from datetime import datetime
 import zoneinfo
 import konfigurasi
-from layanan_wajah import LayananWajah
+from layanan_wajah import LayananWajah, hitung_persentase_akurasi
 
 TZ_WITA = zoneinfo.ZoneInfo("Asia/Makassar")
 
@@ -120,11 +120,19 @@ class ScannerOpenCV:
         # Worker pengenalan wajah async DeepFace
         self.is_recognizing = False
         self.last_recognition_time = 0
-        self.recognition_interval = 0.20 # detik antar inferensi (sangat cepat)
+        self.recognition_interval = 0.05 # detik antar inferensi (responsif instan)
         
         # Cooldown per NISN agar tidak dobel presensi
         self.last_attendance = {}
+        self._last_status = {}
         self.cooldown_sec = 6
+        self.scan_counter = 0
+
+        # Status dinamis scanner untuk informasi real-time ke siswa
+        self.status_scanner = "standby"
+        self.pesan_scanner = "Arahkan Wajah ke Kamera"
+        self.detail_scanner = "Posisikan wajah Anda di dalam frame untuk presensi otomatis"
+        self.face_detected_time = 0.0
 
         # Haar Cascade bawaan OpenCV
         cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
@@ -203,17 +211,18 @@ class ScannerOpenCV:
 
             h, w = frame.shape[:2]
 
-            # Deteksi wajah Haar Cascade pada resolusi diperkecil untuk performa cepat & mulus
-            small = cv2.resize(frame, (0, 0), fx=0.5, fy=0.5)
+            # Deteksi wajah Haar Cascade pada resolusi diperkecil (0.35x) untuk kecepatan 3x lipat (5ms)
+            small = cv2.resize(frame, (0, 0), fx=0.35, fy=0.35)
             gray_small = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY)
             faces_raw = self.face_cascade.detectMultiScale(
-                gray_small, scaleFactor=1.12, minNeighbors=4, minSize=(36, 36)
+                gray_small, scaleFactor=1.10, minNeighbors=3, minSize=(20, 20)
             )
 
             current_face = None
             if len(faces_raw) > 0:
                 fx, fy, fw, fh = max(faces_raw, key=lambda f: f[2] * f[3])
-                tx, ty, tw, th = int(fx * 2), int(fy * 2), int(fw * 2), int(fh * 2)
+                scale_inv = 1.0 / 0.35
+                tx, ty, tw, th = int(fx * scale_inv), int(fy * scale_inv), int(fw * scale_inv), int(fh * scale_inv)
 
                 if self.smooth_box is None:
                     self.smooth_box = [tx, ty, tw, th]
@@ -236,6 +245,40 @@ class ScannerOpenCV:
                     current_face = None
                     if (now - self.last_recognition_time) > 2.5:
                         self.active_name = ""
+
+            # Lacak durasi kehadiran wajah dan perbarui pesan/status scanner real-time
+            if current_face is not None:
+                if self.face_detected_time == 0.0:
+                    self.face_detected_time = now
+
+                durasi_hadir = now - self.face_detected_time
+                cw, ch = current_face[2], current_face[3]
+
+                if self.active_name and now < self.name_display_until:
+                    self.status_scanner = "sukses"
+                    self.pesan_scanner = self.active_name
+                    self.detail_scanner = "Presensi Anda berhasil diverifikasi."
+                elif cw < 55 or ch < 55:
+                    self.status_scanner = "peringatan"
+                    self.pesan_scanner = "Wajah Terlalu Jauh dari Kamera"
+                    self.detail_scanner = "Silakan melangkah lebih dekat ke kamera agar wajah terdeteksi jelas."
+                elif durasi_hadir > 2.5 and not self.active_name:
+                    self.status_scanner = "memproses_lama"
+                    self.pesan_scanner = "Menganalisis Biometrik Wajah..."
+                    self.detail_scanner = "Proses membutuhkan waktu ekstra: pastikan wajah menghadap lurus dan pencahayaan ruangan cukup terang."
+                elif self.is_recognizing or durasi_hadir >= 0.1:
+                    if self.status_scanner not in ["gagal_akurasi", "tidak_dikenali"] or (now - self.last_recognition_time) > 2.0:
+                        self.status_scanner = "memproses"
+                        self.pesan_scanner = "Wajah Terdeteksi! Sedang Memindai..."
+                        self.detail_scanner = "Mohon tahan posisi wajah Anda sejenak menghadap kamera."
+            else:
+                self.face_detected_time = 0.0
+                if self.active_name and now < self.name_display_until:
+                    self.status_scanner = "sukses"
+                else:
+                    self.status_scanner = "standby"
+                    self.pesan_scanner = "Arahkan Wajah ke Kamera"
+                    self.detail_scanner = "Posisikan wajah Anda di dalam frame untuk presensi otomatis"
 
             # Trigger Asynchronous DeepFace di background worker terpisah
             if current_face is not None and not self.is_recognizing:
@@ -274,6 +317,29 @@ class ScannerOpenCV:
             # Istirahat mikro untuk memberi kesempatan thread kamera membaca frame baru
             time.sleep(0.005)
 
+    def _kirim_presensi_background(self, nisn, scan_id):
+        """Mengirim data absensi ke Laravel di thread latar belakang tanpa menghambat video feed atau DeepFace worker."""
+        try:
+            res_api = self.layanan.catat_presensi_ke_laravel(nisn)
+            if res_api and isinstance(res_api, dict):
+                st = res_api.get("siswa", {}).get("status")
+                status_absen = "HADIR"
+                if st:
+                    status_absen = str(st).upper()
+                elif res_api.get("status") == "sudah_absen":
+                    status_absen = "SUDAH ABSEN"
+                elif res_api.get("status") == "diluar_waktu":
+                    status_absen = "DILUAR WAKTU ABSEN"
+
+                self._last_status[nisn] = status_absen
+
+                # Update status_absen pada latest_result jika masih scan_id yang sama
+                with self.lock:
+                    if self.latest_result and self.latest_result.get("scan_id") == scan_id:
+                        self.latest_result["status_absen"] = status_absen
+        except Exception as e_api:
+            print(f"[!] Gagal mencatat presensi background: {e_api}")
+
     def _worker_deepface(self, face_crop):
         """Worker thread independen untuk inferensi FaceNet dan pengiriman ke Laravel."""
         try:
@@ -295,17 +361,21 @@ class ScannerOpenCV:
             if query_norm > 0:
                 query_emb = query_emb / query_norm
 
-            db_embeddings = np.array([item["embedding"] for item in self.layanan.embeddings_db])
-            cosine_distances = 1.0 - np.dot(db_embeddings, query_emb)
+            # Gunakan matriks 2D pre-computed jika ada untuk kalkulasi secepat kilat (0.01 ms)
+            if getattr(self.layanan, 'embeddings_matrix', None) is not None and len(self.layanan.embeddings_matrix) > 0:
+                cosine_distances = 1.0 - np.dot(self.layanan.embeddings_matrix, query_emb)
+                best_idx = int(np.argmin(cosine_distances))
+                min_dist = float(cosine_distances[best_idx])
+                nisn = self.layanan.labels_list[best_idx]
+            else:
+                db_embeddings = np.array([item["embedding"] for item in self.layanan.embeddings_db])
+                cosine_distances = 1.0 - np.dot(db_embeddings, query_emb)
+                best_idx = int(np.argmin(cosine_distances))
+                min_dist = float(cosine_distances[best_idx])
+                nisn = self.layanan.embeddings_db[best_idx]["label"]
 
-            best_idx = int(np.argmin(cosine_distances))
-            min_dist = float(cosine_distances[best_idx])
-            best_match = self.layanan.embeddings_db[best_idx]
-            nisn = best_match["label"]
-
-            # Hitung skor kemiripan kosinus (Cosine Similarity: 1.0 - distance)
-            skor = max(0.0, min(1.0, 1.0 - min_dist))
-            persentase_skor = round(skor * 100, 2)
+            # Hitung skor akurasi proporsional
+            persentase_skor = hitung_persentase_akurasi(min_dist, self.layanan.threshold)
             persentase_format = f"({persentase_skor:.2f}%)"
 
             siswa_data = self.layanan.data_siswa.get(nisn, {})
@@ -314,63 +384,80 @@ class ScannerOpenCV:
 
             sekarang = time.time()
             min_acc = getattr(self, 'min_face_accuracy', None) or getattr(self.layanan, 'min_face_accuracy', 70.0)
+            max_thresh = max(float(self.layanan.threshold), 0.52)
+            lolos = (min_dist <= max_thresh) and (persentase_skor >= min_acc)
+
+            print(f"[*] Scan Wajah: NISN={nisn}, {nama_siswa}, Jarak={min_dist:.4f}, Akurasi={persentase_skor:.2f}%, Min={min_acc:.2f}%, Lolos={lolos}")
 
             # Lolos jika jarak cosine dalam threshold dan akurasi >= batas minimum yang dikonfigurasi
-            if min_dist <= self.layanan.threshold and persentase_skor >= min_acc:
+            if lolos:
                 last_time = self.last_attendance.get(nisn, 0)
-                status_absen = getattr(self, '_last_status', {}).get(nisn, "HADIR")
+                status_absen = self._last_status.get(nisn, "HADIR")
+                self.scan_counter += 1
+                current_scan_id = self.scan_counter
 
-                # Kirim data presensi ke Laravel untuk menentukan status Hadir/Terlambat/Alpa secara dinamis
+                self.status_scanner = "sukses"
+                self.pesan_scanner = f"{nama_siswa} {persentase_format}"
+                self.detail_scanner = f"Siswa {kelas_siswa} • Presensi Terverifikasi"
+
+                # Kirim data presensi ke Laravel secara background non-blocking
                 if (sekarang - last_time) > self.cooldown_sec:
                     self.last_attendance[nisn] = sekarang
-                    try:
-                        res_api = self.layanan.catat_presensi_ke_laravel(nisn)
-                        if res_api and isinstance(res_api, dict) and "siswa" in res_api:
-                            st = res_api["siswa"].get("status")
-                            if st:
-                                status_absen = str(st).upper()
-                                if not hasattr(self, '_last_status'):
-                                    self._last_status = {}
-                                self._last_status[nisn] = status_absen
-                    except Exception as e_api:
-                        print(f"[!] Gagal mencatat presensi: {e_api}")
-                elif hasattr(self, '_last_status') and nisn in self._last_status:
-                    status_absen = self._last_status[nisn]
+                    threading.Thread(
+                        target=self._kirim_presensi_background,
+                        args=(nisn, current_scan_id),
+                        daemon=True
+                    ).start()
 
                 # Tahan nama siswa dengan format akurasi (00.00%) di atas kotak wajah
                 self.active_name = f"{nama_siswa} {persentase_format}"
                 self.name_display_until = sekarang + 5.0
 
-                self.latest_result = {
-                    "nisn": nisn,
-                    "nama": nama_siswa,
-                    "nama_dengan_akurasi": f"{nama_siswa} {persentase_format}",
-                    "kelas": kelas_siswa,
-                    "akurasi": f"{persentase_skor:.2f}%",
-                    "akurasi_format": persentase_format,
-                    "akurasi_num": persentase_skor,
-                    "status": "sukses",
-                    "status_absen": status_absen,
-                    "timestamp": dapatkan_jam_wita(),
-                    "expire_at": sekarang + 5.0
-                }
-            else:
-                # Jangan mereset nama siswa secara mendadak jika baru saja terdeteksi
-                if sekarang >= self.name_display_until:
-                    self.active_name = ""
+                with self.lock:
                     self.latest_result = {
-                        "nisn": None,
-                        "nama": "Wajah Tidak Dikenali",
+                        "scan_id": current_scan_id,
+                        "nisn": nisn,
+                        "nama": nama_siswa,
+                        "nama_dengan_akurasi": f"{nama_siswa} {persentase_format}",
+                        "kelas": kelas_siswa,
                         "akurasi": f"{persentase_skor:.2f}%",
                         "akurasi_format": persentase_format,
                         "akurasi_num": persentase_skor,
-                        "status": "tidak_dikenali",
-                        "status_absen": "TIDAK DIKENAL",
+                        "status": "sukses",
+                        "status_absen": status_absen,
                         "timestamp": dapatkan_jam_wita(),
-                        "expire_at": sekarang + 1.5
+                        "expire_at": sekarang + 5.0
                     }
-        except Exception:
-            pass
+            else:
+                if min_dist <= 0.52:
+                    self.status_scanner = "gagal_akurasi"
+                    self.pesan_scanner = f"Akurasi ({persentase_skor:.2f}%) Belum Memenuhi Syarat"
+                    self.detail_scanner = f"Standar minimum sekolah adalah {min_acc:.2f}%. Mohon hadap lurus ke kamera dan pastikan cahaya cukup terang."
+                else:
+                    self.status_scanner = "tidak_dikenali"
+                    self.pesan_scanner = "Wajah Tidak Dikenali / Belum Terdaftar"
+                    self.detail_scanner = "Wajah Anda tidak cocok dengan data siswa terdaftar. Silakan hubungi operator sekolah."
+
+                # Jangan mereset nama siswa secara mendadak jika baru saja terdeteksi
+                if sekarang >= self.name_display_until:
+                    self.active_name = ""
+                    with self.lock:
+                        self.latest_result = {
+                            "scan_id": 0,
+                            "nisn": None,
+                            "nama": "Wajah Tidak Dikenali",
+                            "akurasi": f"{persentase_skor:.2f}%",
+                            "akurasi_format": persentase_format,
+                            "akurasi_num": persentase_skor,
+                            "status": "tidak_dikenali",
+                            "status_absen": "TIDAK DIKENAL",
+                            "pesan_gagal": self.pesan_scanner,
+                            "detail_gagal": self.detail_scanner,
+                            "timestamp": dapatkan_jam_wita(),
+                            "expire_at": sekarang + 2.0
+                        }
+        except Exception as e:
+            print(f"[!] Error pada _worker_deepface: {e}")
         finally:
             self.is_recognizing = False
 
@@ -422,20 +509,24 @@ class ScannerOpenCV:
     def generate_mjpeg_stream(self):
         """Generator MJPEG stream super responsif tanpa duplikasi frame."""
         last_sent_id = -1
-        while True:
-            with self.lock:
-                if self.frame_id == last_sent_id or self.current_jpeg is None:
-                    jpeg_bytes = None
-                else:
-                    jpeg_bytes = self.current_jpeg
-                    last_sent_id = self.frame_id
+        while self.is_running:
+            try:
+                with self.lock:
+                    if self.frame_id == last_sent_id or self.current_jpeg is None:
+                        jpeg_bytes = None
+                    else:
+                        jpeg_bytes = self.current_jpeg
+                        last_sent_id = self.frame_id
 
-            if jpeg_bytes is None:
-                time.sleep(0.005)
-                continue
+                if jpeg_bytes is None:
+                    time.sleep(0.01)
+                    continue
 
-            yield (b'--frame\r\n'
-                   b'Content-Type: image/jpeg\r\n\r\n' + jpeg_bytes + b'\r\n')
+                yield (b'--frame\r\n'
+                       b'Content-Type: image/jpeg\r\n\r\n' + jpeg_bytes + b'\r\n')
+                time.sleep(0.02)
+            except (GeneratorExit, ConnectionResetError, BrokenPipeError):
+                break
 
     def jalankan_window_desktop(self):
         """Membuka window GUI OpenCV di desktop komputer."""

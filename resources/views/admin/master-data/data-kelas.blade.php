@@ -161,7 +161,7 @@
                                     Nama Siswa <i id="classSortIconName" class="bx bx-chevron-up text-primary ms-1" style="font-size: 11px; vertical-align: middle;"></i>
                                 </th>
                                 <th class="text-center" style="width: 6%;">L/P</th>
-                                <th style="width: 17%;">No. WA Siswa</th>
+                                <th style="width: 17%;">Email Siswa</th>
                                 <th style="width: 19%;">Nama Orang Tua</th>
                                 <th class="text-center" style="width: 11%;">Aksi</th>
                             </tr>
@@ -192,10 +192,12 @@
                                         </span>
                                     </td>
                                     <td class="text-nowrap">
-                                        @if ($siswa->phone)
-                                            <a href="https://wa.me/{{ preg_replace('/[^0-9]/', '', $siswa->phone) }}" target="_blank" class="text-body text-decoration-none">
-                                                <i class="icon-base bx bxl-whatsapp text-success me-1"></i>{{ $siswa->phone }}
+                                        @if ($siswa->email)
+                                            <a href="mailto:{{ $siswa->email }}" class="text-body text-decoration-none">
+                                                <i class="icon-base bx bx-envelope text-primary me-1"></i>{{ $siswa->email }}
                                             </a>
+                                        @elseif ($siswa->phone)
+                                            <span class="text-muted"><i class="icon-base bx bx-phone me-1"></i>{{ $siswa->phone }}</span>
                                         @else
                                             <span class="text-muted">-</span>
                                         @endif

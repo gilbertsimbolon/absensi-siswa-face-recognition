@@ -60,15 +60,27 @@ class StudentSeeder extends Seeder
             }
         }
 
-        // 4. Data 11 siswa bawaan (historis)
+        // 4. Data 12 siswa bawaan (historis)
         $initialStudents = [
+            [
+                'name' => 'Josep Gilbert Andriano Simbolon',
+                'nisn' => '01234564589',
+                'gender' => 'L',
+                'phone' => '085399684844',
+                'email' => 'josep.gilbert@siswa.sman2tondano.sch.id',
+                'parent_name' => 'Maca Simbolon',
+                'parent_phone' => '085399684844',
+                'parent_email' => 'gilbertttsimbolon@gmail.com',
+            ],
             [
                 'name' => 'Ciko',
                 'nisn' => '0025625452',
                 'gender' => 'L',
                 'phone' => '085399684844',
+                'email' => 'ciko@siswa.sman2tondano.sch.id',
                 'parent_name' => 'Royke Mandagi',
                 'parent_phone' => '085399684844',
+                'parent_email' => 'gilbertttsimbolon@gmail.com',
             ],
             [
                 'name' => 'Bryan Wewengkang',
@@ -211,13 +223,18 @@ class StudentSeeder extends Seeder
             $phoneSeq = str_pad((string) ($idx + 10), 4, '0', STR_PAD_LEFT);
             $parentPhoneSeq = str_pad((string) ($idx + 50), 4, '0', STR_PAD_LEFT);
 
+            $slugName = strtolower(preg_replace('/[^a-zA-Z0-9]+/', '.', trim("{$firstName} {$lastName}")));
+            $slugParent = strtolower(preg_replace('/[^a-zA-Z0-9]+/', '.', trim("{$parentFirst} {$lastName}")));
+
             $allStudentPayloads[] = [
                 'name' => "{$firstName} {$lastName}",
                 'nisn' => $nisn,
                 'gender' => $isMale ? 'L' : 'P',
                 'phone' => "081244{$phoneSeq}1",
+                'email' => "{$slugName}.".substr($nisn, -4).'@siswa.sman2tondano.sch.id',
                 'parent_name' => "{$parentFirst} {$lastName}",
                 'parent_phone' => "081355{$parentPhoneSeq}2",
+                'parent_email' => "{$slugParent}@gmail.com",
             ];
         }
 
@@ -243,8 +260,10 @@ class StudentSeeder extends Seeder
                         'class_id' => $class->id,
                         'gender' => $data['gender'],
                         'phone' => $data['phone'],
+                        'email' => $data['email'] ?? (strtolower(preg_replace('/[^a-zA-Z0-9]+/', '.', $data['name'])).'@siswa.sman2tondano.sch.id'),
                         'parent_name' => $data['parent_name'],
                         'parent_phone' => $data['parent_phone'],
+                        'parent_email' => $data['parent_email'] ?? (strtolower(preg_replace('/[^a-zA-Z0-9]+/', '.', $data['parent_name'])).'@gmail.com'),
                         'status' => 'aktif',
                     ]
                 );
@@ -266,11 +285,26 @@ class StudentSeeder extends Seeder
                 $hasStorageFace = Storage::disk('public')->exists($storageDir)
                     && ! empty(Storage::disk('public')->files($storageDir));
 
-                $relativePhotoPath = null;
-
                 if ($hasStorageFace) {
                     $files = Storage::disk('public')->files($storageDir);
-                    $relativePhotoPath = $files[0];
+                    foreach ($files as $file) {
+                        $label = 'Tampak Depan';
+                        if (str_contains($file, 'kanan')) {
+                            $label = 'Tampak Kanan';
+                        } elseif (str_contains($file, 'kiri')) {
+                            $label = 'Tampak Kiri';
+                        }
+
+                        StudentFace::firstOrCreate(
+                            [
+                                'student_id' => $student->id,
+                                'file_path' => $file,
+                            ],
+                            [
+                                'label' => $label,
+                            ]
+                        );
+                    }
                 } elseif ($sampleFacePath && File::exists($sampleFacePath)) {
                     $fileName = 'photo_depan.jpg';
                     $relativePhotoPath = $storageDir.'/'.$fileName;
@@ -293,9 +327,7 @@ class StudentSeeder extends Seeder
                     if (! File::exists($pythonFilePath)) {
                         File::copy($sampleFacePath, $pythonFilePath);
                     }
-                }
 
-                if ($relativePhotoPath) {
                     StudentFace::firstOrCreate(
                         [
                             'student_id' => $student->id,

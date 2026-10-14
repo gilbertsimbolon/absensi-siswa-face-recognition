@@ -10,7 +10,6 @@ use App\Models\Classes;
 use App\Models\Student;
 use App\Services\EmailNotificationService;
 use App\Services\PythonServiceManager;
-use App\Services\WhatsAppService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -626,9 +625,9 @@ class AttendanceController extends Controller
             ]
         );
 
-        // Kirim notifikasi WhatsApp otomatis jika status hadir / terlambat
+        // Kirim notifikasi email otomatis jika status hadir / terlambat
         try {
-            WhatsAppService::sendAttendanceNotification($attendance);
+            EmailNotificationService::sendAttendanceNotification($attendance);
         } catch (\Exception $e) {
             // Abaikan error agar proses penyimpanan tidak terganggu
         }
@@ -897,10 +896,13 @@ class AttendanceController extends Controller
 
         if ($now->lte($jamBatasTerlambat)) {
             $statusKehadiran = Attendance::STATUS_HADIR;
+            $statusDisplay = 'Hadir';
         } elseif ($now->lte($jamBatasAlpa)) {
             $statusKehadiran = Attendance::STATUS_TERLAMBAT;
+            $statusDisplay = 'Terlambat';
         } else {
             $statusKehadiran = Attendance::STATUS_ALPA;
+            $statusDisplay = 'Diluar Waktu Absen';
         }
 
         // Simpan snapshot jika dikirimkan
@@ -957,8 +959,8 @@ class AttendanceController extends Controller
                     'nama' => $student->name,
                     'nisn' => $student->nisn,
                     'kelas' => $student->classes?->name ?? '-',
-                    'status' => $attendance->status_label,
-                    'status_kode' => $attendance->status,
+                    'status' => 'Sudah Absen',
+                    'status_kode' => 'sudah_absen',
                     'jam' => Carbon::parse($attendance->check_out_time)->format('H:i:s'),
                     'foto' => $student->faces->first()?->file_path ? asset('storage/'.$student->faces->first()->file_path) : null,
                 ],
@@ -970,15 +972,15 @@ class AttendanceController extends Controller
             return response()->json([
                 'status' => 'sudah_absen',
                 'tipe' => 'sudah_masuk',
-                'pesan' => "{$student->name} sudah tercatat presensi masuk pukul ".Carbon::parse($attendance->check_in_time)->format('H:i').' WITA.',
+                'pesan' => "{$student->name} sudah melakukan presensi hari ini pukul ".Carbon::parse($attendance->check_in_time)->format('H:i').' WITA.',
                 'frame_annotated' => $frameAnnotated,
                 'siswa' => [
                     'id' => $student->id,
                     'nama' => $student->name,
                     'nisn' => $student->nisn,
                     'kelas' => $student->classes?->name ?? '-',
-                    'status' => $attendance->status_label,
-                    'status_kode' => $attendance->status,
+                    'status' => 'Sudah Absen',
+                    'status_kode' => 'sudah_absen',
                     'jam' => Carbon::parse($attendance->check_in_time)->format('H:i:s'),
                     'foto' => $student->faces->first()?->file_path ? asset('storage/'.$student->faces->first()->file_path) : null,
                 ],
@@ -1009,14 +1011,14 @@ class AttendanceController extends Controller
         return response()->json([
             'status' => 'sukses',
             'tipe' => 'masuk',
-            'pesan' => "Presensi masuk berhasil dicatat! Status: {$attendance->status_label}.",
+            'pesan' => "Presensi masuk berhasil dicatat! Status: {$statusDisplay}.",
             'frame_annotated' => $frameAnnotated,
             'siswa' => [
                 'id' => $student->id,
                 'nama' => $student->name,
                 'nisn' => $student->nisn,
                 'kelas' => $student->classes?->name ?? '-',
-                'status' => $attendance->status_label,
+                'status' => $statusDisplay,
                 'status_kode' => $attendance->status,
                 'jam' => $now->format('H:i:s'),
                 'foto' => $student->faces->first()?->file_path ? asset('storage/'.$student->faces->first()->file_path) : null,

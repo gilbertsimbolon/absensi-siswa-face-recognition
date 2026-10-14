@@ -94,9 +94,9 @@
                             <th style="width: 18%;">Nama Siswa</th>
                             <th style="width: 10%;">Kelas</th>
                             <th class="text-center" style="width: 5%;">L/P</th>
-                            <th style="width: 13%;">Kontak Siswa</th>
+                            <th style="width: 14%;">Email Siswa</th>
                             <th style="width: 13%;">Orang Tua</th>
-                            <th style="width: 13%;">Kontak Ortu</th>
+                            <th style="width: 14%;">Email Ortu</th>
                             <th class="text-center" style="width: 8%;">Aksi</th>
                         </tr>
                     </thead>
@@ -127,7 +127,9 @@
                                 </td>
                                 <td>
                                     @if ($siswa->email)
-                                        <div class="small fw-semibold text-dark">{{ $siswa->email }}</div>
+                                        <a href="mailto:{{ $siswa->email }}" class="small fw-semibold text-primary text-decoration-none d-flex align-items-center">
+                                            <i class="icon-base bx bx-envelope me-1"></i>{{ $siswa->email }}
+                                        </a>
                                     @endif
                                     @if ($siswa->phone)
                                         <small class="text-muted d-block">{{ $siswa->phone }}</small>
@@ -138,7 +140,9 @@
                                 <td>{{ $siswa->parent_name ?: '-' }}</td>
                                 <td>
                                     @if ($siswa->parent_email)
-                                        <div class="small fw-semibold text-dark">{{ $siswa->parent_email }}</div>
+                                        <a href="mailto:{{ $siswa->parent_email }}" class="small fw-semibold text-primary text-decoration-none d-flex align-items-center">
+                                            <i class="icon-base bx bx-envelope me-1"></i>{{ $siswa->parent_email }}
+                                        </a>
                                     @endif
                                     @if ($siswa->parent_phone)
                                         <small class="text-muted d-block">{{ $siswa->parent_phone }}</small>

@@ -18,6 +18,9 @@ return new class extends Migration
             $table->foreignId('academic_year_id')->constrained('academic_years')->onDelete('cascade');
             $table->string('status')->default('aktif'); // 'aktif', 'naik_kelas', 'tinggal_kelas', 'lulus'
             $table->timestamps();
+
+            $table->index(['student_id', 'academic_year_id']);
+            $table->index(['class_id', 'academic_year_id']);
         });
     }
 

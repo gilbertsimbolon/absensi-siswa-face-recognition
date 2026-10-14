@@ -13,11 +13,24 @@ return new class extends Migration
     {
         Schema::create('students', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
-            $table->string('nisn');
-            $table->foreignId('class_id')->constrained('classes')->onDelete('cascade');
+            $table->foreignId('user_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->string('name');
+            $table->string('nisn')->unique();
+            $table->foreignId('class_id')->nullable()->constrained('classes')->nullOnDelete();
             $table->enum('gender', ['L', 'P']);
+            $table->string('phone')->nullable();
+            $table->string('email')->nullable();
+            $table->string('parent_name')->nullable();
+            $table->string('parent_phone')->nullable();
+            $table->string('parent_email')->nullable();
+            $table->string('status')->default('aktif');
             $table->timestamps();
+
+            // Indeks performa untuk query relasi & pencarian
+            $table->index('nisn');
+            $table->index('class_id');
+            $table->index('status');
+            $table->index('gender');
         });
     }
 

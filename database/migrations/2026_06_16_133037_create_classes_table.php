@@ -13,10 +13,16 @@ return new class extends Migration
     {
         Schema::create('classes', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('teacher_id')->constrained('teachers')->onDelete('cascade');
-            $table->string('name');
+            $table->foreignId('teacher_id')->nullable()->constrained('teachers')->nullOnDelete();
+            $table->string('name')->unique();
             $table->string('grade_level');
+            $table->time('jam_masuk')->default('07:00:00');
+            $table->time('batas_terlambat')->default('07:15:00');
+            $table->time('batas_alpa')->default('08:30:00');
             $table->timestamps();
+
+            $table->index('grade_level');
+            $table->index('teacher_id');
         });
     }
 

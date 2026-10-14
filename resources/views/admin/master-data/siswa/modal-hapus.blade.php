@@ -41,16 +41,16 @@
                                 <td class="p-1 fw-semibold">: {{ $siswa->gender == 'L' ? 'Laki-laki' : 'Perempuan' }}</td>
                             </tr>
                             <tr>
-                                <td class="text-muted p-1">No. WhatsApp Siswa</td>
-                                <td class="p-1 fw-semibold">: {{ $siswa->phone ?: '-' }}</td>
+                                <td class="text-muted p-1">Email Siswa</td>
+                                <td class="p-1 fw-semibold">: {{ $siswa->email ?: ($siswa->phone ?: '-') }}</td>
                             </tr>
                             <tr>
                                 <td class="text-muted p-1">Orang Tua / Wali</td>
                                 <td class="p-1 fw-semibold">: {{ $siswa->parent_name ?: '-' }}</td>
                             </tr>
                             <tr>
-                                <td class="text-muted p-1">No. WhatsApp Ortu</td>
-                                <td class="p-1 fw-semibold">: {{ $siswa->parent_phone ?: '-' }}</td>
+                                <td class="text-muted p-1">Email Ortu</td>
+                                <td class="p-1 fw-semibold">: {{ $siswa->parent_email ?: ($siswa->parent_phone ?: '-') }}</td>
                             </tr>
                         </tbody>
                     </table>

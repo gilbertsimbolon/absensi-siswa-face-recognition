@@ -133,6 +133,7 @@ test('attendance marks terlambat when scanning between batas terlambat and batas
     ]);
 
     $response->assertStatus(200);
+    $response->assertJsonPath('siswa.status', 'Terlambat');
 
     $attendance = Attendance::where('student_id', $student->id)->first();
     expect($attendance->status)->toBe(Attendance::STATUS_TERLAMBAT);
@@ -162,9 +163,17 @@ test('attendance marks alpa when scanning after batas alpa', function () {
     ]);
 
     $response->assertStatus(200);
+    $response->assertJsonPath('siswa.status', 'Diluar Waktu Absen');
 
     $attendance = Attendance::where('student_id', $student->id)->first();
     expect($attendance->status)->toBe(Attendance::STATUS_ALPA);
+
+    // Scan ulang kedua kali di hari yang sama menghasilkan status 'Sudah Absen'
+    $responseKedua = $this->actingAs($this->admin)->postJson(route('admin.attendance.proses-pindai'), [
+        'nisn' => '1122334477',
+    ]);
+    $responseKedua->assertStatus(200);
+    $responseKedua->assertJsonPath('siswa.status', 'Sudah Absen');
 
     Carbon::setTestNow();
 });

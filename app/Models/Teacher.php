@@ -24,7 +24,7 @@ class Teacher extends Model
     // relasi ke classes
     public function classes()
     {
-        return $this->hasOne(Classes::class);
+        return $this->hasOne(Classes::class, 'teacher_id');
     }
 
     // relasi ke foto wajah guru

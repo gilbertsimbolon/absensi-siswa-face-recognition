@@ -156,52 +156,29 @@
             left: 50%;
             transform: translateX(-50%);
             z-index: 40;
-            width: 90%;
-            max-width: 480px;
+            width: 92%;
+            max-width: 520px;
             pointer-events: none;
         }
 
-        /* Kondisi Standby */
-        .notif-standby {
-            background: rgba(255, 255, 255, 0.95);
-            color: #334155;
-            border: 1px solid #cbd5e1;
-            padding: 10px 20px;
-            border-radius: 30px;
-            font-size: 0.85rem;
-            font-weight: 600;
+        /* Notifikasi Status Pemindaian Dinamis (Live Real-Time Alert) */
+        .notif-live {
+            padding: 12px 20px;
+            border-radius: 14px;
             display: inline-flex;
             align-items: center;
-            gap: 8px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
-        }
-
-        .titik-biru {
-            width: 8px;
-            height: 8px;
-            background-color: #0284c7;
-            border-radius: 50%;
-        }
-
-        /* Kondisi Sukses Absen */
-        .notif-sukses {
-            background: rgba(255, 255, 255, 0.98);
-            border-left: 5px solid #16a34a;
-            border-radius: 12px;
-            padding: 12px 18px;
-            display: flex;
-            align-items: center;
             gap: 14px;
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            width: 100%;
             text-align: left;
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35);
+            backdrop-filter: blur(8px);
         }
 
-        .notif-sukses .icon-box {
+        .notif-live .icon-box {
             width: 40px;
             height: 40px;
             border-radius: 50%;
-            background: #dcfce7;
-            color: #16a34a;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -209,28 +186,115 @@
             flex-shrink: 0;
         }
 
-        .notif-warning {
-            background: rgba(255, 255, 255, 0.98);
-            border-left: 5px solid #ca8a04;
-            border-radius: 12px;
+        .notif-live .live-title {
+            font-size: 0.92rem;
+            font-weight: 700;
+            margin: 0;
+            line-height: 1.3;
+        }
+
+        .notif-live .live-desc {
+            font-size: 0.78rem;
+            margin: 2px 0 0 0;
+            opacity: 0.95;
+            line-height: 1.35;
+        }
+
+        /* 1. Standby: Dark Glassmorphic Modern (Bukan White Alert) */
+        .notif-live.state-standby {
+            background: rgba(15, 23, 42, 0.90);
+            border: 1.5px solid rgba(56, 189, 248, 0.4);
+            color: #f8fafc;
+        }
+        .notif-live.state-standby .icon-box {
+            background: rgba(56, 189, 248, 0.18);
+            color: #38bdf8;
+        }
+
+        /* 2. Memproses / Mendeteksi: Sky Blue Glow */
+        .notif-live.state-memproses {
+            background: rgba(2, 132, 199, 0.96);
+            border: 1.5px solid #38bdf8;
+            color: #ffffff;
+            box-shadow: 0 10px 30px rgba(2, 132, 199, 0.5);
+        }
+        .notif-live.state-memproses .icon-box {
+            background: rgba(255, 255, 255, 0.22);
+            color: #ffffff;
+        }
+
+        /* 3. Memproses Lama / Petunjuk: Royal Indigo Alert */
+        .notif-live.state-memproses-lama {
+            background: rgba(30, 58, 138, 0.96);
+            border: 1.5px solid #93c5fd;
+            color: #ffffff;
+            box-shadow: 0 10px 30px rgba(30, 58, 138, 0.5);
+        }
+        .notif-live.state-memproses-lama .icon-box {
+            background: rgba(255, 255, 255, 0.22);
+            color: #fde047;
+        }
+
+        /* 4. Peringatan / Akurasi Kurang: Amber Glow Alert */
+        .notif-live.state-gagal-akurasi {
+            background: rgba(217, 119, 6, 0.96);
+            border: 1.5px solid #fde047;
+            color: #ffffff;
+            box-shadow: 0 10px 30px rgba(217, 119, 6, 0.5);
+        }
+        .notif-live.state-gagal-akurasi .icon-box {
+            background: rgba(255, 255, 255, 0.22);
+            color: #ffffff;
+        }
+
+        /* 5. Tidak Dikenali / Belum Terdaftar: Crimson Alert */
+        .notif-live.state-tidak-dikenali {
+            background: rgba(185, 28, 28, 0.96);
+            border: 1.5px solid #fca5a5;
+            color: #ffffff;
+            box-shadow: 0 10px 30px rgba(185, 28, 28, 0.5);
+        }
+        .notif-live.state-tidak-dikenali .icon-box {
+            background: rgba(255, 255, 255, 0.22);
+            color: #ffffff;
+        }
+
+        /* 6. Peringatan Posisi / Jarak: Warning Gold */
+        .notif-live.state-peringatan {
+            background: rgba(180, 83, 9, 0.96);
+            border: 1.5px solid #fde047;
+            color: #ffffff;
+            box-shadow: 0 10px 30px rgba(180, 83, 9, 0.5);
+        }
+        .notif-live.state-peringatan .icon-box {
+            background: rgba(255, 255, 255, 0.22);
+            color: #ffffff;
+        }
+
+        /* Kondisi Sukses Absen: Tampilan Solid & Elegan */
+        .notif-sukses {
+            background: #ffffff;
+            border-left: 6px solid #16a34a;
+            border-radius: 14px;
             padding: 12px 18px;
             display: flex;
             align-items: center;
             gap: 14px;
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
             text-align: left;
+            width: 100%;
         }
 
-        .notif-warning .icon-box {
-            width: 40px;
-            height: 40px;
+        .notif-sukses .icon-box {
+            width: 42px;
+            height: 42px;
             border-radius: 50%;
-            background: #fef9c3;
-            color: #ca8a04;
+            background: #dcfce7;
+            color: #16a34a;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.4rem;
+            font-size: 1.45rem;
             flex-shrink: 0;
         }
 
@@ -256,9 +320,9 @@
         }
 
         .notif-badge-label {
-            padding: 4px 10px;
+            padding: 4px 12px;
             border-radius: 6px;
-            font-size: 0.75rem;
+            font-size: 0.8rem;
             font-weight: 700;
             flex-shrink: 0;
             text-align: center;
@@ -274,6 +338,16 @@
             color: #854d0e;
         }
 
+        .badge-sudah-absen {
+            background: #e0f2fe;
+            color: #0369a1;
+        }
+
+        .badge-diluar-waktu {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
         .badge-alpa {
             background: #fee2e2;
             color: #991b1b;
@@ -282,18 +356,6 @@
         .badge-tidak-dikenal {
             background: #fee2e2;
             color: #991b1b;
-        }
-
-        .notif-badge-akurasi {
-            padding: 4px 10px;
-            border-radius: 6px;
-            font-size: 0.75rem;
-            font-weight: 700;
-            background: #e0f2fe;
-            color: #0369a1;
-            border: 1px solid #bae6fd;
-            flex-shrink: 0;
-            text-align: center;
         }
 
         /* Tampilan Layar Offline */
@@ -445,15 +507,20 @@
 
             <!-- Kartu Detail Informasi Presensi Siswa di Bawah Frame Kamera -->
             <div class="notification-overlay text-center" id="notif-container">
-                <!-- Kondisi Standby (Tenang, tanpa animasi kedip) -->
-                <div class="notif-standby" id="notif-standby">
-                    <i class="bx bx-scan text-primary fs-5 me-1"></i>
-                    <span class="fw-semibold">Arahkan wajah ke kamera untuk presensi</span>
+                <!-- Alert Dinamis Real-Time (Aktif memandu siswa, memberi alasan jelas bila proses lama/gagal) -->
+                <div class="notif-live state-standby" id="notif-live">
+                    <div class="icon-box" id="live-icon-box">
+                        <i class="bx bx-scan"></i>
+                    </div>
+                    <div class="notif-konten text-start">
+                        <h4 class="live-title" id="live-title">Arahkan Wajah ke Kamera</h4>
+                        <p class="live-desc" id="live-desc">Posisikan wajah Anda di dalam frame untuk presensi otomatis</p>
+                    </div>
                 </div>
 
-                <!-- Kondisi Sukses: Detail Lengkap Siswa -->
+                <!-- Kondisi Sukses / Status Absensi: Detail Lengkap Siswa -->
                 <div class="notif-sukses d-none" id="notif-sukses">
-                    <div class="icon-box">
+                    <div class="icon-box" id="notif-icon-box">
                         <i class="bx bx-check"></i>
                     </div>
                     <div class="notif-konten text-start">
@@ -463,7 +530,6 @@
                     <div class="text-end flex-shrink-0">
                         <div class="d-flex align-items-center gap-1 justify-content-end mb-1">
                             <span class="notif-badge-label badge-hadir" id="notif-status-badge">HADIR</span>
-                            <span class="notif-badge-akurasi" id="notif-akurasi-badge">Akurasi: 95%</span>
                         </div>
                         <small class="text-muted d-block" style="font-size: 11px;" id="notif-jam">07:15 WITA</small>
                     </div>
@@ -481,7 +547,7 @@
                     @csrf
                     <input type="hidden" name="sumber" value="0">
                     <button type="submit" class="btn-kamera-pilihan {{ ($pythonStatus['camera_source'] ?? 0) == 0 ? 'active' : '' }}">
-                        Laptop
+                        Kamera Internal
                     </button>
                 </form>
 
@@ -489,15 +555,7 @@
                     @csrf
                     <input type="hidden" name="sumber" value="1">
                     <button type="submit" class="btn-kamera-pilihan {{ ($pythonStatus['camera_source'] ?? 0) == 1 ? 'active' : '' }}">
-                        iPhone USB
-                    </button>
-                </form>
-
-                <form method="POST" action="{{ route('admin.attendance.pindai.kamera') }}" class="d-inline">
-                    @csrf
-                    <input type="hidden" name="sumber" value="2">
-                    <button type="submit" class="btn-kamera-pilihan {{ ($pythonStatus['camera_source'] ?? 0) == 2 ? 'active' : '' }}">
-                        Kamera Tambahan (USB)
+                        Kamera Eksternal
                     </button>
                 </form>
             </div>
@@ -517,77 +575,170 @@
 
         const statusPollUrl = "{{ $statusPollUrl ?? 'http://127.0.0.1:5000/status-scanner' }}";
         let lastResultKey = '';
+        let lastScanId = -1;
         let hideNotifTimer = null;
+        let isShowingSuccess = false;
 
-        const notifStandby = document.getElementById('notif-standby');
+        const notifLive = document.getElementById('notif-live');
+        const liveIconBox = document.getElementById('live-icon-box');
+        const liveTitle = document.getElementById('live-title');
+        const liveDesc = document.getElementById('live-desc');
+
         const notifSukses = document.getElementById('notif-sukses');
         const notifNama = document.getElementById('notif-nama');
         const notifDetail = document.getElementById('notif-detail');
         const notifStatusBadge = document.getElementById('notif-status-badge');
-        const notifAkurasiBadge = document.getElementById('notif-akurasi-badge');
         const notifJam = document.getElementById('notif-jam');
 
+        let isPolling = false;
+
         async function periksaStatusAbsensi() {
+            if (isPolling) return;
+            isPolling = true;
+
             try {
-                const res = await fetch(statusPollUrl);
-                if (!res.ok) return;
-                const data = await res.json();
-                const h = data.latest_result || data.hasil_terakhir;
-                if (h && h.status === 'sukses') {
-                    const key = `${h.timestamp || ''}_${h.nisn || ''}`;
-                    if (key !== lastResultKey) {
-                        lastResultKey = key;
-                        tampilkanDetailPresensi(h);
+                const res = await fetch(statusPollUrl, { cache: 'no-store' });
+                if (res.ok) {
+                    const data = await res.json();
+                    const h = data.latest_result || data.hasil_terakhir;
+
+                    // 1. Cek apakah ada hasil presensi siswa yang sukses / tercatat
+                    if (h && (h.status === 'sukses' || h.status === 'sudah_absen' || h.status === 'diluar_waktu' || h.status === 'alpa')) {
+                        const scanId = h.scan_id !== undefined ? h.scan_id : 0;
+                        const key = `${scanId}_${h.timestamp || ''}_${h.nisn || ''}_${h.status_absen || ''}`;
+                        if (key !== lastResultKey) {
+                            lastResultKey = key;
+                            lastScanId = scanId;
+                            tampilkanDetailPresensi(h);
+                        }
+                    }
+
+                    // 2. Jika tidak sedang menampilkan kartu sukses, perbarui status alert pemindaian secara real-time
+                    if (!isShowingSuccess) {
+                        perbaruiStatusLive(data);
                     }
                 }
-            } catch (err) {}
+            } catch (err) {
+                // Abaikan kesalahan koneksi sesaat
+            } finally {
+                isPolling = false;
+                setTimeout(periksaStatusAbsensi, 250);
+            }
         }
 
-        setInterval(periksaStatusAbsensi, 400);
+        // Jalankan polling loop pertama
+        periksaStatusAbsensi();
+
+        function perbaruiStatusLive(data) {
+            if (!notifLive || isShowingSuccess) return;
+
+            const st = data.status_scanner || 'standby';
+            const pesan = data.pesan_scanner || 'Arahkan Wajah ke Kamera';
+            const detail = data.detail_scanner || 'Posisikan wajah Anda di dalam frame untuk presensi otomatis';
+
+            let stateClass = 'state-standby';
+            let iconHtml = '<i class="bx bx-scan"></i>';
+
+            if (st === 'memproses') {
+                stateClass = 'state-memproses';
+                iconHtml = '<i class="bx bx-loader-alt bx-spin"></i>';
+            } else if (st === 'memproses_lama') {
+                stateClass = 'state-memproses-lama';
+                iconHtml = '<i class="bx bx-time-five bx-tada"></i>';
+            } else if (st === 'gagal_akurasi') {
+                stateClass = 'state-gagal-akurasi';
+                iconHtml = '<i class="bx bx-error-circle bx-burst"></i>';
+            } else if (st === 'tidak_dikenali') {
+                stateClass = 'state-tidak-dikenali';
+                iconHtml = '<i class="bx bx-user-x"></i>';
+            } else if (st === 'peringatan') {
+                stateClass = 'state-peringatan';
+                iconHtml = '<i class="bx bx-zoom-in"></i>';
+            } else if (st === 'sukses') {
+                // Biarkan kartu sukses yang menanganinya
+                return;
+            }
+
+            notifLive.className = 'notif-live ' + stateClass;
+            if (liveIconBox) liveIconBox.innerHTML = iconHtml;
+            if (liveTitle) liveTitle.textContent = pesan;
+            if (liveDesc) liveDesc.textContent = detail;
+
+            notifLive.classList.remove('d-none');
+            if (notifSukses) notifSukses.classList.add('d-none');
+        }
 
         function tampilkanDetailPresensi(h) {
             if (hideNotifTimer) clearTimeout(hideNotifTimer);
-
-            // Format akurasi dengan format (00.00%)
-            let akurasiRaw = h.akurasi_num;
-            if (akurasiRaw === undefined || akurasiRaw === null) {
-                akurasiRaw = parseFloat(String(h.akurasi || '0').replace(/[^0-9.]/g, '')) || 0;
-            }
-            const akurasiFormatted = `(${Number(akurasiRaw).toFixed(2)}%)`;
+            isShowingSuccess = true;
 
             if (notifNama) {
-                const namaSiswa = h.nama || 'Siswa';
-                notifNama.innerHTML = `${namaSiswa} <span class="ms-1 text-primary fw-semibold" style="font-size: 0.9rem;">${akurasiFormatted}</span>`;
+                notifNama.textContent = h.nama || 'Siswa';
             }
-            if (notifDetail) notifDetail.textContent = `${h.kelas || '-'} • NISN: ${h.nisn || '-'}`;
+            if (notifDetail) {
+                notifDetail.textContent = `${h.kelas || '-'} • NISN: ${h.nisn || '-'}`;
+            }
 
-            const statusLabel = h.status_absen || 'HADIR';
+            const rawStatus = (h.status_absen || 'HADIR').toUpperCase();
+            let statusLabel = rawStatus;
+            let badgeClass = 'badge-hadir';
+            let borderColor = '#16a34a';
+            let iconHtml = '<i class="bx bx-check"></i>';
+            let iconBg = '#dcfce7';
+            let iconColor = '#16a34a';
+
+            if (rawStatus.includes('TERLAMBAT')) {
+                statusLabel = 'TERLAMBAT';
+                badgeClass = 'badge-terlambat';
+                borderColor = '#ca8a04';
+                iconHtml = '<i class="bx bx-time"></i>';
+                iconBg = '#fef9c3';
+                iconColor = '#ca8a04';
+            } else if (rawStatus.includes('SUDAH')) {
+                statusLabel = 'SUDAH ABSEN';
+                badgeClass = 'badge-sudah-absen';
+                borderColor = '#0284c7';
+                iconHtml = '<i class="bx bx-check-double"></i>';
+                iconBg = '#e0f2fe';
+                iconColor = '#0284c7';
+            } else if (rawStatus.includes('DILUAR') || rawStatus.includes('ALPA')) {
+                statusLabel = 'DILUAR WAKTU ABSEN';
+                badgeClass = 'badge-diluar-waktu';
+                borderColor = '#dc2626';
+                iconHtml = '<i class="bx bx-alarm-exclamation"></i>';
+                iconBg = '#fee2e2';
+                iconColor = '#dc2626';
+            }
+
             if (notifStatusBadge) {
                 notifStatusBadge.textContent = statusLabel;
-                let badgeClass = 'badge-hadir';
-                const lower = statusLabel.toLowerCase();
-                if (lower.includes('terlambat')) {
-                    badgeClass = 'badge-terlambat';
-                } else if (lower.includes('alpa')) {
-                    badgeClass = 'badge-alpa';
-                }
                 notifStatusBadge.className = 'notif-badge-label ' + badgeClass;
             }
 
-            if (notifAkurasiBadge) {
-                notifAkurasiBadge.textContent = 'Akurasi: ' + akurasiFormatted;
+            if (notifSukses) {
+                notifSukses.style.borderLeftColor = borderColor;
             }
 
-            if (notifJam) notifJam.textContent = (h.timestamp || '') + ' WITA';
+            const iconBox = document.getElementById('notif-icon-box');
+            if (iconBox) {
+                iconBox.innerHTML = iconHtml;
+                iconBox.style.background = iconBg;
+                iconBox.style.color = iconColor;
+            }
 
-            if (notifStandby) notifStandby.classList.add('d-none');
+            if (notifJam) {
+                notifJam.textContent = (h.timestamp || '') + ' WITA';
+            }
+
+            if (notifLive) notifLive.classList.add('d-none');
             if (notifSukses) notifSukses.classList.remove('d-none');
 
-            // Tampilkan detail siswa selama 6 detik stabil tanpa kedip
+            // Tampilkan detail siswa selama 5 detik, lalu kembali ke status live scanner
             hideNotifTimer = setTimeout(() => {
+                isShowingSuccess = false;
                 if (notifSukses) notifSukses.classList.add('d-none');
-                if (notifStandby) notifStandby.classList.remove('d-none');
-            }, 6000);
+                if (notifLive) notifLive.classList.remove('d-none');
+            }, 5000);
         }
     </script>
 </body>

@@ -157,11 +157,16 @@ def ganti_kamera():
 @app.route('/scanner/status-scanner', methods=['GET'])
 @login_diperlukan
 def status_scanner():
-    """Mendapatkan hasil scan terakhir dan status kamera."""
+    """Mendapatkan hasil scan terakhir dan status kamera secara komprehensif."""
     return jsonify({
         "aktif": scanner.is_running,
         "fps": scanner.fps,
         "sumber": scanner.camera_source,
+        "wajah_terdeteksi": bool(scanner.smooth_box is not None),
+        "sedang_memproses": scanner.is_recognizing,
+        "status_scanner": getattr(scanner, 'status_scanner', 'standby'),
+        "pesan_scanner": getattr(scanner, 'pesan_scanner', 'Arahkan Wajah ke Kamera'),
+        "detail_scanner": getattr(scanner, 'detail_scanner', 'Posisikan wajah Anda di dalam frame untuk presensi otomatis'),
         "hasil_terakhir": scanner.latest_result
     })
 

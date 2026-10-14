@@ -21,6 +21,21 @@ class TeacherSeeder extends Seeder
         $sampleFace = StudentFace::first();
         $sampleFacePath = $sampleFace ? storage_path('app/public/'.$sampleFace->file_path) : null;
 
+        if (! $sampleFacePath) {
+            $fallbackCandidates = [
+                base_path('python-service/dataset/0025625452/1791218169_photo_depan.jpg'),
+                base_path('python-service/dataset/0025625453/1791269549_photo_depan.jpg'),
+                storage_path('app/public/faces/0025625452/1791218169_photo_depan.jpg'),
+                storage_path('app/public/faces/0025625453/1791269549_photo_depan.jpg'),
+            ];
+            foreach ($fallbackCandidates as $candidate) {
+                if (File::exists($candidate)) {
+                    $sampleFacePath = $candidate;
+                    break;
+                }
+            }
+        }
+
         $teachers = [
             [
                 'name' => 'Drs. Jemmy Mandagi, M.Pd',

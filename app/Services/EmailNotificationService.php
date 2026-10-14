@@ -237,6 +237,19 @@ HTML;
             ];
         }
 
+        // Cek apakah driver mailer adalah smtp tapi belum ada username / host untuk mencegah proses scan freeze
+        $defaultMailer = config('mail.default');
+        if ($defaultMailer === 'smtp') {
+            $smtpUser = config('mail.mailers.smtp.username');
+            $smtpHost = config('mail.mailers.smtp.host');
+            if (empty($smtpUser) || empty($smtpHost)) {
+                return [
+                    'status' => 'skipped',
+                    'pesan' => 'Kredensial SMTP belum diisi di .env (MAIL_USERNAME kosong). Pengiriman dilewati.',
+                ];
+            }
+        }
+
         // 2. Kumpulkan daftar email tujuan (Orang Tua & Siswa)
         $student = $attendance->student;
         $targetEmails = [];

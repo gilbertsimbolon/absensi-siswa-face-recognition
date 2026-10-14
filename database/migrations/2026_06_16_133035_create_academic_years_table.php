@@ -17,6 +17,8 @@ return new class extends Migration
             $table->enum('semester', ['Ganjil', 'Genap'])->default('Ganjil');
             $table->boolean('is_active')->default(false);
             $table->timestamps();
+
+            $table->index('is_active');
         });
     }
 
