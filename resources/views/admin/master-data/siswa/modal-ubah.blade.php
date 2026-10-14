@@ -127,71 +127,81 @@
                         </div>
                     </div>
 
-                    <!-- Garis Pemisah Dataset Foto Wajah (3 Sampel) -->
+                    <!-- Garis Pemisah Dataset Foto Wajah (AI Face Embedding) -->
                     <div class="d-flex align-items-center mb-3 mt-2">
-                        <span class="text-uppercase small fw-semibold text-muted me-2">Pembaruan Sampel Foto Wajah (Opsional)</span>
+                        <span class="text-uppercase small fw-semibold text-muted me-2">Foto Wajah Siswa Terdaftar (AI Face Embedding)</span>
                         <hr class="flex-grow-1 m-0">
                     </div>
 
-                    @php
-                        $faceDepan = $siswa->faces->firstWhere('label', 'Tampak Depan') ?? $siswa->faces->get(0);
-                        $faceKanan = $siswa->faces->firstWhere('label', 'Serong Kanan') ?? $siswa->faces->get(1);
-                        $faceKiri = $siswa->faces->firstWhere('label', 'Serong Kiri') ?? $siswa->faces->get(2);
-                    @endphp
-
-                    <div class="row">
-                        <!-- Foto Tampak Depan -->
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label fw-semibold d-block">1. Tampak Depan</label>
-                            <div class="mb-2 text-center">
-                                @if ($faceDepan)
-                                    <img src="{{ asset('storage/' . $faceDepan->file_path) }}" alt="Tampak Depan"
-                                        class="rounded border" style="width: 100px; height: 100px; object-fit: cover;">
-                                @else
-                                    <div class="d-flex align-items-center justify-content-center rounded border bg-light mx-auto" style="width: 100px; height: 100px;">
-                                        <span class="text-muted small">Belum ada</span>
-                                    </div>
-                                @endif
-                            </div>
-                            <input type="file" class="form-control form-control-sm" name="photo_depan" accept="image/*" />
-                            <small class="text-muted d-block mt-1 text-center">Biarkan kosong jika tetap</small>
+                    @if ($siswa->faces->isNotEmpty())
+                        <div class="row mb-3">
+                            @foreach ($siswa->faces as $face)
+                                <div class="col-4 col-md-3 mb-2 text-center">
+                                    <img src="{{ asset('storage/' . $face->file_path) }}" alt="Foto Siswa"
+                                        class="rounded border shadow-sm mb-1" style="width: 80px; height: 80px; object-fit: cover;">
+                                    <span class="d-block small text-muted">Foto #{{ $loop->iteration }}</span>
+                                    @if (!empty($face->embedding))
+                                        <span class="badge bg-label-success" style="font-size: 0.65rem;">128-D Vektor</span>
+                                    @endif
+                                </div>
+                            @endforeach
                         </div>
-
-                        <!-- Foto Serong Kanan -->
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label fw-semibold d-block">2. Serong Kanan</label>
-                            <div class="mb-2 text-center">
-                                @if ($faceKanan)
-                                    <img src="{{ asset('storage/' . $faceKanan->file_path) }}" alt="Serong Kanan"
-                                        class="rounded border" style="width: 100px; height: 100px; object-fit: cover;">
-                                @else
-                                    <div class="d-flex align-items-center justify-content-center rounded border bg-light mx-auto" style="width: 100px; height: 100px;">
-                                        <span class="text-muted small">Belum ada</span>
-                                    </div>
-                                @endif
-                            </div>
-                            <input type="file" class="form-control form-control-sm" name="photo_kanan" accept="image/*" />
-                            <small class="text-muted d-block mt-1 text-center">Biarkan kosong jika tetap</small>
+                    @else
+                        <div class="alert alert-warning py-2 px-3 small mb-3">
+                            <i class="icon-base bx bx-error me-1"></i> Belum ada foto wajah terdaftar untuk siswa ini.
                         </div>
+                    @endif
 
-                        <!-- Foto Serong Kiri -->
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label fw-semibold d-block">3. Serong Kiri</label>
-                            <div class="mb-2 text-center">
-                                @if ($faceKiri)
-                                    <img src="{{ asset('storage/' . $faceKiri->file_path) }}" alt="Serong Kiri"
-                                        class="rounded border" style="width: 100px; height: 100px; object-fit: cover;">
-                                @else
-                                    <div class="d-flex align-items-center justify-content-center rounded border bg-light mx-auto" style="width: 100px; height: 100px;">
-                                        <span class="text-muted small">Belum ada</span>
-                                    </div>
-                                @endif
+                    <div class="alert alert-info py-2 px-3 small d-flex align-items-center mb-3">
+                        <i class="icon-base bx bx-info-circle me-2 fs-5"></i>
+                        <span><strong>AI Auto-Crop & Face Zoom:</strong> Unggah foto baru di bawah jika ingin memperbarui / menambahkan sampel foto wajah (otomatis dipotong & di-zoom ke wajah).</span>
+                    </div>
+
+                    <div id="container-foto-ubah-{{ $siswa->id }}">
+                        <div class="row align-items-center mb-2 item-foto-ubah">
+                            <div class="col-md-9">
+                                <label class="form-label fw-semibold small mb-1">Unggah Foto Wajah Baru (Opsional)</label>
+                                <input type="file" class="form-control form-control-sm" name="photos[]" accept="image/*" />
                             </div>
-                            <input type="file" class="form-control form-control-sm" name="photo_kiri" accept="image/*" />
-                            <small class="text-muted d-block mt-1 text-center">Biarkan kosong jika tetap</small>
+                            <div class="col-md-3 pt-3">
+                                <span class="badge bg-label-secondary">Sampel Baru</span>
+                            </div>
                         </div>
                     </div>
+
+                    <button type="button" class="btn btn-outline-primary btn-sm mt-1" id="btn-tambah-foto-ubah-{{ $siswa->id }}">
+                        <i class="icon-base bx bx-plus me-1"></i> Tambah Foto Lainnya
+                    </button>
                 </div>
+
+                <script>
+                document.addEventListener('DOMContentLoaded', function () {
+                    const containerUbah = document.getElementById('container-foto-ubah-{{ $siswa->id }}');
+                    const btnAddUbah = document.getElementById('btn-tambah-foto-ubah-{{ $siswa->id }}');
+                    if (btnAddUbah && containerUbah) {
+                        btnAddUbah.addEventListener('click', function () {
+                            const count = containerUbah.querySelectorAll('.item-foto-ubah').length + 1;
+                            const div = document.createElement('div');
+                            div.className = 'row align-items-center mb-2 item-foto-ubah';
+                            div.innerHTML = `
+                                <div class="col-md-9">
+                                    <label class="form-label fw-semibold small mb-1">Unggah Foto Tambahan #${count}</label>
+                                    <input type="file" class="form-control form-control-sm" name="photos[]" accept="image/*" />
+                                </div>
+                                <div class="col-md-3 pt-3">
+                                    <button type="button" class="btn btn-outline-danger btn-sm w-100 btn-hapus-foto-ubah">
+                                        <i class="icon-base bx bx-trash me-1"></i> Hapus
+                                    </button>
+                                </div>
+                            `;
+                            containerUbah.appendChild(div);
+                            div.querySelector('.btn-hapus-foto-ubah').addEventListener('click', function () {
+                                div.remove();
+                            });
+                        });
+                    }
+                });
+                </script>
 
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>

@@ -83,7 +83,7 @@ class StudentController extends Controller
             $request->merge(['class_id' => $myClass->id]);
         }
 
-        $validator = Validator::make($request->all(), [
+        $rules = [
             'name' => 'required|string|max:255',
             'nisn' => 'required|string|max:30|unique:students,nisn',
             'class_id' => 'required|exists:classes,id',
@@ -93,13 +93,23 @@ class StudentController extends Controller
             'parent_name' => 'nullable|string|max:255',
             'parent_phone' => 'nullable|string|max:30',
             'parent_email' => 'nullable|email|max:255',
-            'photo_depan' => 'required|image|mimes:jpeg,jpg,png|max:5120',
-            'photo_kanan' => 'required|image|mimes:jpeg,jpg,png|max:5120',
-            'photo_kiri' => 'required|image|mimes:jpeg,jpg,png|max:5120',
-        ], [
-            'photo_depan.required' => 'Foto wajah tampak depan wajib diunggah.',
-            'photo_kanan.required' => 'Foto wajah serong kanan wajib diunggah.',
-            'photo_kiri.required' => 'Foto wajah serong kiri wajib diunggah.',
+        ];
+
+        if ($request->hasFile('photos')) {
+            $rules['photos'] = 'required|array|min:1';
+            $rules['photos.*'] = 'image|mimes:jpeg,jpg,png|max:10240';
+        } elseif ($request->hasFile('photo')) {
+            $rules['photo'] = 'required|image|mimes:jpeg,jpg,png|max:10240';
+        } elseif ($request->hasFile('photo_depan')) {
+            $rules['photo_depan'] = 'required|image|mimes:jpeg,jpg,png|max:10240';
+        } else {
+            $rules['photos'] = 'required|array|min:1';
+        }
+
+        $validator = Validator::make($request->all(), $rules, [
+            'photos.required' => 'Minimal 1 foto wajah siswa wajib diunggah.',
+            'photos.*.image' => 'Berkas yang diunggah harus berupa gambar (JPG/PNG).',
+            'photo.required' => 'Foto wajah siswa wajib diunggah.',
         ]);
 
         if ($validator->fails()) {
@@ -118,7 +128,7 @@ class StudentController extends Controller
             'parent_email' => $request->parent_email,
         ]);
 
-        // Simpan 3 sampel foto wajah
+        // Simpan foto wajah siswa dan ekstrak embedding ke database
         $this->saveStudentPhotos($request, $student);
 
         return redirect()->route('admin.student.index')->with('success', 'Berhasil');
@@ -149,9 +159,9 @@ class StudentController extends Controller
             'parent_name' => 'nullable|string|max:255',
             'parent_phone' => 'nullable|string|max:30',
             'parent_email' => 'nullable|email|max:255',
-            'photo_depan' => 'nullable|image|mimes:jpeg,jpg,png|max:5120',
-            'photo_kanan' => 'nullable|image|mimes:jpeg,jpg,png|max:5120',
-            'photo_kiri' => 'nullable|image|mimes:jpeg,jpg,png|max:5120',
+            'photos.*' => 'nullable|image|mimes:jpeg,jpg,png|max:10240',
+            'photo' => 'nullable|image|mimes:jpeg,jpg,png|max:10240',
+            'photo_depan' => 'nullable|image|mimes:jpeg,jpg,png|max:10240',
         ]);
 
         if ($validator->fails()) {
@@ -230,11 +240,23 @@ class StudentController extends Controller
      */
     private function saveStudentPhotos(Request $request, Student $student, bool $isUpdate = false): void
     {
-        $photoInputs = [
-            'photo_depan' => 'Tampak Depan',
-            'photo_kanan' => 'Serong Kanan',
-            'photo_kiri' => 'Serong Kiri',
-        ];
+        // Kumpulkan semua file gambar yang diunggah
+        $uploadedFiles = [];
+        if ($request->hasFile('photos')) {
+            $uploadedFiles = $request->file('photos');
+        } elseif ($request->hasFile('photo')) {
+            $uploadedFiles = [$request->file('photo')];
+        } else {
+            foreach (['photo_depan', 'photo_kanan', 'photo_kiri'] as $key) {
+                if ($request->hasFile($key)) {
+                    $uploadedFiles[] = $request->file($key);
+                }
+            }
+        }
+
+        if (empty($uploadedFiles)) {
+            return;
+        }
 
         // Folder tujuan sinkronisasi DeepFace Python
         $pythonDatasetDir = base_path('python-service/dataset/'.$student->nisn);
@@ -242,47 +264,44 @@ class StudentController extends Controller
             File::makeDirectory($pythonDatasetDir, 0755, true);
         }
 
-        $anyPhotoUploaded = false;
-
-        foreach ($photoInputs as $inputKey => $label) {
-            if ($request->hasFile($inputKey)) {
-                $anyPhotoUploaded = true;
-                $file = $request->file($inputKey);
-                $fileName = time().'_'.$inputKey.'.'.$file->getClientOriginalExtension();
-                $path = $file->storeAs('faces/'.$student->nisn, $fileName, 'public');
-
-                // Salin juga langsung ke folder dataset Python DeepFace
-                $pythonFilePath = $pythonDatasetDir.'/'.$fileName;
-                File::copy(storage_path('app/public/'.$path), $pythonFilePath);
-
-                if ($isUpdate) {
-                    $existingFace = StudentFace::where('student_id', $student->id)->where('label', $label)->first();
-                    if ($existingFace) {
-                        Storage::disk('public')->delete($existingFace->file_path);
-                        $existingFace->update(['file_path' => $path]);
-
-                        continue;
-                    }
-                }
-
-                StudentFace::create([
-                    'student_id' => $student->id,
-                    'file_path' => $path,
-                    'label' => $label,
-                ]);
+        foreach ($uploadedFiles as $idx => $file) {
+            if (! $file || ! $file->isValid()) {
+                continue;
             }
+
+            $fileName = time().'_'.($idx + 1).'_'.uniqid().'.'.$file->getClientOriginalExtension();
+            $path = $file->storeAs('faces/'.$student->nisn, $fileName, 'public');
+
+            // Salin juga langsung ke folder dataset Python DeepFace
+            $pythonFilePath = $pythonDatasetDir.'/'.$fileName;
+            File::copy(storage_path('app/public/'.$path), $pythonFilePath);
+
+            StudentFace::create([
+                'student_id' => $student->id,
+                'file_path' => $path,
+            ]);
         }
 
-        // Otomatis sinkronisasi dan ekstraksi embedding DeepFace FaceNet di microservice Python
-        if ($anyPhotoUploaded || File::exists($pythonDatasetDir)) {
-            try {
-                $pythonUrl = config('services.deepface.base_url', 'http://127.0.0.1:5000').'/sinkronisasi-siswa/'.$student->nisn;
-                Http::timeout(15)->post($pythonUrl, [
-                    'nama' => $student->name,
-                ]);
-            } catch (\Throwable $e) {
-                Log::warning("Gagal memicu ekstraksi embedding FaceNet untuk {$student->nisn}: ".$e->getMessage());
+        // Otomatis sinkronisasi, deteksi auto-crop zoom wajah, dan ekstraksi embedding FaceNet di microservice Python
+        try {
+            $pythonUrl = config('services.deepface.base_url', 'http://127.0.0.1:5000').'/sinkronisasi-siswa/'.$student->nisn;
+            $response = Http::timeout(25)->post($pythonUrl, [
+                'nama' => $student->name,
+            ]);
+
+            if ($response->successful()) {
+                $aiData = $response->json();
+                $embeddingsMap = $aiData['embeddings'] ?? [];
+
+                // Simpan nilai vektor embedding 128-float ke tabel student_faces
+                foreach ($embeddingsMap as $fn => $vector) {
+                    StudentFace::where('student_id', $student->id)
+                        ->where('file_path', 'like', "%{$fn}")
+                        ->update(['embedding' => $vector]);
+                }
             }
+        } catch (\Throwable $e) {
+            Log::warning("Gagal memicu ekstraksi embedding FaceNet untuk {$student->nisn}: ".$e->getMessage());
         }
     }
 }

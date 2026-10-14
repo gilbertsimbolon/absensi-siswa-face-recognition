@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('student_id')->constrained('students')->cascadeOnDelete();
             $table->string('file_path');
-            $table->string('label')->nullable();
+            $table->json('embedding')->nullable();
             $table->timestamps();
 
             $table->index('student_id');

@@ -127,41 +127,62 @@
                         </div>
                     </div>
 
-                    <!-- Garis Pemisah Dataset Foto Wajah (3 Sampel) -->
+                    <!-- Garis Pemisah Dataset Foto Wajah (AI Face Embedding) -->
                     <div class="d-flex align-items-center mb-3 mt-2">
-                        <span class="text-uppercase small fw-semibold text-muted me-2">Sampel Foto Wajah (Dataset DeepFace - Min. 3 Foto)</span>
+                        <span class="text-uppercase small fw-semibold text-muted me-2">Foto Wajah Siswa (AI Face Embedding)</span>
                         <hr class="flex-grow-1 m-0">
                     </div>
 
-                    <div class="row">
-                        <!-- Foto Tampak Depan -->
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label fw-semibold" for="photo_depan">
-                                1. Tampak Depan <span class="text-danger">*</span>
-                            </label>
-                            <input type="file" class="form-control form-control-sm" id="photo_depan" name="photo_depan" accept="image/*" required />
-                            <small class="text-muted d-block mt-1">Wajah lurus ke kamera</small>
-                        </div>
+                    <div class="alert alert-info py-2 px-3 small d-flex align-items-center mb-3">
+                        <i class="icon-base bx bx-info-circle me-2 fs-5"></i>
+                        <span>Sistem dilengkapi fitur <strong>AI Auto-Crop & Face Zoom</strong>. Anda cukup mengunggah minimal <strong>1 foto</strong> (baik foto selfie, setengah badan, atau full body). AI akan secara otomatis mendeteksi wajah, memotong (zoom) ke area wajah, dan menyimpan vektor embedding 128-dimensi ke database.</span>
+                    </div>
 
-                        <!-- Foto Serong Kanan -->
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label fw-semibold" for="photo_kanan">
-                                2. Serong Kanan <span class="text-danger">*</span>
-                            </label>
-                            <input type="file" class="form-control form-control-sm" id="photo_kanan" name="photo_kanan" accept="image/*" required />
-                            <small class="text-muted d-block mt-1">Wajah miring sedikit kanan</small>
-                        </div>
-
-                        <!-- Foto Serong Kiri -->
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label fw-semibold" for="photo_kiri">
-                                3. Serong Kiri <span class="text-danger">*</span>
-                            </label>
-                            <input type="file" class="form-control form-control-sm" id="photo_kiri" name="photo_kiri" accept="image/*" required />
-                            <small class="text-muted d-block mt-1">Wajah miring sedikit kiri</small>
+                    <div id="container-foto-tambah">
+                        <div class="row align-items-center mb-2 item-foto-tambah">
+                            <div class="col-md-9">
+                                <label class="form-label fw-semibold small mb-1">Foto Wajah #1 <span class="text-danger">*</span></label>
+                                <input type="file" class="form-control form-control-sm" name="photos[]" accept="image/*" required />
+                            </div>
+                            <div class="col-md-3 pt-3">
+                                <span class="badge bg-label-primary">Foto Utama</span>
+                            </div>
                         </div>
                     </div>
+
+                    <button type="button" class="btn btn-outline-primary btn-sm mt-1" id="btn-tambah-foto-input">
+                        <i class="icon-base bx bx-plus me-1"></i> Tambah Foto Lainnya (Opsional)
+                    </button>
                 </div>
+
+                <script>
+                document.addEventListener('DOMContentLoaded', function () {
+                    const container = document.getElementById('container-foto-tambah');
+                    const btnAdd = document.getElementById('btn-tambah-foto-input');
+                    if (btnAdd && container) {
+                        btnAdd.addEventListener('click', function () {
+                            const count = container.querySelectorAll('.item-foto-tambah').length + 1;
+                            const div = document.createElement('div');
+                            div.className = 'row align-items-center mb-2 item-foto-tambah';
+                            div.innerHTML = `
+                                <div class="col-md-9">
+                                    <label class="form-label fw-semibold small mb-1">Foto Wajah #${count} (Opsional)</label>
+                                    <input type="file" class="form-control form-control-sm" name="photos[]" accept="image/*" />
+                                </div>
+                                <div class="col-md-3 pt-3">
+                                    <button type="button" class="btn btn-outline-danger btn-sm w-100 btn-hapus-foto">
+                                        <i class="icon-base bx bx-trash me-1"></i> Hapus
+                                    </button>
+                                </div>
+                            `;
+                            container.appendChild(div);
+                            div.querySelector('.btn-hapus-foto').addEventListener('click', function () {
+                                div.remove();
+                            });
+                        });
+                    }
+                });
+                </script>
 
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>

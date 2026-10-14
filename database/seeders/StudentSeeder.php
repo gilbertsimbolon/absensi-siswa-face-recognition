@@ -8,6 +8,7 @@ use App\Models\Student;
 use App\Models\StudentClassHistory;
 use App\Models\StudentFace;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
 
@@ -288,20 +289,10 @@ class StudentSeeder extends Seeder
                 if ($hasStorageFace) {
                     $files = Storage::disk('public')->files($storageDir);
                     foreach ($files as $file) {
-                        $label = 'Tampak Depan';
-                        if (str_contains($file, 'kanan')) {
-                            $label = 'Tampak Kanan';
-                        } elseif (str_contains($file, 'kiri')) {
-                            $label = 'Tampak Kiri';
-                        }
-
                         StudentFace::firstOrCreate(
                             [
                                 'student_id' => $student->id,
                                 'file_path' => $file,
-                            ],
-                            [
-                                'label' => $label,
                             ]
                         );
                     }
@@ -331,14 +322,14 @@ class StudentSeeder extends Seeder
                     StudentFace::firstOrCreate(
                         [
                             'student_id' => $student->id,
-                            'label' => 'Tampak Depan',
-                        ],
-                        [
                             'file_path' => $relativePhotoPath,
                         ]
                     );
                 }
             }
         }
+
+        // Sinkronisasi vektor embedding FaceNet 128-D ke tabel student_faces
+        Artisan::call('app:sync-face-embeddings');
     }
 }

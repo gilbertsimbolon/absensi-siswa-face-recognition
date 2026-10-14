@@ -9,7 +9,11 @@ class StudentFace extends Model
     protected $fillable = [
         'student_id',
         'file_path',
-        'label',
+        'embedding',
+    ];
+
+    protected $casts = [
+        'embedding' => 'array',
     ];
 
     public function student()

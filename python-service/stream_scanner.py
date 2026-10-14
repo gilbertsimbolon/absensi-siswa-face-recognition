@@ -134,9 +134,7 @@ class ScannerOpenCV:
         self.detail_scanner = "Posisikan wajah Anda di dalam frame untuk presensi otomatis"
         self.face_detected_time = 0.0
 
-        # Haar Cascade bawaan OpenCV
-        cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
-        self.face_cascade = cv2.CascadeClassifier(cascade_path)
+        # Deep Learning CNN Face Detector diwarisi dari instance LayananWajah (YuNet ONNX + CLAHE)
 
         # Tracking & smoothing wajah (menghilangkan kedip / jitter)
         self.smooth_box = None
@@ -211,18 +209,15 @@ class ScannerOpenCV:
 
             h, w = frame.shape[:2]
 
-            # Deteksi wajah Haar Cascade pada resolusi diperkecil (0.35x) untuk kecepatan 3x lipat (5ms)
-            small = cv2.resize(frame, (0, 0), fx=0.35, fy=0.35)
-            gray_small = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY)
-            faces_raw = self.face_cascade.detectMultiScale(
-                gray_small, scaleFactor=1.10, minNeighbors=3, minSize=(20, 20)
-            )
+            # Deteksi wajah menggunakan Deep Learning CNN (YuNet ONNX + CLAHE)
+            # Mampu mendeteksi wajah siswa yang sedang berjalan/bergerak secara dinamis dalam berbagai kondisi cahaya
+            faces_raw = self.layanan.deteksi_wajah_cnn(frame, min_score=0.45)
 
             current_face = None
             if len(faces_raw) > 0:
-                fx, fy, fw, fh = max(faces_raw, key=lambda f: f[2] * f[3])
-                scale_inv = 1.0 / 0.35
-                tx, ty, tw, th = int(fx * scale_inv), int(fy * scale_inv), int(fw * scale_inv), int(fh * scale_inv)
+                # Ambil wajah utama / paling dominan di kamera
+                faces_raw = sorted(faces_raw, key=lambda f: f[2] * f[3], reverse=True)
+                tx, ty, tw, th = faces_raw[0][:4]
 
                 if self.smooth_box is None:
                     self.smooth_box = [tx, ty, tw, th]
@@ -346,8 +341,11 @@ class ScannerOpenCV:
             if not self.layanan.embeddings_db or face_crop is None or face_crop.size == 0:
                 return
 
+            # Normalisasi pencahayaan adaptif (CLAHE) pada potongan wajah agar fitur wajah maksimal
+            face_crop_enhanced = self.layanan.normalisasi_pencahayaan_adaptif(face_crop)
+
             representations = DeepFace.represent(
-                img_path=face_crop,
+                img_path=face_crop_enhanced,
                 model_name=self.layanan.model_name,
                 detector_backend="skip",
                 enforce_detection=False

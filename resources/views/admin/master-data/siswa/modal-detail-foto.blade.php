@@ -13,9 +13,14 @@
                         @foreach ($siswa->faces as $face)
                             <div class="col-md-4 mb-3 text-center">
                                 <a href="{{ asset('storage/' . $face->file_path) }}" target="_blank" class="d-block mb-2">
-                                    <img src="{{ asset('storage/' . $face->file_path) }}" alt="{{ $face->label }}" class="img-fluid rounded" style="max-height: 220px; object-fit: cover;">
+                                    <img src="{{ asset('storage/' . $face->file_path) }}" alt="Foto Siswa" class="img-fluid rounded border shadow-sm" style="max-height: 220px; object-fit: cover;">
                                 </a>
-                                <span class="d-block text-muted small">{{ $face->label ?: 'Sampel #' . $loop->iteration }}</span>
+                                <span class="d-block text-muted small mb-1">Sampel #{{ $loop->iteration }}</span>
+                                @if (!empty($face->embedding))
+                                    <span class="badge bg-label-success small"><i class="icon-base bx bx-check-circle me-1"></i> Vektor 128-D Tersimpan</span>
+                                @else
+                                    <span class="badge bg-label-secondary small">Vektor Belum Diekstrak</span>
+                                @endif
                             </div>
                         @endforeach
                     </div>

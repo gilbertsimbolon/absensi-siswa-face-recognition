@@ -17,10 +17,17 @@ HOST = os.getenv('SERVICE_HOST', '127.0.0.1')
 LARAVEL_API_URL = os.getenv('LARAVEL_API_URL', 'http://127.0.0.1:8000/admin/absensi/proses-pindai')
 APP_KEY = os.getenv('APP_KEY', '')
 
-# Model DeepFace
+# Model DeepFace & CNN Face Detector
 MODEL_NAME = os.getenv('DEEPFACE_MODEL', 'Facenet')
-DETECTOR_BACKEND = os.getenv('DETECTOR_BACKEND', 'opencv')
+DETECTOR_BACKEND = os.getenv('DETECTOR_BACKEND', 'yunet')
 DISTANCE_METRIC = os.getenv('DISTANCE_METRIC', 'cosine')
+
+# Model Deteksi Wajah Deep Learning CNN (YuNet ONNX)
+YUNET_MODEL_PATH = os.path.join(BASE_DIR, 'weights', 'face_detection_yunet_2023mar.onnx')
+if not os.path.exists(YUNET_MODEL_PATH):
+    fallback_deepface = os.path.join(os.path.expanduser('~'), '.deepface', 'weights', 'face_detection_yunet_2023mar.onnx')
+    if os.path.exists(fallback_deepface):
+        YUNET_MODEL_PATH = fallback_deepface
 
 # Ambang Batas Jarak Pencocokan (Threshold)
 # Untuk model Facenet dengan metrik cosine, nilai <= 0.50 memberikan kecocokan instan tanpa false-positive

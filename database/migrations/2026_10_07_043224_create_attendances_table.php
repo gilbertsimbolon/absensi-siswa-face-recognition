@@ -19,7 +19,7 @@ return new class extends Migration
             $table->date('date');
             $table->time('check_in_time')->nullable();
             $table->time('check_out_time')->nullable();
-            $table->enum('status', ['hadir', 'terlambat', 'sakit', 'izin', 'alpa'])->default('hadir');
+            $table->enum('status', ['hadir', 'terlambat', 'alpa'])->default('alpa');
             $table->enum('method', ['face_recognition', 'manual'])->default('manual');
             $table->decimal('confidence_score', 5, 2)->nullable();
             $table->string('snapshot_path')->nullable();

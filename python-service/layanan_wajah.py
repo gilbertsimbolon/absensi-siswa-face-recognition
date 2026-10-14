@@ -48,14 +48,100 @@ class LayananWajah:
         self.labels_list = []
         self.data_siswa = {}
         self.is_ready = False
-        
-        # Inisialisasi Haar Cascade Classifier untuk deteksi wajah OpenCV
-        cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
-        self.face_cascade = cv2.CascadeClassifier(cascade_path)
-        
+
+        # Inisialisasi Deep Learning Face Detector (YuNet CNN ONNX)
+        self.yunet_model_path = konfigurasi.YUNET_MODEL_PATH
+        self.yunet_detector = None
+        if hasattr(cv2, 'FaceDetectorYN') and os.path.exists(self.yunet_model_path):
+            try:
+                self.yunet_detector = cv2.FaceDetectorYN.create(
+                    model=self.yunet_model_path,
+                    config="",
+                    input_size=(640, 480),
+                    score_threshold=0.55,
+                    nms_threshold=0.30,
+                    top_k=5000
+                )
+                print(f"[+] Berhasil memuat Deep Learning Face Detector CNN (YuNet ONNX): {self.yunet_model_path}")
+            except Exception as e:
+                print(f"[!] Gagal inisialisasi FaceDetectorYN: {e}")
+
         self.min_face_accuracy = 70.0
         self.last_attendance_time = {}
         self.cooldown_seconds = 5
+
+    @staticmethod
+    def normalisasi_pencahayaan_adaptif(img):
+        """
+        Normalisasi pencahayaan adaptif menggunakan Contrast Limited Adaptive Histogram Equalization (CLAHE)
+        pada ruang warna LAB (kanal Luminance L).
+        Memastikan wajah siswa yang berada dalam kondisi backlight, silau, atau redup/berbayang
+        tetap memiliki kontras fitur wajah (mata, hidung, mulut) yang tajam dan mudah dikenali AI.
+        """
+        if img is None or img.size == 0:
+            return img
+        try:
+            lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
+            l, a, b = cv2.split(lab)
+            clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+            cl = clahe.apply(l)
+            limg = cv2.merge((cl, a, b))
+            return cv2.cvtColor(limg, cv2.COLOR_LAB2BGR)
+        except Exception:
+            return img
+
+    def deteksi_wajah_cnn(self, img, min_score=0.50):
+        """
+        Mendeteksi wajah menggunakan model Deep Learning CNN (YuNet) dengan normalisasi pencahayaan.
+        Mampu mendeteksi wajah dinamis (saat siswa berjalan/bergerak) dan dalam berbagai orientasi.
+        Mengembalikan list bounding box: [(x, y, w, h, score), ...]
+        """
+        if img is None or img.size == 0:
+            return []
+
+        h_img, w_img = img.shape[:2]
+
+        # 1. Normalisasi pencahayaan adaptif CLAHE
+        enhanced = self.normalisasi_pencahayaan_adaptif(img)
+
+        # 2. Deteksi via YuNet CNN
+        if self.yunet_detector is not None:
+            try:
+                self.yunet_detector.setInputSize((w_img, h_img))
+                _, faces = self.yunet_detector.detect(enhanced)
+                if faces is not None and len(faces) > 0:
+                    results = []
+                    for face in faces:
+                        fx, fy, fw, fh = int(face[0]), int(face[1]), int(face[2]), int(face[3])
+                        score = float(face[14]) if len(face) > 14 else 1.0
+                        if score >= min_score and fw > 20 and fh > 20:
+                            results.append((max(0, fx), max(0, fy), min(w_img - fx, fw), min(h_img - fy, fh), score))
+                    if results:
+                        return results
+            except Exception as e:
+                pass
+
+        # 3. Fallback ke DeepFace extract_faces (dengan backend detector YuNet)
+        try:
+            detections = DeepFace.extract_faces(
+                img_path=enhanced,
+                detector_backend=self.detector_backend,
+                enforce_detection=False
+            )
+            if detections and len(detections) > 0:
+                results = []
+                for d in detections:
+                    fa = d.get('facial_area', {})
+                    fw = fa.get('w', 0)
+                    fh = fa.get('h', 0)
+                    if fw > 20 and fh > 20:
+                        results.append((fa.get('x', 0), fa.get('y', 0), fw, fh, float(d.get('confidence', 0.9))))
+                if results:
+                    return results
+        except Exception:
+            pass
+
+        return []
 
     def perbarui_matrix_embeddings(self):
         """Membuat matrix numpy 2D untuk pencocokan vektor secepat kilat (BLAS/AVX)."""
@@ -314,35 +400,16 @@ class LayananWajah:
 
             h_orig, w_orig = frame.shape[:2]
 
-            # 1. Deteksi Wajah Cepat dengan Haar Cascade OpenCV
-            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            faces = self.face_cascade.detectMultiScale(
-                gray, scaleFactor=1.15, minNeighbors=5, minSize=(60, 60)
-            )
-
-            # Jika Haar Cascade belum mendeteksi, gunakan fallback represent DeepFace
+            # 1. Deteksi Wajah dengan Deep Learning CNN (YuNet ONNX + CLAHE Adaptive Lighting)
+            cnn_faces = self.deteksi_wajah_cnn(frame, min_score=0.50)
             detected_faces = []
-            if len(faces) > 0:
-                for (x, y, w, h) in faces:
-                    detected_faces.append({"x": int(x), "y": int(y), "w": int(w), "h": int(h)})
-            else:
-                try:
-                    rep = DeepFace.represent(
-                        img_path=frame,
-                        model_name=self.model_name,
-                        detector_backend=self.detector_backend,
-                        enforce_detection=False
-                    )
-                    if rep and len(rep) > 0 and "facial_area" in rep[0]:
-                        fa = rep[0]["facial_area"]
-                        detected_faces.append({
-                            "x": int(fa.get("x", 0)),
-                            "y": int(fa.get("y", 0)),
-                            "w": int(fa.get("w", 0)),
-                            "h": int(fa.get("h", 0))
-                        })
-                except Exception:
-                    pass
+            for item in cnn_faces:
+                detected_faces.append({
+                    "x": int(item[0]),
+                    "y": int(item[1]),
+                    "w": int(item[2]),
+                    "h": int(item[3])
+                })
 
             hasil_pencocokan = None
             siswa_info = None
@@ -529,6 +596,54 @@ class LayananWajah:
                     print(f"[!] Gagal menyimpan cache setelah sinkronisasi: {e}")
                 self.perbarui_matrix_embeddings()
 
+    def potong_dan_zoom_wajah(self, img_path):
+        """
+        Mendeteksi wajah pada gambar (misal foto full body/setengah badan),
+        lalu memotong dan melakukan zoom proporsional (area kepala/bahu portrait)
+        agar foto yang disimpan ke disk & database adalah pasfoto wajah optimal.
+        """
+        try:
+            if not os.path.exists(img_path):
+                return False
+
+            img = cv2.imread(img_path)
+            if img is None or img.size == 0:
+                return False
+
+            h_img, w_img = img.shape[:2]
+            # Deteksi wajah menggunakan Deep Learning CNN (YuNet ONNX + CLAHE)
+            faces = self.deteksi_wajah_cnn(img, min_score=0.45)
+            if not faces:
+                return False
+
+            # Ambil wajah dengan ukuran paling dominan
+            faces = sorted(faces, key=lambda f: f[2] * f[3], reverse=True)
+            x, y, w, h = faces[0][:4]
+
+            # Jika wajah sudah mengisi > 70% dari gambar, tidak perlu dipotong lagi
+            if (w * h) / (w_img * h_img) > 0.70:
+                return True
+
+            # Tambahkan margin atas, bawah, dan samping untuk pasfoto portrait (zoom ke wajah)
+            pad_top = int(h * 0.40)
+            pad_bottom = int(h * 0.45)
+            pad_side = int(w * 0.35)
+
+            y1 = max(0, y - pad_top)
+            y2 = min(h_img, y + h + pad_bottom)
+            x1 = max(0, x - pad_side)
+            x2 = min(w_img, x + w + pad_side)
+
+            cropped = img[y1:y2, x1:x2]
+            if cropped is not None and cropped.size > 0:
+                cv2.imwrite(img_path, cropped, [int(cv2.IMWRITE_JPEG_QUALITY), 95])
+                return True
+
+        except Exception as e:
+            print(f"[!] Gagal auto-crop zoom wajah pada {img_path}: {e}")
+
+        return False
+
     def ekstrak_dan_sinkronisasi_siswa(self, nisn, nama="", simpan_cache=True):
         """
         Mengekstrak fitur citra wajah (face embedding 128-dimensi FaceNet)
@@ -550,6 +665,13 @@ class LayananWajah:
         new_embeddings = []
         for file_name in foto_files:
             img_path = os.path.join(folder_siswa, file_name)
+            storage_img_path = os.path.join(self.storage_path, nisn, file_name)
+
+            # Terapkan teknik auto-crop & zoom wajah (baik pada folder dataset maupun storage publik)
+            self.potong_dan_zoom_wajah(img_path)
+            if os.path.exists(storage_img_path):
+                self.potong_dan_zoom_wajah(storage_img_path)
+
             try:
                 representations = DeepFace.represent(
                     img_path=img_path,
@@ -593,7 +715,11 @@ class LayananWajah:
         return {
             "status": "sukses",
             "pesan": f"Berhasil mengekstrak {len(new_embeddings)} vektor embedding FaceNet untuk NISN {nisn}.",
-            "total_embedding": len(new_embeddings)
+            "total_embedding": len(new_embeddings),
+            "embeddings": {
+                os.path.basename(item["path"]): item["embedding"].tolist()
+                for item in new_embeddings
+            }
         }
 
     def hapus_embedding_siswa(self, nisn):

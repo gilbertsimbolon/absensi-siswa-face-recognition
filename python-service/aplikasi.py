@@ -211,6 +211,26 @@ def hapus_siswa_api(nisn):
     hasil = layanan.hapus_embedding_siswa(nisn)
     return jsonify(hasil)
 
+# Endpoint Export Seluruh Embedding untuk Sinkronisasi Database Laravel
+@app.route('/semua-embedding', methods=['GET'])
+@app.route('/scanner/semua-embedding', methods=['GET'])
+def semua_embedding_api():
+    """Mengembalikan seluruh mapping NISN -> list of embeddings untuk disimpan di tabel MySQL."""
+    result = {}
+    for item in layanan.embeddings_db:
+        lbl = str(item.get("label", "")).strip()
+        if not lbl:
+            continue
+        if lbl not in result:
+            result[lbl] = []
+        raw_emb = item.get("embedding")
+        emb_list = raw_emb.tolist() if hasattr(raw_emb, 'tolist') else list(raw_emb)
+        result[lbl].append({
+            "filename": os.path.basename(item.get("path", "")),
+            "embedding": emb_list
+        })
+    return jsonify({"status": "sukses", "data": result})
+
 # Endpoint Pembaruan Konfigurasi Akurasi Pemindaian (dari Laravel)
 @app.route('/update-konfigurasi', methods=['POST'])
 @app.route('/scanner/update-konfigurasi', methods=['POST'])
