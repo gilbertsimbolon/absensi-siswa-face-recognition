@@ -38,6 +38,6 @@ THRESHOLD = float(os.getenv('FACE_THRESHOLD', 0.50))
 DATASET_PATH = os.path.abspath(os.path.join(BASE_DIR, 'dataset'))
 STORAGE_FACES_PATH = os.path.abspath(os.path.join(BASE_DIR, '..', 'storage', 'app', 'public', 'faces'))
 
-# File Penyimpanan Cache Embeddings
-CACHE_EMBEDDINGS_FILE = os.path.join(BASE_DIR, f'cache_embeddings_{MODEL_NAME.lower()}.pkl')
+# Penyimpanan Embeddings: Database MySQL (tabel student_faces) sebagai Single Source of Truth
+CACHE_EMBEDDINGS_FILE = None
 

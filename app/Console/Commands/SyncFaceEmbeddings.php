@@ -36,7 +36,7 @@ class SyncFaceEmbeddings extends Command
                     $embeddingsData = $response->json('data') ?: [];
                 }
             } catch (\Throwable $e) {
-                $this->warn('Microservice Python tidak merespons: ' . $e->getMessage());
+                $this->warn('Microservice Python tidak merespons: '.$e->getMessage());
             }
         }
 

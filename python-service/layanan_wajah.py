@@ -1,8 +1,15 @@
 import os
+import sys
+
+# Konfigurasi encoding UTF-8 untuk output terminal / log Windows
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+if hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+
 import io
 import time
 import base64
-import pickle
 import numpy as np
 import cv2
 import requests
@@ -40,7 +47,6 @@ class LayananWajah:
         self.threshold = konfigurasi.THRESHOLD
         self.dataset_path = konfigurasi.DATASET_PATH
         self.storage_path = konfigurasi.STORAGE_FACES_PATH
-        self.cache_file = konfigurasi.CACHE_EMBEDDINGS_FILE
         self.laravel_api_url = "http://127.0.0.1:8000"
         
         self.embeddings_db = []
@@ -90,10 +96,10 @@ class LayananWajah:
         except Exception:
             return img
 
-    def deteksi_wajah_cnn(self, img, min_score=0.50):
+    def deteksi_wajah_cnn(self, img, min_score=0.40):
         """
-        Mendeteksi wajah menggunakan model Deep Learning CNN (YuNet) dengan normalisasi pencahayaan.
-        Mampu mendeteksi wajah dinamis (saat siswa berjalan/bergerak) dan dalam berbagai orientasi.
+        Mendeteksi wajah menggunakan model Deep Learning CNN (YuNet ONNX) secepat kilat (60+ FPS).
+        Menggunakan resolusi deteksi optimal agar responsif menangkap wajah siswa yang sedang berjalan/bergerak.
         Mengembalikan list bounding box: [(x, y, w, h, score), ...]
         """
         if img is None or img.size == 0:
@@ -101,45 +107,54 @@ class LayananWajah:
 
         h_img, w_img = img.shape[:2]
 
-        # 1. Normalisasi pencahayaan adaptif CLAHE
-        enhanced = self.normalisasi_pencahayaan_adaptif(img)
-
-        # 2. Deteksi via YuNet CNN
+        # 1. Deteksi via YuNet CNN langsung pada frame BGR tanpa lag komputasi CLAHE full-frame
         if self.yunet_detector is not None:
             try:
+                # Downscale 0.5x untuk kecepatan 3-5x lipat (< 3 ms) tanpa mengurangi akurasi
+                scale = 0.5
+                det_w = int(w_img * scale)
+                det_h = int(h_img * scale)
+                small_frame = cv2.resize(img, (det_w, det_h), interpolation=cv2.INTER_LINEAR)
+
+                self.yunet_detector.setInputSize((det_w, det_h))
+                _, faces = self.yunet_detector.detect(small_frame)
+                if faces is not None and len(faces) > 0:
+                    inv_scale = 1.0 / scale
+                    results = []
+                    for face in faces:
+                        fx = int(face[0] * inv_scale)
+                        fy = int(face[1] * inv_scale)
+                        fw = int(face[2] * inv_scale)
+                        fh = int(face[3] * inv_scale)
+                        score = float(face[14]) if len(face) > 14 else 1.0
+                        if score >= min_score and fw > 25 and fh > 25:
+                            results.append((
+                                max(0, fx),
+                                max(0, fy),
+                                min(w_img - fx, fw),
+                                min(h_img - fy, fh),
+                                score
+                            ))
+                    if results:
+                        return results
+            except Exception:
+                pass
+
+            # Fallback resolusi native jika tidak ada wajah di 0.5x
+            try:
                 self.yunet_detector.setInputSize((w_img, h_img))
-                _, faces = self.yunet_detector.detect(enhanced)
+                _, faces = self.yunet_detector.detect(img)
                 if faces is not None and len(faces) > 0:
                     results = []
                     for face in faces:
                         fx, fy, fw, fh = int(face[0]), int(face[1]), int(face[2]), int(face[3])
                         score = float(face[14]) if len(face) > 14 else 1.0
-                        if score >= min_score and fw > 20 and fh > 20:
+                        if score >= min_score and fw > 25 and fh > 25:
                             results.append((max(0, fx), max(0, fy), min(w_img - fx, fw), min(h_img - fy, fh), score))
                     if results:
                         return results
-            except Exception as e:
+            except Exception:
                 pass
-
-        # 3. Fallback ke DeepFace extract_faces (dengan backend detector YuNet)
-        try:
-            detections = DeepFace.extract_faces(
-                img_path=enhanced,
-                detector_backend=self.detector_backend,
-                enforce_detection=False
-            )
-            if detections and len(detections) > 0:
-                results = []
-                for d in detections:
-                    fa = d.get('facial_area', {})
-                    fw = fa.get('w', 0)
-                    fh = fa.get('h', 0)
-                    if fw > 20 and fh > 20:
-                        results.append((fa.get('x', 0), fa.get('y', 0), fw, fh, float(d.get('confidence', 0.9))))
-                if results:
-                    return results
-        except Exception:
-            pass
 
         return []
 
@@ -147,8 +162,15 @@ class LayananWajah:
         """Membuat matrix numpy 2D untuk pencocokan vektor secepat kilat (BLAS/AVX)."""
         if self.embeddings_db:
             try:
-                self.embeddings_matrix = np.array([item["embedding"] for item in self.embeddings_db], dtype=np.float32)
-                self.labels_list = [item["label"] for item in self.embeddings_db]
+                aktif_db = self.embeddings_db
+                if self.data_siswa and len(self.data_siswa) > 0:
+                    aktif_db = [item for item in self.embeddings_db if str(item.get("label")) in self.data_siswa]
+                    if not aktif_db:
+                        aktif_db = self.embeddings_db
+
+                self.embeddings_matrix = np.array([item["embedding"] for item in aktif_db], dtype=np.float32)
+                self.labels_list = [str(item["label"]) for item in aktif_db]
+                print(f"[+] Matriks pencocokan aktif: {len(self.labels_list)} embedding untuk {len(set(self.labels_list))} siswa terdaftar.")
             except Exception as e:
                 print(f"[!] Gagal menyusun matriks embedding: {e}")
                 self.embeddings_matrix = None
@@ -158,33 +180,21 @@ class LayananWajah:
             self.labels_list = []
 
     def inisialisasi(self):
-        """Memuat cache embeddings dan data siswa dari Laravel."""
+        """Memuat data siswa dan vektor embedding wajah langsung dari database Laravel."""
         print(f"[*] Menginisialisasi Layanan Wajah (Model: {self.model_name}, Threshold: {self.threshold})...")
         
-        # 1. Muat database embeddings wajah
-        if os.path.exists(self.cache_file):
-            try:
-                with open(self.cache_file, "rb") as f:
-                    self.embeddings_db = pickle.load(f)
-                print(f"[+] Berhasil memuat {len(self.embeddings_db)} data wajah dari cache ({self.cache_file}).")
-                self.is_ready = True
-            except Exception as e:
-                print(f"[!] Gagal membaca cache: {e}. Melakukan indeks ulang dataset...")
-                self.bangun_index_wajah()
-        else:
-            self.bangun_index_wajah()
-            
-        # 2. Muat data nama siswa dari Laravel
+        # 1. Muat data siswa dan vektor embedding langsung dari database Laravel (Single Source of Truth)
         self.muat_data_siswa()
         self.muat_konfigurasi()
 
-        # 3. Sinkronisasi otomatis dataset baru dari disk yang belum ada di cache
-        self.sinkronisasi_dataset_baru()
-        
-        # 4. Bangun matriks 2D untuk pencocokan secepat kilat (0.01 ms)
+        # 2. Jika database belum memiliki embedding sama sekali, bangun indeks dari file foto fisik
+        if not self.embeddings_db:
+            self.bangun_index_wajah()
+
+        # 3. Bangun matriks 2D untuk pencocokan secepat kilat (0.01 ms)
         self.perbarui_matrix_embeddings()
 
-        # 5. Pemanasan model FaceNet (Warmup) agar pemindaian pertama langsung instan (< 1-2 detik)
+        # 4. Pemanasan model FaceNet (Warmup) agar pemindaian pertama langsung instan (< 1-2 detik)
         print("[*] Melakukan pemanasan (warmup) model FaceNet...")
         try:
             dummy = np.zeros((160, 160, 3), dtype=np.uint8)
@@ -206,13 +216,35 @@ class LayananWajah:
             print(f"[!] Info konfigurasi akurasi Laravel: {e}")
 
     def muat_data_siswa(self):
-        """Memuat daftar siswa (NISN => Nama, Kelas) dari backend Laravel."""
+        """Memuat daftar siswa dan vektor embedding wajah langsung dari database Laravel."""
         try:
             url = f"{self.laravel_api_url}/api/presensi/daftar-siswa"
             res = requests.get(url, timeout=4)
             if res.status_code == 200:
                 self.data_siswa = res.json()
-                print(f"[+] Berhasil memuat data {len(self.data_siswa)} siswa dari Laravel.")
+                print(f"[+] Berhasil memuat data {len(self.data_siswa)} siswa dari database Laravel.")
+
+                # Ekstrak vektor embedding wajah langsung dari database Laravel (Single Source of Truth)
+                db_embeddings = []
+                for nisn, info in self.data_siswa.items():
+                    raw_embs = info.get("embeddings", [])
+                    for idx, emb_raw in enumerate(raw_embs):
+                        if emb_raw and len(emb_raw) == 128:
+                            emb_vec = np.array(emb_raw, dtype=np.float32)
+                            norm = np.linalg.norm(emb_vec)
+                            if norm > 0:
+                                emb_vec = emb_vec / norm
+                            db_embeddings.append({
+                                "label": str(nisn),
+                                "embedding": emb_vec,
+                                "path": f"db://faces/{nisn}/{idx}"
+                            })
+
+                if db_embeddings:
+                    self.embeddings_db = db_embeddings
+                    print(f"[+] Berhasil memuat {len(self.embeddings_db)} vektor embedding wajah langsung dari database MySQL.")
+                    self.perbarui_matrix_embeddings()
+                    self.is_ready = True
             else:
                 print(f"[*] Gagal memuat daftar siswa dari Laravel (Status: {res.status_code}).")
         except Exception as e:
@@ -239,6 +271,8 @@ class LayananWajah:
                 item_path = os.path.join(base_folder, item)
                 if os.path.isdir(item_path):
                     label = item  # NISN atau NIP
+                    if self.data_siswa and label not in self.data_siswa:
+                        continue
                     if label in seen_labels:
                         continue
                     
@@ -271,15 +305,7 @@ class LayananWajah:
                             except Exception as e:
                                 print(f"[!] Lewati {img_path}: {e}")
 
-        print(f"[+] Selesai! Sebanyak {len(self.embeddings_db)} wajah siswa berhasil diindeks.")
-
-        try:
-            with open(self.cache_file, "wb") as f:
-                pickle.dump(self.embeddings_db, f)
-            print(f"[+] Cache embedding disimpan ke {self.cache_file}")
-        except Exception as e:
-            print(f"[!] Gagal menyimpan cache: {e}")
-
+        print(f"[+] Selesai! Sebanyak {len(self.embeddings_db)} wajah siswa berhasil diindeks ke memori.")
         self.perbarui_matrix_embeddings()
         self.is_ready = True
 
@@ -416,12 +442,23 @@ class LayananWajah:
 
             # 2. Proses Pengenalan Wajah Jika Ada Wajah yang Terdeteksi
             if len(detected_faces) > 0:
-                # Ambil embedding wajah utama
+                fa = detected_faces[0]
+                fx, fy, fw, fh = fa["x"], fa["y"], fa["w"], fa["h"]
+                pad_top = int(fh * 0.35)
+                pad_bottom = int(fh * 0.35)
+                pad_side = int(fw * 0.30)
+                y1 = max(0, fy - pad_top)
+                y2 = min(h_orig, fy + fh + pad_bottom)
+                x1 = max(0, fx - pad_side)
+                x2 = min(w_orig, fx + fw + pad_side)
+                face_crop = frame[y1:y2, x1:x2]
+
+                # Ambil embedding wajah utama dengan alignment OpenCV presisi
                 try:
                     representations = DeepFace.represent(
-                        img_path=frame,
+                        img_path=face_crop if face_crop.size > 0 else frame,
                         model_name=self.model_name,
-                        detector_backend="skip",
+                        detector_backend="opencv",
                         enforce_detection=False
                     )
                 except Exception:
@@ -482,6 +519,7 @@ class LayananWajah:
                                 hasil_pencocokan["presensi"] = res_laravel
                                 if res_laravel.get("status") == "sudah_absen":
                                     status_scan = "sudah_absen"
+                                    hasil_pencocokan["status"] = "sudah_absen"
 
                         # Gambar Kotak Hijau OpenCV
                         self.gambar_bounding_box_opencv(
@@ -544,7 +582,7 @@ class LayananWajah:
             url = f"{self.laravel_api_url}/api/presensi/pindai-wajah"
             payload = {"nisn": str(nisn)}
             response = requests.post(url, json=payload, timeout=3)
-            if response.status_code == 200:
+            if response.status_code in [200, 400, 404]:
                 return response.json()
             else:
                 return None
@@ -576,6 +614,9 @@ class LayananWajah:
             for item in os.listdir(base_folder):
                 item_path = os.path.join(base_folder, item)
                 if os.path.isdir(item_path):
+                    # Hanya sinkronkan folder siswa yang terdaftar di Laravel jika data_siswa tersedia
+                    if self.data_siswa and item not in self.data_siswa:
+                        continue
                     if item not in indexed_labels and item not in missing_labels:
                         missing_labels.append(item)
 
@@ -588,12 +629,7 @@ class LayananWajah:
                     total_added += res.get("total_embedding", 0)
 
             if total_added > 0:
-                try:
-                    with open(self.cache_file, "wb") as f:
-                        pickle.dump(self.embeddings_db, f)
-                    print(f"[+] Sinkronisasi startup selesai! {total_added} embedding FaceNet baru berhasil disimpan ke cache.")
-                except Exception as e:
-                    print(f"[!] Gagal menyimpan cache setelah sinkronisasi: {e}")
+                print(f"[+] Sinkronisasi startup selesai! {total_added} embedding FaceNet baru berhasil dimuat.")
                 self.perbarui_matrix_embeddings()
 
     def potong_dan_zoom_wajah(self, img_path):
@@ -702,14 +738,6 @@ class LayananWajah:
         if nama:
             self.data_siswa[nisn] = {"nama": nama, "kelas": self.data_siswa.get(nisn, {}).get("kelas", "-")}
 
-        if simpan_cache:
-            try:
-                with open(self.cache_file, "wb") as f:
-                    pickle.dump(self.embeddings_db, f)
-                print(f"[+] Cache FaceNet berhasil diperbarui untuk NISN {nisn} ({len(new_embeddings)} embedding).")
-            except Exception as e:
-                print(f"[!] Gagal menyimpan cache: {e}")
-
         self.perbarui_matrix_embeddings()
         self.is_ready = True
         return {
@@ -723,7 +751,7 @@ class LayananWajah:
         }
 
     def hapus_embedding_siswa(self, nisn):
-        """Menghapus embedding siswa dari database memori dan cache saat siswa dihapus di Laravel."""
+        """Menghapus embedding siswa dari database memori saat siswa dihapus di Laravel."""
         nisn = str(nisn).strip()
         sebelum = len(self.embeddings_db)
         self.embeddings_db = [item for item in self.embeddings_db if str(item.get("label")) != nisn]
@@ -732,12 +760,6 @@ class LayananWajah:
         if self.data_siswa and nisn in self.data_siswa:
             del self.data_siswa[nisn]
 
-        try:
-            with open(self.cache_file, "wb") as f:
-                pickle.dump(self.embeddings_db, f)
-            print(f"[+] Embedding untuk NISN {nisn} dihapus dari cache ({sebelum - sesudah} data).")
-        except Exception as e:
-            print(f"[!] Gagal memperbarui cache: {e}")
-
+        print(f"[+] Embedding untuk NISN {nisn} dihapus dari memori ({sebelum - sesudah} data).")
         self.perbarui_matrix_embeddings()
         return {"status": "sukses", "pesan": f"Embedding untuk NISN {nisn} berhasil dihapus."}

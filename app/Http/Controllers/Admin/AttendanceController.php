@@ -1031,12 +1031,19 @@ class AttendanceController extends Controller
      */
     public function daftarSiswa()
     {
-        $students = Student::with('classes')->get()->mapWithKeys(function ($student) {
+        $students = Student::with(['classes', 'faces'])->get()->mapWithKeys(function ($student) {
+            $embeddings = $student->faces
+                ->whereNotNull('embedding')
+                ->pluck('embedding')
+                ->values()
+                ->toArray();
+
             return [
                 $student->nisn => [
                     'id' => $student->id,
                     'nama' => $student->name,
                     'kelas' => $student->classes?->name ?? '-',
+                    'embeddings' => $embeddings,
                 ],
             ];
         });
