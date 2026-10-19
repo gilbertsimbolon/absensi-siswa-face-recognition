@@ -196,7 +196,8 @@ def proses_frame_api():
     gambar_base64 = data.get('gambar')
     if not gambar_base64:
         return jsonify({"status": "error", "pesan": "Payload 'gambar' diperlukan."}), 400
-    hasil = layanan.proses_frame_kamera(gambar_base64)
+    catat = bool(data.get('catat', False))
+    hasil = layanan.proses_frame_kamera(gambar_base64, catat_laravel=catat)
     return jsonify(hasil)
 
 # Endpoint Sinkronisasi & Ekstraksi Embedding Wajah Siswa (DeepFace FaceNet)

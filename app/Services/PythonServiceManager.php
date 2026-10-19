@@ -193,7 +193,7 @@ class PythonServiceManager
     {
         try {
             $baseUrl = self::getBaseUrl();
-            $response = Http::timeout(4)->post("{$baseUrl}/ganti-kamera", [
+            $response = Http::timeout(10)->post("{$baseUrl}/ganti-kamera", [
                 'sumber' => $source,
             ]);
 

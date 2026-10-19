@@ -399,12 +399,12 @@ class LayananWajah:
                     cv2.FONT_HERSHEY_SIMPLEX, 0.38, (0, 220, 0), 1, cv2.LINE_AA)
         return frame
 
-    def proses_frame_kamera(self, gambar_base64):
+    def proses_frame_kamera(self, gambar_base64, catat_laravel=False):
         """
         Menerima frame kamera dari browser HP / Desktop,
         Mendeteksi wajah, mencocokkan ke database DeepFace,
         Menggambar kotak-kotak wajah OpenCV,
-        Mencatat absensi ke Laravel,
+        Mencatat absensi ke Laravel (opsional),
         dan Mengembalikan gambar beranotasi OpenCV.
         """
         if not self.is_ready or not self.embeddings_db:
@@ -508,18 +508,18 @@ class LayananWajah:
                             "jarak": round(min_dist, 4)
                         }
 
-                        # Kirim presensi ke Laravel jika sudah melewati jeda cooldown
-                        sekarang = time.time()
-                        last_time = self.last_attendance_time.get(nisn, 0)
-                        
-                        if (sekarang - last_time) > self.cooldown_seconds:
-                            res_laravel = self.catat_presensi_ke_laravel(nisn)
-                            self.last_attendance_time[nisn] = sekarang
-                            if res_laravel:
-                                hasil_pencocokan["presensi"] = res_laravel
-                                if res_laravel.get("status") == "sudah_absen":
-                                    status_scan = "sudah_absen"
-                                    hasil_pencocokan["status"] = "sudah_absen"
+                        # Kirim presensi ke Laravel jika diminta (default False jika Laravel sendiri yang memanggil)
+                        if catat_laravel:
+                            sekarang = time.time()
+                            last_time = self.last_attendance_time.get(nisn, 0)
+                            if (sekarang - last_time) > self.cooldown_seconds:
+                                res_laravel = self.catat_presensi_ke_laravel(nisn)
+                                self.last_attendance_time[nisn] = sekarang
+                                if res_laravel:
+                                    hasil_pencocokan["presensi"] = res_laravel
+                                    if res_laravel.get("status") == "sudah_absen":
+                                        status_scan = "sudah_absen"
+                                        hasil_pencocokan["status"] = "sudah_absen"
 
                         # Gambar Kotak Hijau OpenCV
                         self.gambar_bounding_box_opencv(

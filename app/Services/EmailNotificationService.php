@@ -10,11 +10,11 @@ use Illuminate\Support\Facades\Mail;
 class EmailNotificationService
 {
     /**
-     * Menghasilkan subjek dan konten email statis sesuai status (Hadir, Terlambat, Alpa).
+     * Menghasilkan subjek dan konten email statis sesuai status (Hadir, Terlambat, Alpa, Pulang).
      *
      * @return array{subject: string, html: string}
      */
-    public static function generateStaticEmail(Attendance $attendance): array
+    public static function generateStaticEmail(Attendance $attendance, string $tipe = 'masuk'): array
     {
         $student = $attendance->student;
         $studentClass = $student?->classes;
@@ -22,6 +22,10 @@ class EmailNotificationService
 
         $checkInTime = $attendance->check_in_time
             ? Carbon::parse($attendance->check_in_time)->format('H:i')
+            : Carbon::now()->format('H:i');
+
+        $checkOutTime = $attendance->check_out_time
+            ? Carbon::parse($attendance->check_out_time)->format('H:i')
             : Carbon::now()->format('H:i');
 
         $dateFormatted = $attendance->date
@@ -38,18 +42,30 @@ class EmailNotificationService
 
         $status = $attendance->status;
 
-        if ($status === Attendance::STATUS_TERLAMBAT) {
+        if ($tipe === 'pulang') {
+            $subject = "[Presensi Kepulangan] {$student->name} ({$studentClass?->name}) - Pulang Sekolah";
+            $statusBadge = '<span style="display: inline-block; padding: 4px 12px; background-color: #e0e7ff; color: #4338ca; font-weight: 700; border-radius: 4px; font-size: 13px;">PULANG</span>';
+            $pesanPengantar = "Diberitahukan bahwa ananda <strong>{$student->name}</strong> telah melakukan presensi kepulangan di SMAN 2 Tondano pada pukul <strong>{$checkOutTime} WITA</strong>.";
+            $catatanKhusus = 'Ananda telah menyelesaikan kegiatan di sekolah dan tercatat telah melakukan presensi kepulangan. Terima kasih atas perhatian dan kerja samanya.';
+            $headerColor = '#4f46e5';
+            $labelWaktu = 'Waktu Kepulangan';
+            $nilaiWaktu = "{$checkOutTime} WITA";
+        } elseif ($status === Attendance::STATUS_TERLAMBAT) {
             $subject = "[Pemberitahuan Keterlambatan] {$student->name} ({$studentClass?->name}) - Terlambat";
             $statusBadge = '<span style="display: inline-block; padding: 4px 12px; background-color: #fef3c7; color: #92400e; font-weight: 700; border-radius: 4px; font-size: 13px;">TERLAMBAT</span>';
             $pesanPengantar = "Diberitahukan bahwa ananda <strong>{$student->name}</strong> tercatat hadir <strong>TERLAMBAT</strong> pada presensi hari ini di SMAN 2 Tondano.";
             $catatanKhusus = "Waktu kedatangan siswa melewati batas toleransi keterlambatan ({$batasTerlambat} WITA). Mohon perhatian dan pendampingan Bapak/Ibu agar ananda dapat hadir tepat waktu pada kegiatan belajar selanjutnya.";
             $headerColor = '#d97706';
+            $labelWaktu = 'Waktu Presensi';
+            $nilaiWaktu = "{$checkInTime} WITA";
         } elseif ($status === Attendance::STATUS_ALPA) {
             $subject = "[Pemberitahuan Ketidakhadiran] {$student->name} ({$studentClass?->name}) - Alpa";
             $statusBadge = '<span style="display: inline-block; padding: 4px 12px; background-color: #fee2e2; color: #991b1b; font-weight: 700; border-radius: 4px; font-size: 13px;">ALPA</span>';
             $pesanPengantar = "Diberitahukan bahwa ananda <strong>{$student->name}</strong> tercatat berstatus <strong>ALPA</strong> pada presensi hari ini di SMAN 2 Tondano.";
             $catatanKhusus = "Siswa melakukan pemindaian melewati batas toleransi alpa ({$batasAlpa} WITA). Mohon konfirmasi dan klarifikasi kehadiran ananda kepada pihak sekolah atau wali kelas.";
             $headerColor = '#dc2626';
+            $labelWaktu = 'Waktu Presensi';
+            $nilaiWaktu = "{$checkInTime} WITA";
         } else {
             // Default: HADIR
             $subject = "[Presensi Kehadiran] {$student->name} ({$studentClass?->name}) - Hadir Tepat Waktu";
@@ -57,6 +73,8 @@ class EmailNotificationService
             $pesanPengantar = "Diberitahukan bahwa ananda <strong>{$student->name}</strong> telah hadir dan tercatat presensi tepat waktu di SMAN 2 Tondano.";
             $catatanKhusus = 'Terima kasih atas kedisiplinan ananda dan kerja sama Bapak/Ibu dalam mendukung ketertiban belajar di sekolah.';
             $headerColor = '#0284c7';
+            $labelWaktu = 'Waktu Presensi';
+            $nilaiWaktu = "{$checkInTime} WITA";
         }
 
         $html = <<<HTML
@@ -102,8 +120,8 @@ class EmailNotificationService
                         <td style="color: #0f172a; border-bottom: 1px solid #f1f5f9;">{$dateFormatted}</td>
                     </tr>
                     <tr>
-                        <td style="color: #64748b; border-bottom: 1px solid #f1f5f9;">Waktu Presensi</td>
-                        <td style="color: #0f172a; border-bottom: 1px solid #f1f5f9;">{$checkInTime} WITA</td>
+                        <td style="color: #64748b; border-bottom: 1px solid #f1f5f9;">{$labelWaktu}</td>
+                        <td style="color: #0f172a; border-bottom: 1px solid #f1f5f9;">{$nilaiWaktu}</td>
                     </tr>
                     <tr>
                         <td style="color: #64748b;">Status Kehadiran</td>
@@ -223,11 +241,11 @@ HTML;
     }
 
     /**
-     * Mengirim notifikasi email presensi otomatis dengan template statis (Hadir, Terlambat, Alpa).
+     * Mengirim notifikasi email presensi otomatis dengan template statis (Hadir, Terlambat, Alpa, Pulang).
      *
      * @return array{status: string, pesan: string, detail?: array}
      */
-    public static function sendAttendanceNotification(Attendance $attendance): array
+    public static function sendAttendanceNotification(Attendance $attendance, string $tipe = 'masuk'): array
     {
         // 1. Cek apakah notifikasi diaktifkan di .env (default: true)
         if (! config('mail.notification_enabled', env('MAIL_NOTIFICATION_ENABLED', true))) {
@@ -278,7 +296,7 @@ HTML;
         }
 
         // 3. Generate template email statis untuk status ini
-        $emailData = self::generateStaticEmail($attendance);
+        $emailData = self::generateStaticEmail($attendance, $tipe);
         $subject = $emailData['subject'];
         $htmlContent = $emailData['html'];
 

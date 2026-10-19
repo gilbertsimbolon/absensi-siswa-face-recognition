@@ -112,15 +112,14 @@ class DashboardController extends Controller
         // 6. Aktivitas Absensi Terbaru (10 Siswa Terkini)
         $recentAttendances = Attendance::with(['student.classes', 'student.faces'])
             ->whereDate('date', $today)
-            ->orderBy('check_in_time', 'desc')
+            ->latest('id')
             ->limit(10)
             ->get();
 
         // Fallback jika belum ada absensi pada hari ini
         if ($recentAttendances->isEmpty()) {
             $recentAttendances = Attendance::with(['student.classes', 'student.faces'])
-                ->orderBy('date', 'desc')
-                ->orderBy('check_in_time', 'desc')
+                ->latest('id')
                 ->limit(10)
                 ->get();
         }

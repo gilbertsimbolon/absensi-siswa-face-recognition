@@ -95,7 +95,66 @@
             </div>
         </div>
 
-        <!-- 3. GRAFIK KEHADIRAN & PERSENTASE KEHADIRAN -->
+        <!-- 3. KARTU RINGKASAN PRESENSI HARI INI -->
+        <div class="row g-3 mb-3">
+            <div class="col-6 col-md-3">
+                <div class="card shadow-sm h-100 border border-success border-opacity-25 bg-white">
+                    <div class="card-body p-3 d-flex align-items-center">
+                        <div class="me-3 d-flex align-items-center justify-content-center text-success" style="width: 44px; height: 44px; border-radius: 10px; background: rgba(22, 163, 74, 0.1);">
+                            <i class="icon-base bx bx-check-circle" style="font-size: 1.8rem;"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <span class="text-secondary small fw-semibold d-block">Hadir Tepat Waktu</span>
+                            <h4 class="mb-0 fw-bold text-success">{{ $hadirToday }} <span class="small fw-normal text-muted fs-6">siswa</span></h4>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-6 col-md-3">
+                <div class="card shadow-sm h-100 border border-warning border-opacity-25 bg-white">
+                    <div class="card-body p-3 d-flex align-items-center">
+                        <div class="me-3 d-flex align-items-center justify-content-center text-warning" style="width: 44px; height: 44px; border-radius: 10px; background: rgba(217, 119, 6, 0.1);">
+                            <i class="icon-base bx bx-time" style="font-size: 1.8rem;"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <span class="text-secondary small fw-semibold d-block">Terlambat</span>
+                            <h4 class="mb-0 fw-bold text-warning">{{ $terlambatToday }} <span class="small fw-normal text-muted fs-6">siswa</span></h4>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-6 col-md-3">
+                <div class="card shadow-sm h-100 border border-danger border-opacity-25 bg-white">
+                    <div class="card-body p-3 d-flex align-items-center">
+                        <div class="me-3 d-flex align-items-center justify-content-center text-danger" style="width: 44px; height: 44px; border-radius: 10px; background: rgba(220, 38, 38, 0.1);">
+                            <i class="icon-base bx bx-alarm-exclamation" style="font-size: 1.8rem;"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <span class="text-secondary small fw-semibold d-block">Alpa / Diluar Jam</span>
+                            <h4 class="mb-0 fw-bold text-danger">{{ $alpaToday }} <span class="small fw-normal text-muted fs-6">siswa</span></h4>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-6 col-md-3">
+                <div class="card shadow-sm h-100 border border-primary border-opacity-25 bg-white">
+                    <div class="card-body p-3 d-flex align-items-center">
+                        <div class="me-3 d-flex align-items-center justify-content-center text-primary" style="width: 44px; height: 44px; border-radius: 10px; background: rgba(2, 132, 199, 0.1);">
+                            <i class="icon-base bx bx-scan" style="font-size: 1.8rem;"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <span class="text-secondary small fw-semibold d-block">Total Presensi Hari Ini</span>
+                            <h4 class="mb-0 fw-bold text-primary">{{ $totalPresensiToday }} <span class="small fw-normal text-muted fs-6">siswa</span></h4>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 4. GRAFIK KEHADIRAN & PERSENTASE KEHADIRAN -->
         <div class="row g-3 mb-3">
             <!-- Grafik Kehadiran (Tren 7 Hari) -->
             <div class="col-12 col-lg-8">
@@ -142,16 +201,28 @@
                                 <span class="text-dark fw-medium">Alpa</span>
                                 <span class="fw-bold text-danger">{{ $alpaToday }} siswa</span>
                             </div>
+
+                            @if ($totalPresensiToday > 0)
+                                <div class="d-flex justify-content-between align-items-center py-1 mt-1 border-top">
+                                    <span class="text-secondary small fw-semibold">Total Presensi Masuk</span>
+                                    <span class="fw-bold text-primary">{{ $totalPresensiToday }} siswa</span>
+                                </div>
+                            @endif
                         </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- 4. AKTIVITAS ABSENSI -->
+        <!-- 5. AKTIVITAS ABSENSI -->
         <div class="card shadow-sm mb-3 border">
             <div class="card-header py-3 d-flex justify-content-between align-items-center bg-white border-bottom">
-                <h5 class="mb-0 fw-bold text-dark">Aktivitas Absensi</h5>
+                <div class="d-flex align-items-center gap-2">
+                    <h5 class="mb-0 fw-bold text-dark">Aktivitas Absensi</h5>
+                    @if ($totalPresensiToday > 0)
+                        <span class="badge bg-label-primary font-monospace">{{ $totalPresensiToday }} Hari Ini</span>
+                    @endif
+                </div>
                 <a href="{{ route('admin.attendance.index') }}" class="btn btn-sm btn-outline-primary">
                     Lihat Semua
                 </a>

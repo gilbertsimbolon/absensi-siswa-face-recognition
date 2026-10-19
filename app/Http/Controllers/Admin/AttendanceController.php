@@ -924,54 +924,11 @@ class AttendanceController extends Controller
             ->whereDate('date', $today)
             ->first();
 
-        // Skenario Pulang jika sudah lewat pukul 12:00 dan sudah absen masuk
-        if ($attendance && $now->hour >= 12) {
-            if (! $attendance->check_out_time) {
-                $attendance->update([
-                    'check_out_time' => $now->format('H:i:s'),
-                ]);
-
-                return response()->json([
-                    'status' => 'sukses',
-                    'tipe' => 'pulang',
-                    'pesan' => "Presensi pulang berhasil dicatat untuk {$student->name}!",
-                    'frame_annotated' => $frameAnnotated,
-                    'siswa' => [
-                        'id' => $student->id,
-                        'nama' => $student->name,
-                        'nisn' => $student->nisn,
-                        'kelas' => $student->classes?->name ?? '-',
-                        'status' => $attendance->status_label,
-                        'status_kode' => $attendance->status,
-                        'jam' => $now->format('H:i:s'),
-                        'foto' => $student->faces->first()?->file_path ? asset('storage/'.$student->faces->first()->file_path) : null,
-                    ],
-                ]);
-            }
-
-            return response()->json([
-                'status' => 'sudah_absen',
-                'tipe' => 'sudah_pulang',
-                'pesan' => "{$student->name} sudah melakukan presensi pulang hari ini.",
-                'frame_annotated' => $frameAnnotated,
-                'siswa' => [
-                    'id' => $student->id,
-                    'nama' => $student->name,
-                    'nisn' => $student->nisn,
-                    'kelas' => $student->classes?->name ?? '-',
-                    'status' => 'Sudah Absen',
-                    'status_kode' => 'sudah_absen',
-                    'jam' => Carbon::parse($attendance->check_out_time)->format('H:i:s'),
-                    'foto' => $student->faces->first()?->file_path ? asset('storage/'.$student->faces->first()->file_path) : null,
-                ],
-            ]);
-        }
-
-        // Skenario Masuk jika sudah absen sebelumnya hari ini
+        // 1. Skenario jika sudah tercatat presensi hari ini (cukup presensi masuk, tidak ada validasi pulang)
         if ($attendance) {
             return response()->json([
                 'status' => 'sudah_absen',
-                'tipe' => 'sudah_masuk',
+                'tipe' => 'masuk',
                 'pesan' => "{$student->name} sudah melakukan presensi hari ini pukul ".Carbon::parse($attendance->check_in_time)->format('H:i').' WITA.',
                 'frame_annotated' => $frameAnnotated,
                 'siswa' => [
@@ -980,14 +937,14 @@ class AttendanceController extends Controller
                     'nisn' => $student->nisn,
                     'kelas' => $student->classes?->name ?? '-',
                     'status' => 'Sudah Absen',
-                    'status_kode' => 'sudah_absen',
+                    'status_kode' => $attendance->status,
                     'jam' => Carbon::parse($attendance->check_in_time)->format('H:i:s'),
                     'foto' => $student->faces->first()?->file_path ? asset('storage/'.$student->faces->first()->file_path) : null,
                 ],
             ]);
         }
 
-        // Simpan Presensi Masuk Baru
+        // 3. Simpan Presensi Masuk Baru jika belum presensi hari ini
         $attendance = Attendance::create([
             'student_id' => $student->id,
             'class_id' => $student->class_id,
@@ -998,12 +955,12 @@ class AttendanceController extends Controller
             'method' => Attendance::METHOD_FACE,
             'confidence_score' => $skorAkurasi ? (float) $skorAkurasi : null,
             'snapshot_path' => $snapshotPath,
-            'notes' => 'Presensi otomatis melalui pindai wajah',
+            'notes' => $statusKehadiran === Attendance::STATUS_ALPA ? 'Presensi melewati batas waktu toleransi (Alpa)' : 'Presensi otomatis melalui pindai wajah',
         ]);
 
         // Kirim notifikasi email otomatis ke orang tua / siswa
         try {
-            EmailNotificationService::sendAttendanceNotification($attendance);
+            EmailNotificationService::sendAttendanceNotification($attendance, 'masuk');
         } catch (\Exception $e) {
             // Jangan gagalkan respons scanner jika pengiriman email bermasalah
         }

@@ -252,18 +252,19 @@ test('proses pindai can record student attendance by nisn', function () {
     ]);
 });
 
-test('attendance scanner page renders native mjpeg stream structure and not using getusermedia', function () {
+test('attendance scanner page renders native camera structure and opencv stream elements', function () {
     $response = $this->actingAs($this->admin)->get(route('admin.attendance.pindai'));
 
     $response->assertStatus(200);
     $response->assertViewIs('admin.absensi.pindai');
     $response->assertSee('Pindai Wajah Presensi Otomatis');
 
-    // Pastikan berkas Blade pindai menggunakan OpenCV stream murni tanpa getUserMedia browser
+    // Pastikan berkas Blade pindai mendukung kamera perangkat (Skenario 2) dan fallback OpenCV
     $viewContent = file_get_contents(resource_path('views/admin/absensi/pindai.blade.php'));
-    expect($viewContent)->not->toContain('getUserMedia')
+    expect($viewContent)
         ->toContain('id="opencv-feed"')
-        ->toContain('/video_feed');
+        ->toContain('/video_feed')
+        ->toContain('webcam-video');
 });
 
 test('ganti kamera route changes camera and redirects back without javascript', function () {

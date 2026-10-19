@@ -38,13 +38,15 @@ class ThreadedCamera:
         self.lock = threading.Lock()
         self._buka_kamera()
 
+    def isOpened(self):
+        return bool(self.cap and self.cap.isOpened() and self.ret and self.frame is not None)
+
     def _buka_kamera(self):
         src = int(self.source) if str(self.source).isdigit() else self.source
         try:
             if isinstance(src, int):
+                # Pada Windows gunakan CAP_DSHOW agar device index valid dideteksi tanpa crash async MSMF
                 self.cap = cv2.VideoCapture(src, cv2.CAP_DSHOW)
-                if not self.cap.isOpened():
-                    self.cap = cv2.VideoCapture(src)
             else:
                 self.cap = cv2.VideoCapture(src)
         except Exception as e:
@@ -61,20 +63,38 @@ class ThreadedCamera:
             except Exception:
                 pass
 
-            self.ret, self.frame = self.cap.read()
-            self.is_running = True
-            self.thread = threading.Thread(target=self._loop_capture, daemon=True)
-            self.thread.start()
+            # Verifikasi bahwa frame aktual dapat diambil dari hardware
+            try:
+                self.ret, self.frame = self.cap.read()
+            except Exception as e:
+                print(f"[!] Gagal membaca frame dari sumber {src}: {e}")
+                self.ret = False
+                self.frame = None
+
+            if self.ret and self.frame is not None:
+                self.is_running = True
+                self.thread = threading.Thread(target=self._loop_capture, daemon=True)
+                self.thread.start()
+            else:
+                print(f"[!] Kamera {src} tidak menghasilkan frame visual valid.")
+                try:
+                    self.cap.release()
+                except Exception:
+                    pass
+                self.cap = None
 
     def _loop_capture(self):
         """Thread khusus yang hanya membaca frame secepat mungkin dari sensor kamera."""
         while self.is_running and self.cap and self.cap.isOpened():
-            ret, frame = self.cap.read()
-            if ret and frame is not None:
-                with self.lock:
-                    self.ret = ret
-                    self.frame = frame
-            else:
+            try:
+                ret, frame = self.cap.read()
+                if ret and frame is not None:
+                    with self.lock:
+                        self.ret = ret
+                        self.frame = frame
+                else:
+                    time.sleep(0.01)
+            except Exception:
                 time.sleep(0.01)
             time.sleep(0.001)
 
@@ -90,6 +110,7 @@ class ThreadedCamera:
         self.is_running = False
         if self.thread and self.thread.is_alive():
             self.thread.join(timeout=1.0)
+        self.thread = None
         if self.cap:
             try:
                 self.cap.release()
@@ -111,18 +132,18 @@ class ScannerOpenCV:
         self.is_running = False
         self.process_thread = None
         self.lock = threading.Lock()
-        
+
         self.current_frame = None
         self.current_jpeg = None
         self.frame_id = 0
         self.latest_result = None
         self.fps = 0
-        
+
         # Worker pengenalan wajah async DeepFace
         self.is_recognizing = False
         self.last_recognition_time = 0
         self.recognition_interval = 0.05 # detik antar inferensi (responsif instan)
-        
+
         # Cooldown per NISN agar tidak dobel presensi
         self.last_attendance = {}
         self._last_status = {}
@@ -148,7 +169,7 @@ class ScannerOpenCV:
 
     def mulai(self):
         """Memulai kamera berulir dan loop pemrosesan OpenCV."""
-        if self.is_running:
+        if self.is_running and self.camera and self.camera.isOpened():
             return True
 
         if not self.layanan.is_ready:
@@ -156,8 +177,10 @@ class ScannerOpenCV:
 
         print(f"[*] Menginisialisasi Threaded Camera (Sumber: {self.camera_source})...")
         self.camera = ThreadedCamera(self.camera_source)
-        if not self.camera.cap or not self.camera.cap.isOpened():
+        if not self.camera.isOpened():
             print(f"[!] Gagal membuka perangkat kamera: {self.camera_source}")
+            self.camera.stop()
+            self.camera = None
             return False
 
         self.is_running = True
@@ -171,23 +194,33 @@ class ScannerOpenCV:
         self.is_running = False
         if self.process_thread and self.process_thread.is_alive():
             self.process_thread.join(timeout=1.5)
+        self.process_thread = None
         if self.camera:
             self.camera.stop()
             self.camera = None
         print("[*] Scanner OpenCV dihentikan.")
 
     def ganti_sumber_kamera(self, sumber_baru):
-        """Mengganti sumber kamera secara instan."""
-        print(f"[*] Mengganti sumber kamera ke: {sumber_baru}")
+        """Mengganti sumber kamera secara aman dan instan tanpa crash."""
+        if str(sumber_baru) == str(self.camera_source) and self.is_running:
+            return True
+
+        print(f"[*] Menguji ketersediaan kamera baru: {sumber_baru}")
+        test_cam = ThreadedCamera(sumber_baru)
+        if not test_cam.isOpened():
+            print(f"[!] Kamera {sumber_baru} tidak ditemukan atau gagal dibuka. Mempertahankan kamera aktif.")
+            test_cam.stop()
+            return False
+
+        # Kamera baru valid, lakukan pergantian kamera secara mulus
         sumber_lama = self.camera_source
         self.berhenti()
         self.camera_source = sumber_baru
-        sukses = self.mulai()
-        if not sukses:
-            print(f"[!] Gagal ke {sumber_baru}, mengembalikan ke {sumber_lama}...")
-            self.camera_source = sumber_lama
-            self.mulai()
-            return False
+        self.camera = test_cam
+        self.is_running = True
+        self.process_thread = threading.Thread(target=self._loop_pemrosesan, daemon=True)
+        self.process_thread.start()
+        print(f"[+] Berhasil beralih ke kamera {sumber_baru}!")
         return True
 
     def _loop_pemrosesan(self):
@@ -315,38 +348,27 @@ class ScannerOpenCV:
             # Istirahat mikro minimal agar thread capture kamera dapat menulis frame baru
             time.sleep(0.001)
 
-    def _kirim_presensi_background(self, nisn, scan_id):
-        """Mengirim data absensi ke Laravel di thread latar belakang tanpa menghambat video feed atau DeepFace worker."""
-        try:
-            res_api = self.layanan.catat_presensi_ke_laravel(nisn)
-            if res_api and isinstance(res_api, dict):
-                st = res_api.get("siswa", {}).get("status")
-                status_absen = "HADIR"
-                if res_api.get("status") == "sudah_absen":
-                    status_absen = "SUDAH ABSEN"
-                elif st:
-                    status_absen = str(st).upper()
-                elif res_api.get("status") == "diluar_waktu":
-                    status_absen = "DILUAR WAKTU ABSEN"
-                elif res_api.get("status") in ["tidak_ditemukan", "error"]:
-                    status_absen = "GAGAL"
+    def _tentukan_status_absen(self, res_api):
+        """Menentukan status absensi dari respon Laravel secara akurat."""
+        if not res_api or not isinstance(res_api, dict):
+            return "HADIR"
 
-                self._last_status[nisn] = status_absen
+        status_api = str(res_api.get("status", "")).lower()
+        st_siswa = str(res_api.get("siswa", {}).get("status", "")).upper()
+        st_kode = str(res_api.get("siswa", {}).get("status_kode", "")).lower()
 
-                # Update status_absen pada latest_result jika masih scan_id yang sama
-                with self.lock:
-                    if self.latest_result and self.latest_result.get("scan_id") == scan_id:
-                        self.latest_result["status_absen"] = status_absen
-                        if status_absen == "SUDAH ABSEN":
-                            self.latest_result["status"] = "sudah_absen"
-                            pesan_api = res_api.get("pesan") or "Sudah melakukan presensi hari ini."
-                            self.detail_scanner = pesan_api
-                            siswa_nama = self.latest_result.get("nama", "")
-                            acc_fmt = self.latest_result.get("akurasi_format", "")
-                            self.active_name = f"{siswa_nama} {acc_fmt} [SUDAH ABSEN]".strip()
-                            self.latest_result["nama_dengan_akurasi"] = self.active_name
-        except Exception as e_api:
-            print(f"[!] Gagal mencatat presensi background: {e_api}")
+        if st_kode == "alpa" or "ALPA" in st_siswa or "DILUAR" in st_siswa or status_api == "alpa":
+            return "ALPA"
+        elif status_api == "sudah_absen" or "SUDAH" in st_siswa:
+            return "SUDAH ABSEN"
+        elif st_kode == "terlambat" or "TERLAMBAT" in st_siswa:
+            return "TERLAMBAT"
+        elif "HADIR" in st_siswa or st_kode == "hadir":
+            return "HADIR"
+        elif st_siswa:
+            return st_siswa
+
+        return "HADIR"
 
     def _worker_deepface(self, face_crop):
         """Worker thread independen untuk inferensi FaceNet dan pengiriman ke Laravel."""
@@ -405,28 +427,38 @@ class ScannerOpenCV:
             # Lolos jika jarak cosine dalam threshold, akurasi >= batas minimum, dan NISN terdaftar di Laravel
             if lolos:
                 last_time = self.last_attendance.get(nisn, 0)
-                status_absen = self._last_status.get(nisn, "HADIR")
                 self.scan_counter += 1
                 current_scan_id = self.scan_counter
+                pesan_api = None
 
-                self.status_scanner = "sukses"
-                self.pesan_scanner = f"{nama_siswa} {persentase_format}"
-                if status_absen == "SUDAH ABSEN":
-                    self.detail_scanner = f"Siswa {kelas_siswa} • Sudah Melakukan Presensi Hari Ini"
-                    self.active_name = f"{nama_siswa} {persentase_format} [SUDAH ABSEN]"
-                else:
-                    self.detail_scanner = f"Siswa {kelas_siswa} • Presensi Terverifikasi"
-                    self.active_name = f"{nama_siswa} {persentase_format}"
-
-                # Kirim data presensi ke Laravel secara background non-blocking
-                if (sekarang - last_time) > self.cooldown_sec:
+                # Ambil status real-time langsung dari Laravel (Single Source of Truth)
+                if (sekarang - last_time) > self.cooldown_sec or nisn not in self._last_status:
                     self.last_attendance[nisn] = sekarang
-                    threading.Thread(
-                        target=self._kirim_presensi_background,
-                        args=(nisn, current_scan_id),
-                        daemon=True
-                    ).start()
+                    res_api = self.layanan.catat_presensi_ke_laravel(nisn)
+                    status_absen = self._tentukan_status_absen(res_api)
+                    self._last_status[nisn] = status_absen
+                    if res_api and isinstance(res_api, dict):
+                        pesan_api = res_api.get("pesan")
+                else:
+                    status_absen = self._last_status.get(nisn, "HADIR")
 
+                # Format pesan status pada antarmuka web
+                self.pesan_scanner = f"{nama_siswa}"
+                if status_absen == "ALPA":
+                    self.status_scanner = "gagal_akurasi"
+                    self.detail_scanner = pesan_api or f"Siswa {kelas_siswa} • Batas Waktu Presensi Telah Lewat (Alpa)"
+                elif status_absen == "SUDAH ABSEN":
+                    self.status_scanner = "sukses"
+                    self.detail_scanner = pesan_api or f"Siswa {kelas_siswa} • Sudah Melakukan Presensi Hari Ini"
+                elif status_absen == "TERLAMBAT":
+                    self.status_scanner = "sukses"
+                    self.detail_scanner = pesan_api or f"Siswa {kelas_siswa} • Presensi Terlambat Terverifikasi"
+                else:
+                    self.status_scanner = "sukses"
+                    self.detail_scanner = pesan_api or f"Siswa {kelas_siswa} • Presensi Masuk Terverifikasi"
+
+                # PENTING: active_name HANYA nama dan akurasi (tanpa embel-embel status di bounding box)
+                self.active_name = f"{nama_siswa} {persentase_format}"
                 self.name_display_until = sekarang + 5.0
 
                 with self.lock:
@@ -439,7 +471,7 @@ class ScannerOpenCV:
                         "akurasi": f"{persentase_skor:.2f}%",
                         "akurasi_format": persentase_format,
                         "akurasi_num": persentase_skor,
-                        "status": "sudah_absen" if status_absen == "SUDAH ABSEN" else "sukses",
+                        "status": "sudah_absen" if status_absen == "SUDAH ABSEN" else ("alpa" if status_absen == "ALPA" else "sukses"),
                         "status_absen": status_absen,
                         "timestamp": dapatkan_jam_wita(),
                         "expire_at": sekarang + 5.0
@@ -496,8 +528,16 @@ class ScannerOpenCV:
         is_recognized = bool(self.active_name and now < self.name_display_until)
 
         if is_recognized:
-            if "SUDAH ABSEN" in self.active_name:
-                color = (255, 140, 0) # BGR: Biru langit (B=255, G=140, R=0) untuk siswa yang sudah absen
+            st = ""
+            with self.lock:
+                if self.latest_result:
+                    st = self.latest_result.get("status_absen", "")
+            if st == "ALPA":
+                color = (0, 0, 225) # BGR: Merah untuk Alpa
+            elif st == "TERLAMBAT":
+                color = (0, 180, 255) # BGR: Kuning/Amber untuk Terlambat
+            elif st == "SUDAH ABSEN":
+                color = (255, 140, 0) # BGR: Biru langit untuk siswa yang sudah absen
             else:
                 color = (0, 200, 0) # BGR: Hijau sukses untuk presensi baru
             nama_tampil = self.active_name
