@@ -14,7 +14,8 @@ else:
 # Konfigurasi Server (Terkunci ke localhost loopback internal demi keamanan)
 PORT = int(os.getenv('SERVICE_PORT', 5000))
 HOST = os.getenv('SERVICE_HOST', '127.0.0.1')
-LARAVEL_API_URL = os.getenv('LARAVEL_API_URL', 'http://127.0.0.1:8000/admin/absensi/proses-pindai')
+LARAVEL_BASE_URL = os.getenv('LARAVEL_BASE_URL') or os.getenv('APP_URL', 'http://127.0.0.1:8000')
+LARAVEL_API_URL = os.getenv('LARAVEL_API_URL', f"{LARAVEL_BASE_URL.rstrip('/')}/admin/absensi/proses-pindai")
 APP_KEY = os.getenv('APP_KEY', '')
 
 # Model DeepFace & CNN Face Detector

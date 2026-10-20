@@ -48,7 +48,8 @@ class LayananWajah:
         self.threshold = konfigurasi.THRESHOLD
         self.dataset_path = konfigurasi.DATASET_PATH
         self.storage_path = konfigurasi.STORAGE_FACES_PATH
-        self.laravel_api_url = "http://127.0.0.1:8000"
+        raw_laravel_url = getattr(konfigurasi, 'LARAVEL_BASE_URL', None) or os.getenv('LARAVEL_BASE_URL') or os.getenv('APP_URL', 'http://127.0.0.1:8000')
+        self.laravel_api_url = str(raw_laravel_url).rstrip('/')
         
         self.embeddings_db = []
         self.embeddings_matrix = None
