@@ -10,6 +10,7 @@ if hasattr(sys.stderr, 'reconfigure'):
 import io
 import time
 import base64
+import threading
 import numpy as np
 import cv2
 import requests
@@ -54,6 +55,8 @@ class LayananWajah:
         self.labels_list = []
         self.data_siswa = {}
         self.is_ready = False
+        self.model_lock = threading.RLock()
+        self.detector_lock = threading.RLock()
 
         # Inisialisasi Deep Learning Face Detector (YuNet CNN ONNX)
         self.yunet_model_path = konfigurasi.YUNET_MODEL_PATH
@@ -100,63 +103,65 @@ class LayananWajah:
         """
         Mendeteksi wajah menggunakan model Deep Learning CNN (YuNet ONNX) secepat kilat (60+ FPS).
         Menggunakan resolusi deteksi optimal agar responsif menangkap wajah siswa yang sedang berjalan/bergerak.
+        Thread-safe: Dilindungi mutex detector_lock agar tidak crash saat diakses multi-thread.
         Mengembalikan list bounding box: [(x, y, w, h, score), ...]
         """
         if img is None or img.size == 0:
             return []
 
-        h_img, w_img = img.shape[:2]
+        with self.detector_lock:
+            h_img, w_img = img.shape[:2]
 
-        # 1. Deteksi via YuNet CNN langsung pada frame BGR tanpa lag komputasi CLAHE full-frame
-        if self.yunet_detector is not None:
-            try:
-                # Downscale 0.5x untuk kecepatan 3-5x lipat (< 3 ms) tanpa mengurangi akurasi
-                scale = 0.5
-                det_w = int(w_img * scale)
-                det_h = int(h_img * scale)
-                small_frame = cv2.resize(img, (det_w, det_h), interpolation=cv2.INTER_LINEAR)
+            # 1. Deteksi via YuNet CNN langsung pada frame BGR tanpa lag komputasi CLAHE full-frame
+            if self.yunet_detector is not None:
+                try:
+                    # Downscale 0.5x untuk kecepatan 3-5x lipat (< 3 ms) tanpa mengurangi akurasi
+                    scale = 0.5
+                    det_w = int(w_img * scale)
+                    det_h = int(h_img * scale)
+                    small_frame = cv2.resize(img, (det_w, det_h), interpolation=cv2.INTER_LINEAR)
 
-                self.yunet_detector.setInputSize((det_w, det_h))
-                _, faces = self.yunet_detector.detect(small_frame)
-                if faces is not None and len(faces) > 0:
-                    inv_scale = 1.0 / scale
-                    results = []
-                    for face in faces:
-                        fx = int(face[0] * inv_scale)
-                        fy = int(face[1] * inv_scale)
-                        fw = int(face[2] * inv_scale)
-                        fh = int(face[3] * inv_scale)
-                        score = float(face[14]) if len(face) > 14 else 1.0
-                        if score >= min_score and fw > 25 and fh > 25:
-                            results.append((
-                                max(0, fx),
-                                max(0, fy),
-                                min(w_img - fx, fw),
-                                min(h_img - fy, fh),
-                                score
-                            ))
-                    if results:
-                        return results
-            except Exception:
-                pass
+                    self.yunet_detector.setInputSize((det_w, det_h))
+                    _, faces = self.yunet_detector.detect(small_frame)
+                    if faces is not None and len(faces) > 0:
+                        inv_scale = 1.0 / scale
+                        results = []
+                        for face in faces:
+                            fx = int(face[0] * inv_scale)
+                            fy = int(face[1] * inv_scale)
+                            fw = int(face[2] * inv_scale)
+                            fh = int(face[3] * inv_scale)
+                            score = float(face[14]) if len(face) > 14 else 1.0
+                            if score >= min_score and fw > 25 and fh > 25:
+                                results.append((
+                                    max(0, fx),
+                                    max(0, fy),
+                                    min(w_img - fx, fw),
+                                    min(h_img - fy, fh),
+                                    score
+                                ))
+                        if results:
+                            return results
+                except Exception:
+                    pass
 
-            # Fallback resolusi native jika tidak ada wajah di 0.5x
-            try:
-                self.yunet_detector.setInputSize((w_img, h_img))
-                _, faces = self.yunet_detector.detect(img)
-                if faces is not None and len(faces) > 0:
-                    results = []
-                    for face in faces:
-                        fx, fy, fw, fh = int(face[0]), int(face[1]), int(face[2]), int(face[3])
-                        score = float(face[14]) if len(face) > 14 else 1.0
-                        if score >= min_score and fw > 25 and fh > 25:
-                            results.append((max(0, fx), max(0, fy), min(w_img - fx, fw), min(h_img - fy, fh), score))
-                    if results:
-                        return results
-            except Exception:
-                pass
+                # Fallback resolusi native jika tidak ada wajah di 0.5x
+                try:
+                    self.yunet_detector.setInputSize((w_img, h_img))
+                    _, faces = self.yunet_detector.detect(img)
+                    if faces is not None and len(faces) > 0:
+                        results = []
+                        for face in faces:
+                            fx, fy, fw, fh = int(face[0]), int(face[1]), int(face[2]), int(face[3])
+                            score = float(face[14]) if len(face) > 14 else 1.0
+                            if score >= min_score and fw > 25 and fh > 25:
+                                results.append((max(0, fx), max(0, fy), min(w_img - fx, fw), min(h_img - fy, fh), score))
+                        if results:
+                            return results
+                except Exception:
+                    pass
 
-        return []
+            return []
 
     def perbarui_matrix_embeddings(self):
         """Membuat matrix numpy 2D untuk pencocokan vektor secepat kilat (BLAS/AVX)."""
@@ -198,7 +203,8 @@ class LayananWajah:
         print("[*] Melakukan pemanasan (warmup) model FaceNet...")
         try:
             dummy = np.zeros((160, 160, 3), dtype=np.uint8)
-            DeepFace.represent(dummy, model_name=self.model_name, detector_backend="skip", enforce_detection=False)
+            with self.model_lock:
+                DeepFace.represent(dummy, model_name=self.model_name, detector_backend="skip", enforce_detection=False)
             print("[+] Pemanasan model FaceNet selesai. Siap memindai secara instan!")
         except Exception as e_warm:
             print(f"[!] Warning warmup model: {e_warm}")
@@ -280,12 +286,13 @@ class LayananWajah:
                         if file_name.lower().endswith(('.jpg', '.jpeg', '.png')):
                             img_path = os.path.join(item_path, file_name)
                             try:
-                                representations = DeepFace.represent(
-                                    img_path=img_path,
-                                    model_name=self.model_name,
-                                    detector_backend=self.detector_backend,
-                                    enforce_detection=False
-                                )
+                                with self.model_lock:
+                                    representations = DeepFace.represent(
+                                        img_path=img_path,
+                                        model_name=self.model_name,
+                                        detector_backend=self.detector_backend,
+                                        enforce_detection=False
+                                    )
                                 if representations and len(representations) > 0:
                                     emb = np.array(representations[0]["embedding"], dtype=np.float32)
                                     norm = np.linalg.norm(emb)
@@ -453,14 +460,17 @@ class LayananWajah:
                 x2 = min(w_orig, fx + fw + pad_side)
                 face_crop = frame[y1:y2, x1:x2]
 
-                # Ambil embedding wajah utama dengan alignment OpenCV presisi
+                target_img = face_crop if (face_crop is not None and face_crop.size > 0 and face_crop.shape[0] > 20 and face_crop.shape[1] > 20) else frame
+
+                # Ambil embedding wajah utama dengan alignment OpenCV presisi (Thread-Safe)
                 try:
-                    representations = DeepFace.represent(
-                        img_path=face_crop if face_crop.size > 0 else frame,
-                        model_name=self.model_name,
-                        detector_backend="opencv",
-                        enforce_detection=False
-                    )
+                    with self.model_lock:
+                        representations = DeepFace.represent(
+                            img_path=target_img,
+                            model_name=self.model_name,
+                            detector_backend="opencv",
+                            enforce_detection=False
+                        )
                 except Exception:
                     representations = []
 
@@ -558,7 +568,36 @@ class LayananWajah:
             # 3. Gambar HUD Atas
             self.gambar_hud_opencv(frame)
 
-            # 4. Encode kembali frame OpenCV ke JPEG Base64
+            # 4. Susun data bounding box untuk frontend client (HTML5 Video & Canvas)
+            wajah_data = None
+            if len(detected_faces) > 0:
+                fa = detected_faces[0]
+                status_box = "memindai"
+                nama_box = "MEMINDAI..."
+                skor_box = ""
+                if hasil_pencocokan:
+                    if hasil_pencocokan.get("status") == "sukses":
+                        status_box = "sukses"
+                        nama_box = hasil_pencocokan.get("nama", "SISWA")
+                        skor_box = hasil_pencocokan.get("akurasi", "")
+                    elif hasil_pencocokan.get("status") == "tidak_dikenali":
+                        status_box = "tidak_dikenali"
+                        nama_box = "TIDAK DIKENAL"
+                        skor_box = persentase_skor if 'persentase_skor' in locals() else ""
+
+                wajah_data = {
+                    "x": int(fa["x"]),
+                    "y": int(fa["y"]),
+                    "w": int(fa["w"]),
+                    "h": int(fa["h"]),
+                    "frame_w": int(w_orig),
+                    "frame_h": int(h_orig),
+                    "nama": nama_box,
+                    "skor": skor_box,
+                    "status": status_box
+                }
+
+            # 5. Encode kembali frame OpenCV ke JPEG Base64
             _, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
             frame_base64 = "data:image/jpeg;base64," + base64.b64encode(buffer).decode('utf-8')
 
@@ -567,6 +606,7 @@ class LayananWajah:
                 "terdeteksi": len(detected_faces) > 0,
                 "frame_annotated": frame_base64,
                 "hasil": hasil_pencocokan,
+                "wajah": wajah_data,
                 "total_wajah_frame": len(detected_faces)
             }
 
@@ -709,12 +749,13 @@ class LayananWajah:
                 self.potong_dan_zoom_wajah(storage_img_path)
 
             try:
-                representations = DeepFace.represent(
-                    img_path=img_path,
-                    model_name=self.model_name,
-                    detector_backend=self.detector_backend,
-                    enforce_detection=False
-                )
+                with self.model_lock:
+                    representations = DeepFace.represent(
+                        img_path=img_path,
+                        model_name=self.model_name,
+                        detector_backend=self.detector_backend,
+                        enforce_detection=False
+                    )
                 if representations and len(representations) > 0:
                     emb = np.array(representations[0]["embedding"], dtype=np.float32)
                     norm = np.linalg.norm(emb)

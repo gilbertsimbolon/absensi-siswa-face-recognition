@@ -42,7 +42,7 @@
                             </tr>
                             <tr>
                                 <td class="text-muted p-1">Email Siswa</td>
-                                <td class="p-1 fw-semibold">: {{ $siswa->email ?: ($siswa->phone ?: '-') }}</td>
+                                <td class="p-1 fw-semibold">: {{ $siswa->email ?: '-' }}</td>
                             </tr>
                             <tr>
                                 <td class="text-muted p-1">Orang Tua / Wali</td>
@@ -50,7 +50,7 @@
                             </tr>
                             <tr>
                                 <td class="text-muted p-1">Email Ortu</td>
-                                <td class="p-1 fw-semibold">: {{ $siswa->parent_email ?: ($siswa->parent_phone ?: '-') }}</td>
+                                <td class="p-1 fw-semibold">: {{ $siswa->parent_email ?: '-' }}</td>
                             </tr>
                         </tbody>
                     </table>

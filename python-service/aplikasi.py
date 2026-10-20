@@ -24,9 +24,13 @@ template_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'templat
 app = Flask(__name__, template_folder=template_dir)
 CORS(app)
 
-# Inisialisasi Service AI dan Pemindai OpenCV
+# Inisialisasi Service AI dan Pemindai OpenCV (Mendukung index USB 0/1 atau string URL IP Camera RTSP/HTTP)
+default_camera = getattr(konfigurasi, 'CAMERA_SOURCE', '0')
+if str(default_camera).isdigit():
+    default_camera = int(default_camera)
+
 layanan = LayananWajah()
-scanner = ScannerOpenCV(layanan_wajah=layanan, camera_source=0)
+scanner = ScannerOpenCV(layanan_wajah=layanan, camera_source=default_camera)
 
 def get_app_key_bytes():
     """Mengambil byte secret APP_KEY Laravel dari environment."""
@@ -263,4 +267,9 @@ if __name__ == '__main__':
     print("====================================================")
     layanan.inisialisasi()
     scanner.mulai()
-    app.run(host=konfigurasi.HOST, port=konfigurasi.PORT, debug=False, threaded=True)
+    try:
+        app.run(host=konfigurasi.HOST, port=konfigurasi.PORT, debug=False, threaded=True)
+    except BaseException as e:
+        import traceback
+        traceback.print_exc()
+        print(f"[!] Server berhenti: {type(e).__name__}: {e}")

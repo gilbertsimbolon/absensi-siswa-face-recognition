@@ -30,8 +30,8 @@ if not os.path.exists(YUNET_MODEL_PATH):
         YUNET_MODEL_PATH = fallback_deepface
 
 # Ambang Batas Jarak Pencocokan (Threshold)
-# Untuk model Facenet dengan metrik cosine, nilai <= 0.50 memberikan kecocokan instan tanpa false-positive
-THRESHOLD = float(os.getenv('FACE_THRESHOLD', 0.50))
+# Untuk model Facenet dengan metrik cosine pada webcam beragam pencahayaan: 0.78
+THRESHOLD = float(os.getenv('FACE_THRESHOLD', 0.78))
 
 # Path Dataset Wajah
 # Prioritaskan folder dataset internal python-service, jika tidak ada gunakan storage/app/public/faces
@@ -40,4 +40,7 @@ STORAGE_FACES_PATH = os.path.abspath(os.path.join(BASE_DIR, '..', 'storage', 'ap
 
 # Penyimpanan Embeddings: Database MySQL (tabel student_faces) sebagai Single Source of Truth
 CACHE_EMBEDDINGS_FILE = None
+
+# Sumber Kamera Pemindai OpenCV (0 untuk Webcam USB/Internal, atau URL string RTSP/HTTP untuk IP Kamera/CCTV)
+CAMERA_SOURCE = os.getenv('CAMERA_SOURCE', '0')
 

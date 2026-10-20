@@ -130,10 +130,7 @@
                                         <a href="mailto:{{ $siswa->email }}" class="small fw-semibold text-primary text-decoration-none d-flex align-items-center">
                                             <i class="icon-base bx bx-envelope me-1"></i>{{ $siswa->email }}
                                         </a>
-                                    @endif
-                                    @if ($siswa->phone)
-                                        <small class="text-muted d-block">{{ $siswa->phone }}</small>
-                                    @elseif (!$siswa->email)
+                                    @else
                                         <span class="text-muted">-</span>
                                     @endif
                                 </td>
@@ -143,10 +140,7 @@
                                         <a href="mailto:{{ $siswa->parent_email }}" class="small fw-semibold text-primary text-decoration-none d-flex align-items-center">
                                             <i class="icon-base bx bx-envelope me-1"></i>{{ $siswa->parent_email }}
                                         </a>
-                                    @endif
-                                    @if ($siswa->parent_phone)
-                                        <small class="text-muted d-block">{{ $siswa->parent_phone }}</small>
-                                    @elseif (!$siswa->parent_email)
+                                    @else
                                         <span class="text-muted">-</span>
                                     @endif
                                 </td>

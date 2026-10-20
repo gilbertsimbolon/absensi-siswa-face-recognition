@@ -809,6 +809,7 @@ class AttendanceController extends Controller
         $skorAkurasi = $request->input('skor_akurasi');
         $gambarBase64 = $request->input('gambar');
         $frameAnnotated = null;
+        $wajah = null;
 
         // Jika NISN belum ada tetapi ada gambar, teruskan ke microservice Python DeepFace & OpenCV
         if (! $nisn && $gambarBase64) {
@@ -822,6 +823,7 @@ class AttendanceController extends Controller
                     $aiData = $response->json();
                     $frameAnnotated = $aiData['frame_annotated'] ?? null;
                     $hasil = $aiData['hasil'] ?? [];
+                    $wajah = $aiData['wajah'] ?? null;
 
                     if (($aiData['status'] ?? '') === 'sukses' && ! empty($hasil['nisn'] ?? $aiData['nisn'] ?? null)) {
                         $nisn = $hasil['nisn'] ?? $aiData['nisn'];
@@ -830,12 +832,14 @@ class AttendanceController extends Controller
                         return response()->json([
                             'status' => 'tidak_ada_wajah',
                             'pesan' => 'Wajah tidak terdeteksi pada kamera.',
+                            'wajah' => null,
                             'frame_annotated' => $frameAnnotated,
                         ], 200);
                     } else {
                         return response()->json([
                             'status' => 'tidak_dikenali',
                             'pesan' => $hasil['pesan'] ?? $aiData['pesan'] ?? 'Wajah tidak cocok dengan data siswa terdaftar.',
+                            'wajah' => $wajah,
                             'frame_annotated' => $frameAnnotated,
                         ], 200);
                     }
@@ -887,22 +891,23 @@ class AttendanceController extends Controller
         $today = Carbon::today()->format('Y-m-d');
 
         // Tentukan status kehadiran berdasarkan jam kelas siswa (Hadir, Terlambat, Alpa)
+        // Hanya 2 acuan: Jam Masuk (Hadir) dan Batas Terlambat (Terlambat). Lewat dari itu otomatis Alpa.
         $studentClass = $student->classes;
+        $strJamMasuk = $studentClass?->jam_masuk ?? '07:00:00';
         $strBatasTerlambat = $studentClass?->batas_terlambat ?? '07:15:00';
-        $strBatasAlpa = $studentClass?->batas_alpa ?? '08:30:00';
 
+        $jamMasuk = Carbon::today()->setTimeFromTimeString($strJamMasuk);
         $jamBatasTerlambat = Carbon::today()->setTimeFromTimeString($strBatasTerlambat);
-        $jamBatasAlpa = Carbon::today()->setTimeFromTimeString($strBatasAlpa);
 
-        if ($now->lte($jamBatasTerlambat)) {
+        if ($now->lte($jamMasuk)) {
             $statusKehadiran = Attendance::STATUS_HADIR;
             $statusDisplay = 'Hadir';
-        } elseif ($now->lte($jamBatasAlpa)) {
+        } elseif ($now->lte($jamBatasTerlambat)) {
             $statusKehadiran = Attendance::STATUS_TERLAMBAT;
             $statusDisplay = 'Terlambat';
         } else {
             $statusKehadiran = Attendance::STATUS_ALPA;
-            $statusDisplay = 'Diluar Waktu Absen';
+            $statusDisplay = 'Alpa';
         }
 
         // Simpan snapshot jika dikirimkan
@@ -924,12 +929,22 @@ class AttendanceController extends Controller
             ->whereDate('date', $today)
             ->first();
 
+        // Format data wajah untuk frontend visual bounding box
+        if ($wajah) {
+            $wajah['nama'] = $student->name;
+            $wajah['status'] = 'sukses';
+            if ($skorAkurasi) {
+                $wajah['skor'] = $skorAkurasi.'%';
+            }
+        }
+
         // 1. Skenario jika sudah tercatat presensi hari ini (cukup presensi masuk, tidak ada validasi pulang)
         if ($attendance) {
             return response()->json([
                 'status' => 'sudah_absen',
                 'tipe' => 'masuk',
                 'pesan' => "{$student->name} sudah melakukan presensi hari ini pukul ".Carbon::parse($attendance->check_in_time)->format('H:i').' WITA.',
+                'wajah' => $wajah,
                 'frame_annotated' => $frameAnnotated,
                 'siswa' => [
                     'id' => $student->id,
@@ -955,7 +970,7 @@ class AttendanceController extends Controller
             'method' => Attendance::METHOD_FACE,
             'confidence_score' => $skorAkurasi ? (float) $skorAkurasi : null,
             'snapshot_path' => $snapshotPath,
-            'notes' => $statusKehadiran === Attendance::STATUS_ALPA ? 'Presensi melewati batas waktu toleransi (Alpa)' : 'Presensi otomatis melalui pindai wajah',
+            'notes' => $statusKehadiran === Attendance::STATUS_ALPA ? 'Presensi melewati batas waktu terlambat (Alpa)' : 'Presensi otomatis melalui pindai wajah',
         ]);
 
         // Kirim notifikasi email otomatis ke orang tua / siswa
@@ -969,6 +984,7 @@ class AttendanceController extends Controller
             'status' => 'sukses',
             'tipe' => 'masuk',
             'pesan' => "Presensi masuk berhasil dicatat! Status: {$statusDisplay}.",
+            'wajah' => $wajah,
             'frame_annotated' => $frameAnnotated,
             'siswa' => [
                 'id' => $student->id,

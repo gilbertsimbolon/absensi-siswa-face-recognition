@@ -69,22 +69,12 @@
 
                     <div class="row">
                         <!-- Input Email Siswa -->
-                        <div class="col-md-6 mb-3">
+                        <div class="col-12 mb-3">
                             <label class="form-label fw-semibold">Email Siswa (Notifikasi Presensi)</label>
                             <div class="input-group input-group-merge">
                                 <span class="input-group-text"><i class="icon-base bx bx-envelope"></i></span>
                                 <input type="email" class="form-control" name="email"
                                     value="{{ old('email', $siswa->email) }}" placeholder="siswa@email.com" />
-                            </div>
-                        </div>
-
-                        <!-- Input No. Telp Siswa -->
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">No. Telp Siswa (Opsional)</label>
-                            <div class="input-group input-group-merge">
-                                <span class="input-group-text"><i class="icon-base bx bx-phone"></i></span>
-                                <input type="text" class="form-control" name="phone"
-                                    value="{{ old('phone', $siswa->phone) }}" placeholder="0812 3456 7890" />
                             </div>
                         </div>
                     </div>
@@ -97,7 +87,7 @@
 
                     <div class="row">
                         <!-- Input Nama Orang Tua -->
-                        <div class="col-md-4 mb-3">
+                        <div class="col-md-6 mb-3">
                             <label class="form-label">Nama Orang Tua / Wali</label>
                             <div class="input-group input-group-merge">
                                 <span class="input-group-text"><i class="icon-base bx bx-user"></i></span>
@@ -107,22 +97,12 @@
                         </div>
 
                         <!-- Input Email Orang Tua -->
-                        <div class="col-md-4 mb-3">
+                        <div class="col-md-6 mb-3">
                             <label class="form-label fw-semibold">Email Orang Tua (Notifikasi Presensi)</label>
                             <div class="input-group input-group-merge">
                                 <span class="input-group-text"><i class="icon-base bx bx-envelope"></i></span>
                                 <input type="email" class="form-control" name="parent_email"
                                     value="{{ old('parent_email', $siswa->parent_email) }}" placeholder="ortu@email.com" />
-                            </div>
-                        </div>
-
-                        <!-- Input No Telp Orang Tua -->
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label">No. Telp Orang Tua (Opsional)</label>
-                            <div class="input-group input-group-merge">
-                                <span class="input-group-text"><i class="icon-base bx bx-phone"></i></span>
-                                <input type="text" class="form-control" name="parent_phone"
-                                    value="{{ old('parent_phone', $siswa->parent_phone) }}" placeholder="0812 3456 7890" />
                             </div>
                         </div>
                     </div>

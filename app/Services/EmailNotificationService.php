@@ -36,10 +36,6 @@ class EmailNotificationService
             ? Carbon::parse($studentClass->batas_terlambat)->format('H:i')
             : '07:15';
 
-        $batasAlpa = $studentClass?->batas_alpa
-            ? Carbon::parse($studentClass->batas_alpa)->format('H:i')
-            : '08:30';
-
         $status = $attendance->status;
 
         if ($tipe === 'pulang') {
@@ -62,7 +58,7 @@ class EmailNotificationService
             $subject = "[Pemberitahuan Ketidakhadiran] {$student->name} ({$studentClass?->name}) - Alpa";
             $statusBadge = '<span style="display: inline-block; padding: 4px 12px; background-color: #fee2e2; color: #991b1b; font-weight: 700; border-radius: 4px; font-size: 13px;">ALPA</span>';
             $pesanPengantar = "Diberitahukan bahwa ananda <strong>{$student->name}</strong> tercatat berstatus <strong>ALPA</strong> pada presensi hari ini di SMAN 2 Tondano.";
-            $catatanKhusus = "Siswa melakukan pemindaian melewati batas toleransi alpa ({$batasAlpa} WITA). Mohon konfirmasi dan klarifikasi kehadiran ananda kepada pihak sekolah atau wali kelas.";
+            $catatanKhusus = "Siswa melakukan pemindaian melewati batas toleransi keterlambatan ({$batasTerlambat} WITA). Mohon konfirmasi dan klarifikasi kehadiran ananda kepada pihak sekolah atau wali kelas.";
             $headerColor = '#dc2626';
             $labelWaktu = 'Waktu Presensi';
             $nilaiWaktu = "{$checkInTime} WITA";

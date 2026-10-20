@@ -702,48 +702,46 @@ class ClassesController extends Controller
     }
 
     /**
-     * Perbarui jam kelas untuk kelas tertentu.
+     * Perbarui jam kelas untuk kelas tertentu (Jam Masuk & Batas Terlambat).
      */
     public function updateSchedule(Request $request, Classes $class)
     {
         $validated = $request->validate([
             'jam_masuk' => 'required|date_format:H:i',
             'batas_terlambat' => 'required|date_format:H:i|after:jam_masuk',
-            'batas_alpa' => 'required|date_format:H:i|after:batas_terlambat',
         ], [
+            'jam_masuk.required' => 'Jam masuk wajib diisi.',
+            'batas_terlambat.required' => 'Batas terlambat wajib diisi.',
             'batas_terlambat.after' => 'Batas terlambat harus setelah jam masuk.',
-            'batas_alpa.after' => 'Batas alpa harus setelah batas terlambat.',
         ]);
 
         $class->update([
             'jam_masuk' => $validated['jam_masuk'].':00',
             'batas_terlambat' => $validated['batas_terlambat'].':00',
-            'batas_alpa' => $validated['batas_alpa'].':00',
         ]);
 
-        return redirect()->back()->with('success', "Jam kelas untuk {$class->name} berhasil diperbarui.");
+        return redirect()->back()->with('success', "Jam masuk dan batas terlambat untuk {$class->name} berhasil diperbarui.");
     }
 
     /**
-     * Terapkan jam kelas serentak ke seluruh kelas.
+     * Terapkan jam kelas serentak ke seluruh kelas (Jam Masuk & Batas Terlambat).
      */
     public function updateAllSchedules(Request $request)
     {
         $validated = $request->validate([
             'jam_masuk' => 'required|date_format:H:i',
             'batas_terlambat' => 'required|date_format:H:i|after:jam_masuk',
-            'batas_alpa' => 'required|date_format:H:i|after:batas_terlambat',
         ], [
+            'jam_masuk.required' => 'Jam masuk wajib diisi.',
+            'batas_terlambat.required' => 'Batas terlambat wajib diisi.',
             'batas_terlambat.after' => 'Batas terlambat harus setelah jam masuk.',
-            'batas_alpa.after' => 'Batas alpa harus setelah batas terlambat.',
         ]);
 
         Classes::query()->update([
             'jam_masuk' => $validated['jam_masuk'].':00',
             'batas_terlambat' => $validated['batas_terlambat'].':00',
-            'batas_alpa' => $validated['batas_alpa'].':00',
         ]);
 
-        return redirect()->back()->with('success', 'Jam masuk, batas terlambat, dan batas alpa berhasil diterapkan ke seluruh kelas.');
+        return redirect()->back()->with('success', 'Jam masuk dan batas terlambat berhasil diterapkan ke seluruh kelas.');
     }
 }

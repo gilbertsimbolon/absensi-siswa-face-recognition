@@ -86,11 +86,10 @@
                     <thead>
                         <tr>
                             <th class="text-center" style="width: 5%;">No.</th>
-                            <th style="width: 20%;">Kelas</th>
-                            <th style="width: 20%;">Wali Kelas</th>
-                            <th class="text-center" style="width: 15%;">Jam Masuk</th>
-                            <th class="text-center" style="width: 15%;">Batas Terlambat</th>
-                            <th class="text-center" style="width: 15%;">Batas Alpa</th>
+                            <th style="width: 25%;">Kelas</th>
+                            <th style="width: 25%;">Wali Kelas</th>
+                            <th class="text-center" style="width: 17%;">Jam Masuk</th>
+                            <th class="text-center" style="width: 18%;">Batas Terlambat</th>
                             <th class="text-center" style="width: 10%;">Aksi</th>
                         </tr>
                     </thead>
@@ -111,9 +110,6 @@
                                 <td class="text-center text-nowrap">
                                     {{ \Carbon\Carbon::parse($cls->batas_terlambat ?? '07:15:00')->format('H:i') }} WITA
                                 </td>
-                                <td class="text-center text-nowrap">
-                                    {{ \Carbon\Carbon::parse($cls->batas_alpa ?? '08:30:00')->format('H:i') }} WITA
-                                </td>
                                 <td class="text-center">
                                     <button type="button" class="btn btn-sm btn-outline-primary py-1 px-2"
                                         data-bs-toggle="modal" data-bs-target="#modalEditJam{{ $cls->id }}">
@@ -123,7 +119,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="7" class="text-center py-4 text-muted">
+                                <td colspan="6" class="text-center py-4 text-muted">
                                     Belum ada data kelas yang terdaftar.
                                 </td>
                             </tr>
@@ -159,13 +155,7 @@
                         <div class="mb-3">
                             <label class="form-label" for="all_batas_terlambat">Batas Terlambat <span class="text-danger">*</span></label>
                             <input type="time" name="batas_terlambat" id="all_batas_terlambat" class="form-control" value="07:15" required>
-                            <small class="text-muted" style="font-size: 11px;">Siswa yang scan setelah jam ini akan berstatus <strong>TERLAMBAT</strong>.</small>
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="form-label" for="all_batas_alpa">Batas Alpa <span class="text-danger">*</span></label>
-                            <input type="time" name="batas_alpa" id="all_batas_alpa" class="form-control" value="08:30" required>
-                            <small class="text-muted" style="font-size: 11px;">Siswa yang scan setelah jam ini otomatis berstatus <strong>ALPA</strong>.</small>
+                            <small class="text-muted" style="font-size: 11px;">Scan s/d jam masuk: <strong>HADIR</strong>. Scan antara jam masuk s/d batas ini: <strong>TERLAMBAT</strong>. Lewat dari jam ini otomatis: <strong>ALPA</strong>.</small>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -200,14 +190,7 @@
                                 <label class="form-label" for="batas_terlambat_{{ $cls->id }}">Batas Terlambat <span class="text-danger">*</span></label>
                                 <input type="time" name="batas_terlambat" id="batas_terlambat_{{ $cls->id }}" class="form-control"
                                     value="{{ \Carbon\Carbon::parse($cls->batas_terlambat ?? '07:15:00')->format('H:i') }}" required>
-                                <small class="text-muted" style="font-size: 11px;">Scan setelah jam ini berstatus Terlambat.</small>
-                            </div>
-
-                            <div class="mb-3">
-                                <label class="form-label" for="batas_alpa_{{ $cls->id }}">Batas Alpa <span class="text-danger">*</span></label>
-                                <input type="time" name="batas_alpa" id="batas_alpa_{{ $cls->id }}" class="form-control"
-                                    value="{{ \Carbon\Carbon::parse($cls->batas_alpa ?? '08:30:00')->format('H:i') }}" required>
-                                <small class="text-muted" style="font-size: 11px;">Scan setelah jam ini berstatus Alpa.</small>
+                                <small class="text-muted" style="font-size: 11px;">Scan s/d jam masuk: <strong>Hadir</strong>. Scan antara jam masuk s/d batas ini: <strong>Terlambat</strong>. Lewat dari batas ini otomatis: <strong>Alpa</strong>.</small>
                             </div>
                         </div>
                         <div class="modal-footer">

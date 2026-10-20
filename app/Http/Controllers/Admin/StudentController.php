@@ -272,9 +272,12 @@ class StudentController extends Controller
             $fileName = time().'_'.($idx + 1).'_'.uniqid().'.'.$file->getClientOriginalExtension();
             $path = $file->storeAs('faces/'.$student->nisn, $fileName, 'public');
 
-            // Salin juga langsung ke folder dataset Python DeepFace
+            // Salin juga langsung ke folder dataset Python DeepFace jika berkas tersedia di storage disk
             $pythonFilePath = $pythonDatasetDir.'/'.$fileName;
-            File::copy(storage_path('app/public/'.$path), $pythonFilePath);
+            $realSourcePath = Storage::disk('public')->path($path);
+            if (File::exists($realSourcePath)) {
+                File::copy($realSourcePath, $pythonFilePath);
+            }
 
             StudentFace::create([
                 'student_id' => $student->id,

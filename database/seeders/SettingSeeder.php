@@ -17,7 +17,7 @@ class SettingSeeder extends Seeder
         AppSetting::updateOrCreate(
             ['id' => 1],
             [
-                'min_face_accuracy' => 70.00,
+                'min_face_accuracy' => 85.00,
             ]
         );
 

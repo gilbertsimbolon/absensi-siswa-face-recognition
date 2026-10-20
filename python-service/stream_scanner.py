@@ -42,13 +42,16 @@ class ThreadedCamera:
         return bool(self.cap and self.cap.isOpened() and self.ret and self.frame is not None)
 
     def _buka_kamera(self):
-        src = int(self.source) if str(self.source).isdigit() else self.source
+        src = int(self.source) if str(self.source).isdigit() else str(self.source)
         try:
             if isinstance(src, int):
                 # Pada Windows gunakan CAP_DSHOW agar device index valid dideteksi tanpa crash async MSMF
                 self.cap = cv2.VideoCapture(src, cv2.CAP_DSHOW)
             else:
-                self.cap = cv2.VideoCapture(src)
+                # Untuk RTSP / HTTP IP Camera gunakan backend FFMPEG
+                self.cap = cv2.VideoCapture(src, cv2.CAP_FFMPEG)
+                if not self.cap or not self.cap.isOpened():
+                    self.cap = cv2.VideoCapture(src)
         except Exception as e:
             print(f"[!] Gagal membuka VideoCapture untuk sumber {src}: {e}")
             self.cap = None
@@ -373,15 +376,25 @@ class ScannerOpenCV:
     def _worker_deepface(self, face_crop):
         """Worker thread independen untuk inferensi FaceNet dan pengiriman ke Laravel."""
         try:
-            if not self.layanan.embeddings_db or face_crop is None or face_crop.size == 0:
+            if not self.layanan.embeddings_db or face_crop is None or face_crop.size == 0 or face_crop.shape[0] < 20 or face_crop.shape[1] < 20:
                 return
 
-            representations = DeepFace.represent(
-                img_path=face_crop,
-                model_name=self.layanan.model_name,
-                detector_backend="opencv",
-                enforce_detection=False
-            )
+            lock = getattr(self.layanan, 'model_lock', None)
+            if lock:
+                with lock:
+                    representations = DeepFace.represent(
+                        img_path=face_crop,
+                        model_name=self.layanan.model_name,
+                        detector_backend="opencv",
+                        enforce_detection=False
+                    )
+            else:
+                representations = DeepFace.represent(
+                    img_path=face_crop,
+                    model_name=self.layanan.model_name,
+                    detector_backend="opencv",
+                    enforce_detection=False
+                )
 
             if not representations or len(representations) == 0:
                 return
@@ -548,6 +561,22 @@ class ScannerOpenCV:
 
         # 1. Gambar Kotak Wajah Utama
         cv2.rectangle(frame, (x, y), (x + fw, y + fh), color, 2)
+
+        # 1b. Sudut Siku-Siku Aksen Khas Computer Vision (Corner Brackets)
+        corner_len = max(14, int(min(fw, fh) * 0.22))
+        thick = 4
+        # Top-Left
+        cv2.line(frame, (x, y), (x + corner_len, y), color, thick)
+        cv2.line(frame, (x, y), (x, y + corner_len), color, thick)
+        # Top-Right
+        cv2.line(frame, (x + fw, y), (x + fw - corner_len, y), color, thick)
+        cv2.line(frame, (x + fw, y), (x + fw, y + corner_len), color, thick)
+        # Bottom-Left
+        cv2.line(frame, (x, y + fh), (x + corner_len, y + fh), color, thick)
+        cv2.line(frame, (x, y + fh), (x, y + fh - corner_len), color, thick)
+        # Bottom-Right
+        cv2.line(frame, (x + fw, y + fh), (x + fw - corner_len, y + fh), color, thick)
+        cv2.line(frame, (x + fw, y + fh), (x + fw, y + fh - corner_len), color, thick)
 
         # 2. Gambar Nama Siswa di Atas Kotak Saja
         if nama_tampil:
