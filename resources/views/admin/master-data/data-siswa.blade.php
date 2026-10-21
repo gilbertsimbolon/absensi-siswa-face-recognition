@@ -13,6 +13,14 @@
             </div>
         @endif
 
+        @if (session('info'))
+            <div class="alert alert-info alert-dismissible fade show flex-shrink-0" role="alert">
+                <i class="icon-base bx bx-info-circle me-1"></i>
+                {{ session('info') }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        @endif
+
         @if (session('error'))
             <div class="alert alert-danger alert-dismissible fade show flex-shrink-0" role="alert">
                 <i class="icon-base bx bx-error-circle me-1"></i>
@@ -31,9 +39,17 @@
 
         <div class="d-flex justify-content-between align-items-center mb-3 flex-shrink-0">
             <h4 class="fw-bold mb-0">Data Siswa</h4>
-            <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalTambahSiswa">
-                <i class="icon-base bx bx-plus me-1"></i> Tambah Data Siswa
-            </button>
+            <div class="d-flex align-items-center gap-2">
+                <form action="{{ route('admin.student.sync-all-faces') }}" method="POST" class="d-inline m-0">
+                    @csrf
+                    <button type="submit" class="btn btn-outline-primary" title="Ekstrak & sinkronkan semua foto wajah siswa yang belum terindeks AI">
+                        <i class="icon-base bx bx-sync me-1"></i> Sinkronkan Wajah AI
+                    </button>
+                </form>
+                <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalTambahSiswa">
+                    <i class="icon-base bx bx-plus me-1"></i> Tambah Data Siswa
+                </button>
+            </div>
         </div>
 
         <!-- Tabel Data Siswa -->

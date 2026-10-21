@@ -196,6 +196,15 @@ class LayananWajah:
         # 2. Jika database belum memiliki embedding sama sekali, bangun indeks dari file foto fisik
         if not self.embeddings_db:
             self.bangun_index_wajah()
+        else:
+            # Periksa apakah ada siswa terdaftar yang fotonya di disk belum diekstrak ke embedding
+            label_terindeks = set(str(item.get("label")) for item in self.embeddings_db)
+            siswa_tanpa_embedding = [str(nisn) for nisn in self.data_siswa if str(nisn) not in label_terindeks]
+            if siswa_tanpa_embedding:
+                print(f"[*] Ditemukan {len(siswa_tanpa_embedding)} siswa belum memiliki embedding di memori. Memulai ekstraksi otomatis...")
+                for nisn in siswa_tanpa_embedding:
+                    nama_s = self.data_siswa.get(nisn, {}).get("nama", "")
+                    self.ekstrak_dan_sinkronisasi_siswa(nisn, nama=nama_s)
 
         # 3. Bangun matriks 2D untuk pencocokan secepat kilat (0.01 ms)
         self.perbarui_matrix_embeddings()
@@ -776,14 +785,16 @@ class LayananWajah:
             img_path = os.path.join(folder_siswa, file_name)
 
             # Terapkan teknik auto-crop & zoom wajah langsung pada berkas foto di storage publik
-            self.potong_dan_zoom_wajah(img_path)
+            berhasil_crop = self.potong_dan_zoom_wajah(img_path)
 
             try:
+                # Jika sudah berhasil di-crop oleh YuNet OpenCV, lewati re-deteksi berat DeepFace agar inferensi instan (< 0.2s)
+                backend_deteksi = "skip" if berhasil_crop else self.detector_backend
                 with self.model_lock:
                     representations = DeepFace.represent(
                         img_path=img_path,
                         model_name=self.model_name,
-                        detector_backend=self.detector_backend,
+                        detector_backend=backend_deteksi,
                         enforce_detection=False
                     )
                 if representations and len(representations) > 0:

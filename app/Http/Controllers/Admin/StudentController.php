@@ -267,9 +267,17 @@ class StudentController extends Controller
         }
 
         // Otomatis sinkronisasi, deteksi auto-crop zoom wajah, dan ekstraksi embedding FaceNet di microservice Python
+        $this->triggerFaceExtraction($student);
+    }
+
+    /**
+     * Memicu microservice Python untuk mengekstrak vektor FaceNet 128-D dan menyimpannya ke MySQL.
+     */
+    public function triggerFaceExtraction(Student $student): bool
+    {
         try {
             $pythonUrl = config('services.deepface.base_url', 'http://127.0.0.1:5000').'/sinkronisasi-siswa/'.$student->nisn;
-            $response = Http::timeout(25)->post($pythonUrl, [
+            $response = Http::timeout(120)->post($pythonUrl, [
                 'nama' => $student->name,
             ]);
 
@@ -277,15 +285,61 @@ class StudentController extends Controller
                 $aiData = $response->json();
                 $embeddingsMap = $aiData['embeddings'] ?? [];
 
-                // Simpan nilai vektor embedding 128-float ke tabel student_faces
+                $savedCount = 0;
                 foreach ($embeddingsMap as $fn => $vector) {
-                    StudentFace::where('student_id', $student->id)
+                    $updated = StudentFace::where('student_id', $student->id)
                         ->where('file_path', 'like', "%{$fn}")
                         ->update(['embedding' => $vector]);
+                    if ($updated) {
+                        $savedCount++;
+                    }
                 }
+                Log::info("Sinkronisasi FaceNet sukses untuk {$student->nisn}: {$savedCount} vektor tersimpan.");
+
+                return $savedCount > 0;
             }
+
+            Log::error("Microservice Python gagal mengekstrak wajah {$student->nisn}: ".$response->body());
         } catch (\Throwable $e) {
             Log::warning("Gagal memicu ekstraksi embedding FaceNet untuk {$student->nisn}: ".$e->getMessage());
         }
+
+        return false;
+    }
+
+    /**
+     * Ekstrak / sinkronisasi ulang vektor wajah untuk 1 siswa tertentu dari tombol modal.
+     */
+    public function syncFace(Student $student)
+    {
+        $sukses = $this->triggerFaceExtraction($student);
+        if ($sukses) {
+            return back()->with('success', "Vektor wajah untuk {$student->name} berhasil diekstrak dan disinkronkan ke AI!");
+        }
+
+        return back()->with('error', "Gagal mengekstrak vektor wajah untuk {$student->name}. Pastikan layanan AI (Python) aktif.");
+    }
+
+    /**
+     * Sinkronisasi seluruh siswa yang memiliki foto namun belum memiliki vektor embedding.
+     */
+    public function syncAllFaces()
+    {
+        $students = Student::whereHas('faces', function ($q) {
+            $q->whereNull('embedding');
+        })->get();
+
+        if ($students->isEmpty()) {
+            return back()->with('info', 'Semua foto wajah siswa sudah memiliki vektor embedding.');
+        }
+
+        $suksesCount = 0;
+        foreach ($students as $student) {
+            if ($this->triggerFaceExtraction($student)) {
+                $suksesCount++;
+            }
+        }
+
+        return back()->with('success', "Berhasil menyinkronkan vektor wajah untuk {$suksesCount} dari {$students->count()} siswa.");
     }
 }
