@@ -22,8 +22,9 @@
             color: #1e293b;
             font-family: 'Plus Jakarta Sans', sans-serif;
             min-height: 100vh;
+            min-height: 100dvh;
             margin: 0;
-            padding: 1.5rem 1rem;
+            padding: 1rem;
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -41,19 +42,15 @@
 
         /* Bar Navigasi Atas */
         .scanner-nav {
-            position: relative;
             display: flex;
             align-items: center;
-            justify-content: center;
-            padding: 4px 0 10px 0;
-            min-height: 60px;
+            justify-content: space-between;
+            padding: 4px 0 8px 0;
+            width: 100%;
+            gap: 12px;
         }
 
         .btn-kembali {
-            position: absolute;
-            left: 0;
-            top: 50%;
-            transform: translateY(-50%);
             background: #f1f5f9;
             color: #334155;
             border: 1px solid #cbd5e1;
@@ -66,6 +63,8 @@
             align-items: center;
             gap: 6px;
             transition: all 0.2s ease;
+            white-space: nowrap;
+            flex-shrink: 0;
         }
 
         .btn-kembali:hover {
@@ -78,12 +77,15 @@
             flex-direction: column;
             align-items: center;
             text-align: center;
+            flex-grow: 1;
+            min-width: 0;
         }
 
         .sekolah-logo {
-            height: 48px;
+            height: 44px;
             width: auto;
-            margin-bottom: 4px;
+            margin-bottom: 2px;
+            object-fit: contain;
         }
 
         .sekolah-nama {
@@ -92,19 +94,19 @@
             color: #0f172a;
             margin: 0;
             line-height: 1.2;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .sekolah-sub {
             font-size: 0.78rem;
             color: #64748b;
             margin: 2px 0 0 0;
+            white-space: nowrap;
         }
 
         .jam-badge {
-            position: absolute;
-            right: 0;
-            top: 50%;
-            transform: translateY(-50%);
             background: #f8fafc;
             border: 1px solid #e2e8f0;
             color: #0284c7;
@@ -112,6 +114,8 @@
             border-radius: 8px;
             font-size: 0.85rem;
             font-weight: 600;
+            white-space: nowrap;
+            flex-shrink: 0;
         }
 
         /* 1 Frame Kamera Presensi */
@@ -443,12 +447,373 @@
         .btn-putar-kamera:active {
             transform: rotate(360deg) scale(0.95);
         }
+
+        /* Tombol Putar Kamera Floating (Khusus Mode Lanskap / Mobile) */
+        .btn-putar-kamera-floating {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            z-index: 45;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.90);
+            border: 1.5px solid rgba(2, 132, 199, 0.4);
+            color: #0284c7;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.45rem;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+            backdrop-filter: blur(6px);
+            transition: all 0.25s ease;
+        }
+
+        .btn-putar-kamera-floating:hover {
+            background: #0284c7;
+            color: #ffffff;
+            transform: rotate(180deg);
+        }
+
+        .btn-putar-kamera-floating:active {
+            transform: rotate(360deg) scale(0.92);
+        }
+
+        /* Banner Saran Rotasi Lanskap untuk Layar HP */
+        .rotate-prompt {
+            position: fixed;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1050;
+            width: calc(100% - 20px);
+            max-width: 440px;
+            animation: slideDownPrompt 0.4s ease;
+        }
+
+        .rotate-prompt-box {
+            background: rgba(15, 23, 42, 0.95);
+            color: #f8fafc;
+            border: 1.5px solid rgba(56, 189, 248, 0.45);
+            padding: 9px 14px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+            backdrop-filter: blur(8px);
+        }
+
+        .rotate-icon {
+            font-size: 1.5rem;
+            color: #38bdf8;
+            flex-shrink: 0;
+            animation: animRotatePhone 2.5s infinite ease-in-out;
+        }
+
+        .rotate-text {
+            font-size: 0.78rem;
+            line-height: 1.3;
+            color: #f1f5f9;
+        }
+
+        .btn-close-prompt {
+            background: transparent;
+            border: none;
+            color: #94a3b8;
+            font-size: 1.35rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2px 6px;
+            cursor: pointer;
+            flex-shrink: 0;
+            transition: color 0.2s;
+        }
+
+        .btn-close-prompt:hover {
+            color: #ffffff;
+        }
+
+        @keyframes animRotatePhone {
+            0%, 20% { transform: rotate(0deg); }
+            50%, 70% { transform: rotate(-90deg); }
+            90%, 100% { transform: rotate(0deg); }
+        }
+
+        @keyframes slideDownPrompt {
+            from { opacity: 0; transform: translate(-50%, -12px); }
+            to { opacity: 1; transform: translate(-50%, 0); }
+        }
+
+        /* ========================================================
+           1. RESPONSIVITAS MOBILE (HP POTRAIT - HURUF & ELEMEN LEBIH KECIL)
+           ======================================================== */
+        @media (max-width: 768px) {
+            body {
+                padding: 0.6rem 0.6rem;
+                justify-content: flex-start;
+            }
+
+            .scanner-page {
+                gap: 8px;
+            }
+
+            .scanner-nav {
+                padding: 2px 0 6px 0;
+                gap: 8px;
+            }
+
+            .btn-kembali {
+                padding: 4px 10px;
+                font-size: 0.74rem;
+                border-radius: 6px;
+                gap: 4px;
+            }
+
+            .sekolah-logo {
+                height: 32px;
+                margin-bottom: 1px;
+            }
+
+            .sekolah-nama {
+                font-size: 0.86rem;
+            }
+
+            .sekolah-sub {
+                font-size: 0.68rem;
+            }
+
+            .jam-badge {
+                padding: 4px 10px;
+                font-size: 0.74rem;
+                border-radius: 6px;
+            }
+
+            .camera-container {
+                border-width: 2.5px;
+                border-radius: 12px;
+                aspect-ratio: 4 / 3;
+            }
+
+            .notification-overlay {
+                bottom: 12px;
+                width: 94%;
+            }
+
+            .notif-live {
+                padding: 8px 12px;
+                gap: 10px;
+                border-radius: 10px;
+            }
+
+            .notif-live .icon-box {
+                width: 32px;
+                height: 32px;
+                font-size: 1.15rem;
+            }
+
+            .notif-live .live-title {
+                font-size: 0.8rem;
+            }
+
+            .notif-live .live-desc {
+                font-size: 0.68rem;
+            }
+
+            .notif-sukses {
+                padding: 8px 12px;
+                gap: 10px;
+                border-radius: 10px;
+            }
+
+            .notif-sukses .icon-box {
+                width: 32px;
+                height: 32px;
+                font-size: 1.15rem;
+            }
+
+            .notif-nama-siswa {
+                font-size: 0.85rem;
+            }
+
+            .notif-keterangan {
+                font-size: 0.7rem;
+            }
+
+            .notif-badge-label {
+                padding: 3px 8px;
+                font-size: 0.7rem;
+            }
+
+            #notif-jam {
+                font-size: 10px !important;
+            }
+
+            .camera-footer {
+                padding: 4px;
+            }
+
+            .btn-putar-kamera {
+                width: 40px;
+                height: 40px;
+                font-size: 1.35rem;
+            }
+        }
+
+        /* ========================================================
+           2. RESPONSIVITAS MOBILE MODE LANSKAP (MENYAMPING SEPERTI LAPTOP)
+           ======================================================== */
+        @media (orientation: landscape) and (max-height: 580px) {
+            body {
+                padding: 4px 10px !important;
+                min-height: 100dvh;
+                height: 100dvh;
+                justify-content: flex-start !important;
+                overflow: hidden;
+            }
+
+            .rotate-prompt {
+                display: none !important;
+            }
+
+            .scanner-page {
+                height: 100%;
+                gap: 4px !important;
+                max-width: 100% !important;
+                justify-content: space-between;
+            }
+
+            .scanner-nav {
+                padding: 0 !important;
+                min-height: auto;
+                gap: 8px;
+            }
+
+            .btn-kembali {
+                padding: 2px 8px !important;
+                font-size: 0.7rem !important;
+            }
+
+            .sekolah-logo {
+                height: 22px !important;
+                margin-bottom: 0 !important;
+            }
+
+            .sekolah-nama {
+                font-size: 0.78rem !important;
+            }
+
+            .sekolah-sub {
+                display: none !important;
+            }
+
+            .jam-badge {
+                padding: 2px 8px !important;
+                font-size: 0.7rem !important;
+            }
+
+            .camera-container {
+                flex-grow: 1 !important;
+                height: calc(100dvh - 56px) !important;
+                max-height: calc(100dvh - 56px) !important;
+                aspect-ratio: auto !important;
+                border-width: 2.5px !important;
+                border-radius: 10px !important;
+            }
+
+            /* Di mode lanskap HP, sembunyikan footer bawah agar kamera maksimal tinggi, gunakan tombol floating */
+            .camera-footer {
+                display: none !important;
+            }
+
+            .btn-putar-kamera-floating {
+                display: inline-flex !important;
+                top: 8px !important;
+                right: 8px !important;
+                width: 34px !important;
+                height: 34px !important;
+                font-size: 1.15rem !important;
+            }
+
+            .notification-overlay {
+                bottom: 8px !important;
+                width: 82% !important;
+                max-width: 420px !important;
+            }
+
+            .notif-live {
+                padding: 6px 10px !important;
+                gap: 8px !important;
+                border-radius: 8px !important;
+            }
+
+            .notif-live .icon-box {
+                width: 28px !important;
+                height: 28px !important;
+                font-size: 1.05rem !important;
+            }
+
+            .notif-live .live-title {
+                font-size: 0.74rem !important;
+            }
+
+            .notif-live .live-desc {
+                font-size: 0.64rem !important;
+            }
+
+            .notif-sukses {
+                padding: 6px 10px !important;
+                gap: 8px !important;
+                border-radius: 8px !important;
+            }
+
+            .notif-sukses .icon-box {
+                width: 28px !important;
+                height: 28px !important;
+                font-size: 1.05rem !important;
+            }
+
+            .notif-nama-siswa {
+                font-size: 0.78rem !important;
+            }
+
+            .notif-keterangan {
+                font-size: 0.64rem !important;
+            }
+
+            .notif-badge-label {
+                padding: 2px 6px !important;
+                font-size: 0.64rem !important;
+            }
+
+            #notif-jam {
+                font-size: 9px !important;
+            }
+        }
     </style>
 </head>
 <body>
 
     <!-- Penanda aksesibilitas & verifikasi -->
     <span class="visually-hidden">Pindai Wajah Presensi Otomatis</span>
+
+    <!-- Banner Saran Rotasi Lanskap untuk Layar HP -->
+    <div class="rotate-prompt d-none" id="rotate-prompt">
+        <div class="rotate-prompt-box">
+            <div class="d-flex align-items-center gap-2">
+                <i class="bx bx-mobile-landscape rotate-icon"></i>
+                <div class="rotate-text">
+                    <strong>Putar Layar ke Lanskap (Menyamping)</strong>
+                    <small class="d-block opacity-75">Untuk tampilan penuh seperti laptop</small>
+                </div>
+            </div>
+            <button type="button" class="btn-close-prompt" onclick="tutupRotatePrompt()" aria-label="Tutup">
+                <i class="bx bx-x"></i>
+            </button>
+        </div>
+    </div>
 
     <div class="scanner-page">
 
@@ -471,6 +836,11 @@
 
         <!-- 1 Frame Kamera Presensi -->
         <div class="camera-container">
+
+            <!-- Tombol Putar Kamera Floating (Khusus Mode Lanskap / Layar Kecil) -->
+            <button type="button" class="btn-putar-kamera-floating" onclick="toggleKamera()" title="Ganti Kamera Depan/Belakang" aria-label="Ganti Kamera">
+                <i class="bx bx-sync"></i>
+            </button>
 
             <!-- Video Kamera Klien (Webcam / Kamera HP) -->
             <video id="webcam-video" 
@@ -917,9 +1287,39 @@
             }, 3500);
         }
 
-        // Jalankan inisialisasi kamera saat halaman dimuat
+        // 8. Deteksi Orientasi Mobile & Rekomendasi Mode Lanskap
+        function periksaOrientasi() {
+            const promptEl = document.getElementById('rotate-prompt');
+            if (!promptEl) return;
+
+            const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+                                   (window.innerWidth <= 768 && window.innerHeight > window.innerWidth);
+            const isPortrait = window.innerHeight > window.innerWidth;
+
+            if (isMobileDevice && isPortrait && window.innerWidth <= 768) {
+                if (sessionStorage.getItem('rotate_prompt_dismissed') !== 'true') {
+                    promptEl.classList.remove('d-none');
+                }
+            } else {
+                promptEl.classList.add('d-none');
+            }
+        }
+
+        function tutupRotatePrompt() {
+            const promptEl = document.getElementById('rotate-prompt');
+            if (promptEl) {
+                promptEl.classList.add('d-none');
+            }
+            sessionStorage.setItem('rotate_prompt_dismissed', 'true');
+        }
+
+        window.addEventListener('resize', periksaOrientasi);
+        window.addEventListener('orientationchange', periksaOrientasi);
+
+        // Jalankan inisialisasi kamera & cek orientasi saat halaman dimuat
         document.addEventListener('DOMContentLoaded', () => {
             mulaiKamera();
+            periksaOrientasi();
         });
     </script>
 </body>
