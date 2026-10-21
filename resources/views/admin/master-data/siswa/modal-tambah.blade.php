@@ -107,15 +107,10 @@
                         </div>
                     </div>
 
-                    <!-- Garis Pemisah Dataset Foto Wajah (AI Face Embedding) -->
+                    <!-- Garis Pemisah Foto Wajah (DeepFace FaceNet) -->
                     <div class="d-flex align-items-center mb-3 mt-2">
-                        <span class="text-uppercase small fw-semibold text-muted me-2">Foto Wajah Siswa (AI Face Embedding)</span>
+                        <span class="text-uppercase small fw-semibold text-muted me-2">Foto Wajah Siswa (DeepFace FaceNet)</span>
                         <hr class="flex-grow-1 m-0">
-                    </div>
-
-                    <div class="alert alert-info py-2 px-3 small d-flex align-items-center mb-3">
-                        <i class="icon-base bx bx-info-circle me-2 fs-5"></i>
-                        <span>Sistem dilengkapi fitur <strong>AI Auto-Crop & Face Zoom</strong>. Anda cukup mengunggah minimal <strong>1 foto</strong> (baik foto selfie, setengah badan, atau full body). AI akan secara otomatis mendeteksi wajah, memotong (zoom) ke area wajah, dan menyimpan vektor embedding 128-dimensi ke database.</span>
                     </div>
 
                     <div id="container-foto-tambah">

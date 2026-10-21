@@ -39,17 +39,9 @@
 
         <div class="d-flex justify-content-between align-items-center mb-3 flex-shrink-0">
             <h4 class="fw-bold mb-0">Data Siswa</h4>
-            <div class="d-flex align-items-center gap-2">
-                <form action="{{ route('admin.student.sync-all-faces') }}" method="POST" class="d-inline m-0">
-                    @csrf
-                    <button type="submit" class="btn btn-outline-primary" title="Ekstrak & sinkronkan semua foto wajah siswa yang belum terindeks AI">
-                        <i class="icon-base bx bx-sync me-1"></i> Sinkronkan Wajah AI
-                    </button>
-                </form>
-                <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalTambahSiswa">
-                    <i class="icon-base bx bx-plus me-1"></i> Tambah Data Siswa
-                </button>
-            </div>
+            <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalTambahSiswa">
+                <i class="icon-base bx bx-plus me-1"></i> Tambah Data Siswa
+            </button>
         </div>
 
         <!-- Tabel Data Siswa -->

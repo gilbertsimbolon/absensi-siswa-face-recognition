@@ -757,7 +757,7 @@ class AttendanceController extends Controller
 
         // Jika layanan offline, tampilkan informasi penanganan kegagalan yang jelas
         if (! $isOnline) {
-            $pythonStatus['message'] = 'Layanan kamera & AI Flask sedang tidak aktif. Harap jalankan layanan secara terpisah di server.';
+            $pythonStatus['message'] = 'Layanan kamera & pemindai DeepFace sedang tidak aktif. Harap jalankan layanan secara terpisah di server.';
         }
 
         return response()
@@ -857,14 +857,14 @@ class AttendanceController extends Controller
                     }
                 } else {
                     return response()->json([
-                        'status' => 'error_ai',
-                        'pesan' => 'Layanan AI pengenalan wajah sedang bermasalah.',
+                        'status' => 'error_server',
+                        'pesan' => 'Layanan pemindai wajah DeepFace sedang bermasalah.',
                     ], 502);
                 }
             } catch (\Exception $e) {
                 return response()->json([
-                    'status' => 'error_ai',
-                    'pesan' => 'Tidak dapat terhubung ke server AI DeepFace: '.$e->getMessage(),
+                    'status' => 'error_server',
+                    'pesan' => 'Tidak dapat terhubung ke server DeepFace: '.$e->getMessage(),
                 ], 503);
             }
         }
@@ -1047,7 +1047,7 @@ class AttendanceController extends Controller
     }
 
     /**
-     * Dapatkan peta seluruh data siswa (NISN => Nama & Kelas) untuk layanan AI Scanner.
+     * Dapatkan peta seluruh data siswa (NISN => Nama & Kelas) untuk layanan DeepFace Scanner.
      */
     public function daftarSiswa()
     {
@@ -1072,7 +1072,7 @@ class AttendanceController extends Controller
     }
 
     /**
-     * Dapatkan konfigurasi presensi untuk layanan AI Scanner.
+     * Dapatkan konfigurasi presensi untuk layanan DeepFace Scanner.
      */
     public function konfigurasi()
     {

@@ -906,7 +906,7 @@
 
     </div>
 
-    <!-- Script Jam Digital, Kamera HTML5 & Penangkapan Frame Citra ke AI Python -->
+    <!-- Script Jam Digital, Kamera HTML5 & Penangkapan Frame Citra ke Python DeepFace -->
     <script>
         // 1. Jam Digital
         setInterval(() => {
@@ -1106,7 +1106,7 @@
                     tanganiResponPresensi(data);
                 } else {
                     if (response.status === 502 || response.status === 503) {
-                        perbaruiNotifLive('state-peringatan', '<i class="bx bx-chip bx-spin"></i>', 'Server AI Sedang Memuat', 'Menghubungkan ke layanan FaceNet di server...');
+                        perbaruiNotifLive('state-peringatan', '<i class="bx bx-chip bx-spin"></i>', 'Server Sedang Memuat', 'Menghubungkan ke layanan FaceNet di server...');
                     }
                 }
             } catch (err) {

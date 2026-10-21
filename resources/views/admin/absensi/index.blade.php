@@ -180,7 +180,7 @@
                                 <td>
                                     @if ($att)
                                         @if ($att->method === 'face_recognition')
-                                            <span class="text-dark small"><i class="bx bx-camera me-1 text-muted"></i>Face AI</span>
+                                            <span class="text-dark small"><i class="bx bx-camera me-1 text-muted"></i>DeepFace</span>
                                         @else
                                             <span class="text-muted small"><i class="bx bx-edit me-1"></i>Manual</span>
                                         @endif

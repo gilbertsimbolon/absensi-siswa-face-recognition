@@ -86,7 +86,7 @@ class LayananWajah:
         Normalisasi pencahayaan adaptif menggunakan Contrast Limited Adaptive Histogram Equalization (CLAHE)
         pada ruang warna LAB (kanal Luminance L).
         Memastikan wajah siswa yang berada dalam kondisi backlight, silau, atau redup/berbayang
-        tetap memiliki kontras fitur wajah (mata, hidung, mulut) yang tajam dan mudah dikenali AI.
+        tetap memiliki kontras fitur wajah (mata, hidung, mulut) yang tajam dan mudah dikenali DeepFace.
         """
         if img is None or img.size == 0:
             return img
@@ -404,7 +404,7 @@ class LayananWajah:
         cv2.addWeighted(overlay, 0.75, frame, 0.25, 0, frame)
 
         # Teks Judul Kiri
-        cv2.putText(frame, "SMAN 2 TONDANO | AI COMPUTER VISION (OPENCV & DEEPFACE)", 
+        cv2.putText(frame, "SMAN 2 TONDANO | COMPUTER VISION (OPENCV & DEEPFACE)", 
                     (12, 21), cv2.FONT_HERSHEY_SIMPLEX, 0.44, (0, 245, 180), 1, cv2.LINE_AA)
 
         # Status Kanan

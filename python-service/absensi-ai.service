@@ -1,5 +1,5 @@
 [Unit]
-Description=Layanan AI Face Recognition Presensi Siswa (SMAN 2 Tondano)
+Description=Layanan DeepFace Face Recognition Presensi Siswa (SMAN 2 Tondano)
 After=network.target
 
 [Service]

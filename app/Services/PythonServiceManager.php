@@ -150,7 +150,7 @@ class PythonServiceManager
     }
 
     /**
-     * Dapatkan status ketersediaan layanan AI DeepFace Python.
+     * Dapatkan status ketersediaan layanan DeepFace Python.
      *
      * @return array{online: bool, fps: int, camera_source: mixed, latest_result: ?array, message: string}
      */
@@ -163,7 +163,7 @@ class PythonServiceManager
             'fps' => 0,
             'camera_source' => 'client',
             'latest_result' => null,
-            'message' => $running ? 'Layanan AI DeepFace aktif dan siap.' : 'Layanan AI DeepFace sedang tidak aktif.',
+            'message' => $running ? 'Layanan DeepFace aktif dan siap.' : 'Layanan DeepFace sedang tidak aktif.',
         ];
     }
 

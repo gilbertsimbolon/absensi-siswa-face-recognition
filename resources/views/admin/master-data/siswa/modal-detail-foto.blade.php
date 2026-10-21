@@ -19,13 +19,7 @@
                                 @if (!empty($face->embedding))
                                     <span class="badge bg-label-success small"><i class="icon-base bx bx-check-circle me-1"></i> Vektor 128-D Tersimpan</span>
                                 @else
-                                    <span class="badge bg-label-danger small d-block mb-1">Vektor Belum Diekstrak</span>
-                                    <form action="{{ route('admin.student.sync-face', $siswa->id) }}" method="POST" class="d-inline">
-                                        @csrf
-                                        <button type="submit" class="btn btn-xs btn-primary mt-1" title="Ekstrak fitur citra wajah AI">
-                                            <i class="icon-base bx bx-scan me-1"></i> Ekstrak Vektor
-                                        </button>
-                                    </form>
+                                    <span class="badge bg-label-secondary small">Vektor Belum Diekstrak</span>
                                 @endif
                             </div>
                         @endforeach
@@ -36,17 +30,7 @@
                     </div>
                 @endif
             </div>
-            <div class="modal-footer d-flex justify-content-between">
-                <div>
-                    @if ($siswa->faces->whereNull('embedding')->count() > 0)
-                        <form action="{{ route('admin.student.sync-face', $siswa->id) }}" method="POST" class="d-inline">
-                            @csrf
-                            <button type="submit" class="btn btn-primary btn-sm">
-                                <i class="icon-base bx bx-scan me-1"></i> Ekstrak Semua Vektor Siswa Ini
-                            </button>
-                        </form>
-                    @endif
-                </div>
+            <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
             </div>
         </div>

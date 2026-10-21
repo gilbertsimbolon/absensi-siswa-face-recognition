@@ -69,8 +69,6 @@ Route::middleware(['auth', 'role:admin|teacher'])->prefix('admin')->group(functi
     // Route Data Siswa & Orang Tua (Admin & Guru Wali Kelas)
     Route::get('/data-siswa', [StudentController::class, 'index'])->name('admin.student.index');
     Route::post('/data-siswa', [StudentController::class, 'store'])->name('admin.student.store');
-    Route::post('/data-siswa/sync-all-faces', [StudentController::class, 'syncAllFaces'])->name('admin.student.sync-all-faces');
-    Route::post('/data-siswa/{student}/sync-face', [StudentController::class, 'syncFace'])->name('admin.student.sync-face');
     Route::put('/data-siswa/{student}', [StudentController::class, 'update'])->name('admin.student.update');
     Route::delete('/data-siswa/{student}', [StudentController::class, 'destroy'])->name('admin.student.destroy');
 

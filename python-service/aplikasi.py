@@ -22,7 +22,7 @@ from layanan_wajah import LayananWajah
 app = Flask(__name__)
 CORS(app)
 
-# Inisialisasi Layanan AI Wajah (DeepFace & FaceNet)
+# Inisialisasi Layanan Wajah (DeepFace & FaceNet)
 layanan = LayananWajah()
 
 def get_app_key_bytes():
@@ -118,10 +118,10 @@ def login_diperlukan(f):
 @app.route('/scanner', methods=['GET'])
 @app.route('/scanner/', methods=['GET'])
 def index():
-    """Endpoint root - informasi status layanan AI."""
+    """Endpoint root - informasi status layanan DeepFace."""
     return jsonify({
         "status": "aktif",
-        "layanan": "Layanan AI DeepFace FaceNet Presensi SMAN 2 Tondano",
+        "layanan": "Layanan DeepFace FaceNet Presensi SMAN 2 Tondano",
         "model": konfigurasi.MODEL_NAME,
         "total_wajah_terindeks": len(layanan.embeddings_db),
         "siap_digunakan": layanan.is_ready
@@ -130,7 +130,7 @@ def index():
 @app.route('/status-scanner', methods=['GET'])
 @app.route('/scanner/status-scanner', methods=['GET'])
 def status_scanner():
-    """Status ketersediaan AI scanner (kompatibilitas)."""
+    """Status ketersediaan pemindai wajah (kompatibilitas)."""
     return jsonify({
         "aktif": layanan.is_ready,
         "status_scanner": "standby",
@@ -140,10 +140,10 @@ def status_scanner():
 
 @app.route('/status', methods=['GET'])
 def status_ai():
-    """Cek kesehatan server AI (dipanggil secara internal oleh Laravel)."""
+    """Cek kesehatan server pemindai (dipanggil secara internal oleh Laravel)."""
     return jsonify({
         "status": "aktif",
-        "layanan": "Layanan AI DeepFace & OpenCV Presensi SMAN 2 Tondano",
+        "layanan": "Layanan DeepFace & OpenCV Presensi SMAN 2 Tondano",
         "model": konfigurasi.MODEL_NAME,
         "total_wajah_terindeks": len(layanan.embeddings_db),
         "siap_digunakan": layanan.is_ready
@@ -218,7 +218,7 @@ def update_konfigurasi_api():
 
 if __name__ == '__main__':
     print("====================================================")
-    print("  Server AI DeepFace Presensi Wajah SMAN 2 Tondano")
+    print("  Server DeepFace FaceNet Presensi Wajah SMAN 2 Tondano")
     print(f"  Berjalan di http://{konfigurasi.HOST}:{konfigurasi.PORT}")
     print("====================================================")
     try:

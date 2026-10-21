@@ -107,9 +107,9 @@
                         </div>
                     </div>
 
-                    <!-- Garis Pemisah Dataset Foto Wajah (AI Face Embedding) -->
+                    <!-- Garis Pemisah Foto Wajah (DeepFace FaceNet) -->
                     <div class="d-flex align-items-center mb-3 mt-2">
-                        <span class="text-uppercase small fw-semibold text-muted me-2">Foto Wajah Siswa Terdaftar (AI Face Embedding)</span>
+                        <span class="text-uppercase small fw-semibold text-muted me-2">Foto Wajah Siswa Terdaftar (DeepFace FaceNet)</span>
                         <hr class="flex-grow-1 m-0">
                     </div>
 
@@ -131,11 +131,6 @@
                             <i class="icon-base bx bx-error me-1"></i> Belum ada foto wajah terdaftar untuk siswa ini.
                         </div>
                     @endif
-
-                    <div class="alert alert-info py-2 px-3 small d-flex align-items-center mb-3">
-                        <i class="icon-base bx bx-info-circle me-2 fs-5"></i>
-                        <span><strong>AI Auto-Crop & Face Zoom:</strong> Unggah foto baru di bawah jika ingin memperbarui / menambahkan sampel foto wajah (otomatis dipotong & di-zoom ke wajah).</span>
-                    </div>
 
                     <div id="container-foto-ubah-{{ $siswa->id }}">
                         <div class="row align-items-center mb-2 item-foto-ubah">
