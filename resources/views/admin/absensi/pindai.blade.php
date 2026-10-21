@@ -726,36 +726,46 @@
             }
         }
 
-        // 5. Siklus Penangkapan Citra & Pengiriman ke Backend Python
+        // 5. Siklus Penangkapan Citra & Pengiriman ke Backend Python Secepat Kilat
         function mulaiSiklusPemindaian() {
-            if (loopIntervalId) clearInterval(loopIntervalId);
-            loopIntervalId = setInterval(tangkapDanProsesFrame, 800);
+            if (loopIntervalId) clearTimeout(loopIntervalId);
+            jadwalkanFrameBerikutnya(80);
+        }
+
+        function jadwalkanFrameBerikutnya(delayMs = 150) {
+            if (isCoolingDown) return;
+            if (loopIntervalId) clearTimeout(loopIntervalId);
+            loopIntervalId = setTimeout(tangkapDanProsesFrame, delayMs);
         }
 
         async function tangkapDanProsesFrame() {
             // Jangan memproses jika sedang ada request aktif, sedang jeda sukses, atau video belum siap
-            if (isProcessingFrame || isCoolingDown || !videoEl || videoEl.readyState !== 4) {
+            if (isProcessingFrame || isCoolingDown || !videoEl || videoEl.readyState < 2) {
+                if (!isCoolingDown) jadwalkanFrameBerikutnya(200);
                 return;
             }
 
             const videoW = videoEl.videoWidth;
             const videoH = videoEl.videoHeight;
-            if (!videoW || !videoH) return;
+            if (!videoW || !videoH) {
+                jadwalkanFrameBerikutnya(200);
+                return;
+            }
 
             isProcessingFrame = true;
 
             try {
-                // Skala frame citra optimal untuk pengiriman cepat ke backend (640x480)
-                const targetW = 640;
+                // Resolusi optimal 400px (~12-15 KB), sangat cepat dikirim (< 5 ms) dan diproses FaceNet instan
+                const targetW = 400;
                 const targetH = Math.round((videoH / videoW) * targetW);
                 canvasEl.width = targetW;
                 canvasEl.height = targetH;
 
-                const ctx = canvasEl.getContext('2d');
+                const ctx = canvasEl.getContext('2d', { willReadFrequently: true });
                 ctx.drawImage(videoEl, 0, 0, targetW, targetH);
 
-                // Ekstrak JPEG Base64
-                const base64Image = canvasEl.toDataURL('image/jpeg', 0.82);
+                // Ekstrak JPEG Base64 ringan
+                const base64Image = canvasEl.toDataURL('image/jpeg', 0.70);
 
                 // Kirim ke Laravel -> diteruskan ke Python DeepFace
                 const response = await fetch(prosesPindaiUrl, {
@@ -782,6 +792,9 @@
                 // Abaikan kesalahan koneksi sementara
             } finally {
                 isProcessingFrame = false;
+                if (!isCoolingDown) {
+                    jadwalkanFrameBerikutnya(150); // Scan berlanjut setiap 150ms untuk respons instan
+                }
             }
         }
 
@@ -795,8 +808,8 @@
                 const siswa = data.siswa || {};
                 const nowSec = Date.now() / 1000;
 
-                // Hindari duplikasi rekaman berulang untuk siswa yang sama berturut-turut dalam 10 detik
-                if (siswa.nisn === lastScannedNisn && (nowSec - lastScannedTime) < 10) {
+                // Hindari duplikasi rekaman berulang untuk siswa yang sama berturut-turut dalam 8 detik
+                if (siswa.nisn === lastScannedNisn && (nowSec - lastScannedTime) < 8) {
                     return;
                 }
 
@@ -886,13 +899,14 @@
             if (notifLive) notifLive.classList.add('d-none');
             if (notifSukses) notifSukses.classList.remove('d-none');
 
-            // Tampilkan kartu sukses selama 4.5 detik untuk siswa, lalu kembali ke standby
+            // Tampilkan kartu sukses selama 3.5 detik untuk siswa, lalu kembali ke standby & lanjut memindai instan
             cooldownTimer = setTimeout(() => {
                 isCoolingDown = false;
                 if (notifSukses) notifSukses.classList.add('d-none');
                 if (notifLive) notifLive.classList.remove('d-none');
                 perbaruiNotifLive('state-standby', '<i class="bx bx-scan"></i>', 'Arahkan Wajah ke Kamera', 'Posisikan wajah Anda di dalam frame untuk presensi otomatis');
-            }, 4500);
+                jadwalkanFrameBerikutnya(80);
+            }, 3500);
         }
 
         // Jalankan inisialisasi kamera saat halaman dimuat

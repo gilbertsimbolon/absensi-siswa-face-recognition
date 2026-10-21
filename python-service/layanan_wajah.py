@@ -463,17 +463,26 @@ class LayananWajah:
 
                 target_img = face_crop if (face_crop is not None and face_crop.size > 0 and face_crop.shape[0] > 20 and face_crop.shape[1] > 20) else frame
 
-                # Ambil embedding wajah utama dengan alignment OpenCV presisi (Thread-Safe)
+                # Ambil embedding wajah utama secepat kilat (skip detector karena sudah dicrop oleh YuNet)
                 try:
                     with self.model_lock:
                         representations = DeepFace.represent(
                             img_path=target_img,
                             model_name=self.model_name,
-                            detector_backend="opencv",
+                            detector_backend="skip",
                             enforce_detection=False
                         )
                 except Exception:
-                    representations = []
+                    try:
+                        with self.model_lock:
+                            representations = DeepFace.represent(
+                                img_path=target_img,
+                                model_name=self.model_name,
+                                detector_backend="opencv",
+                                enforce_detection=False
+                            )
+                    except Exception:
+                        representations = []
 
                 if representations and len(representations) > 0:
                     query_emb = np.array(representations[0]["embedding"], dtype=np.float32)
@@ -598,9 +607,8 @@ class LayananWajah:
                     "status": status_box
                 }
 
-            # 5. Encode kembali frame OpenCV ke JPEG Base64
-            _, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
-            frame_base64 = "data:image/jpeg;base64," + base64.b64encode(buffer).decode('utf-8')
+            # 5. Hindari encoding ulang JPEG yang memakan waktu CPU (browser sudah memiliki feed video native)
+            frame_base64 = None
 
             return {
                 "status": hasil_pencocokan.get("status", "ok") if hasil_pencocokan else "ok",
