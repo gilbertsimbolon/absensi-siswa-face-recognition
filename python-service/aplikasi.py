@@ -221,7 +221,13 @@ if __name__ == '__main__':
     print("  Server AI DeepFace Presensi Wajah SMAN 2 Tondano")
     print(f"  Berjalan di http://{konfigurasi.HOST}:{konfigurasi.PORT}")
     print("====================================================")
-    layanan.inisialisasi()
+    try:
+        layanan.inisialisasi()
+    except Exception as e_init:
+        print(f"[!] Warning saat inisialisasi model: {e_init}")
+        import traceback
+        traceback.print_exc()
+
     try:
         app.run(host=konfigurasi.HOST, port=konfigurasi.PORT, debug=False, threaded=True)
     except BaseException as e:

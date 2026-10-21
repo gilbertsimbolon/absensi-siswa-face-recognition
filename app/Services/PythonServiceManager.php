@@ -65,25 +65,35 @@ class PythonServiceManager
     public static function isRunning(): bool
     {
         $baseUrl = self::getBaseUrl();
-        $parsed = parse_url($baseUrl);
-        $host = $parsed['host'] ?? '127.0.0.1';
-        $port = (int) ($parsed['port'] ?? 5000);
 
-        // 1. Uji koneksi soket cepat (timeout 0.3 detik)
-        $connection = @fsockopen($host, $port, $errorCode, $errorMessage, 0.3);
-        if (! is_resource($connection)) {
-            return false;
-        }
-        fclose($connection);
-
-        // 2. Verifikasi endpoint status
+        // 1. Verifikasi langsung endpoint status dengan toleransi waktu wajar (2.5 detik)
         try {
-            $response = Http::timeout(1)->get("{$baseUrl}/status");
+            $response = Http::timeout(2.5)->get("{$baseUrl}/status");
 
-            return $response->successful() && ($response->json('status') === 'aktif');
+            if ($response->successful() && ($response->json('status') === 'aktif')) {
+                return true;
+            }
         } catch (\Throwable $e) {
-            return false;
+            // Jika gagal HTTP, coba uji soket fallback
         }
+
+        // 2. Uji koneksi soket TCP fallback (timeout 1.0 detik)
+        try {
+            $parsed = parse_url($baseUrl);
+            $host = $parsed['host'] ?? '127.0.0.1';
+            $port = (int) ($parsed['port'] ?? 5000);
+
+            $connection = @fsockopen($host, $port, $errorCode, $errorMessage, 1.0);
+            if (is_resource($connection)) {
+                fclose($connection);
+
+                return true;
+            }
+        } catch (\Throwable $e) {
+            // Ignore
+        }
+
+        return false;
     }
 
     /**
