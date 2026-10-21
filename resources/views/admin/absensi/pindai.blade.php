@@ -755,7 +755,7 @@
 
             const st = data.status;
 
-            if (st === 'sukses' || st === 'sudah_absen') {
+            if (st === 'sukses' || st === 'sudah_absen' || st === 'diluar_waktu') {
                 const siswa = data.siswa || {};
                 const nowSec = Date.now() / 1000;
 

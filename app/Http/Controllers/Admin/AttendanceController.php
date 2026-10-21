@@ -835,6 +835,13 @@ class AttendanceController extends Controller
                             'wajah' => null,
                             'frame_annotated' => $frameAnnotated,
                         ], 200);
+                    } elseif (($hasil['status'] ?? '') === 'gagal_akurasi' || ($aiData['status'] ?? '') === 'gagal_akurasi') {
+                        return response()->json([
+                            'status' => 'gagal_akurasi',
+                            'pesan' => $hasil['pesan'] ?? 'Akurasi wajah di bawah batas minimum.',
+                            'wajah' => $wajah,
+                            'frame_annotated' => $frameAnnotated,
+                        ], 200);
                     } else {
                         return response()->json([
                             'status' => 'tidak_dikenali',

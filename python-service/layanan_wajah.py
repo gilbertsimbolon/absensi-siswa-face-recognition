@@ -563,8 +563,23 @@ class LayananWajah:
                                 status=status_scan, 
                                 skor=persentase_skor
                             )
+                        elif min_dist <= self.threshold:
+                            # Terdeteksi siswa terdaftar, tetapi skor akurasi di bawah batas minimum
+                            hasil_pencocokan = {
+                                "status": "gagal_akurasi",
+                                "pesan": f"Kemiripan wajah terdeteksi ({persentase_skor}), namun di bawah batas minimum ({min_acc:.0f}%). Harap hadap kamera lebih tegak dan jelas.",
+                                "nisn": nisn,
+                                "nama": nama_siswa,
+                                "akurasi": persentase_skor
+                            }
+                            self.gambar_bounding_box_opencv(
+                                frame, x, y, w, h, 
+                                label_text=f"{nama_siswa} ({persentase_skor})", 
+                                status="gagal_akurasi", 
+                                skor=persentase_skor
+                            )
                         else:
-                            # Wajah Tidak Dikenal / Belum Terdaftar
+                            # Benar-benar tidak terdaftar sama sekali
                             hasil_pencocokan = {
                                 "status": "tidak_dikenali",
                                 "pesan": "Data belum terdaftar. Silahkan hubungi administrator."
