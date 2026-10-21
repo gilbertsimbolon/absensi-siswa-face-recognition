@@ -8,7 +8,6 @@ use App\Models\TeacherFace;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 
@@ -155,13 +154,7 @@ class TeacherController extends Controller
             Storage::disk('public')->deleteDirectory($storagePath);
         }
 
-        // 3. Hapus folder dataset siswa/guru di python-service jika ada
-        $pythonDatasetPath = base_path('python-service/dataset/'.$teacher->nip);
-        if (File::exists($pythonDatasetPath)) {
-            File::deleteDirectory($pythonDatasetPath);
-        }
-
-        // 4. Hapus record relasi teacher_faces
+        // 3. Hapus record relasi teacher_faces
         $teacher->faces()->delete();
 
         // 5. Hapus teacher dan user akun
@@ -177,7 +170,7 @@ class TeacherController extends Controller
     }
 
     /**
-     * Helper penyimpanan foto wajah guru ke storage public dan sinkronisasi ke python-service/dataset.
+     * Helper penyimpanan foto wajah guru ke storage public (teacher_faces/{nip}).
      */
     private function saveTeacherPhotos(Request $request, Teacher $teacher, bool $isUpdate = false): void
     {
@@ -187,21 +180,11 @@ class TeacherController extends Controller
             'photo_kiri' => 'Serong Kiri',
         ];
 
-        // Folder tujuan sinkronisasi DeepFace Python
-        $pythonDatasetDir = base_path('python-service/dataset/'.$teacher->nip);
-        if (! File::exists($pythonDatasetDir)) {
-            File::makeDirectory($pythonDatasetDir, 0755, true);
-        }
-
         foreach ($photoInputs as $inputKey => $label) {
             if ($request->hasFile($inputKey)) {
                 $file = $request->file($inputKey);
                 $fileName = time().'_'.$inputKey.'.'.$file->getClientOriginalExtension();
                 $path = $file->storeAs('teacher_faces/'.$teacher->nip, $fileName, 'public');
-
-                // Salin ke folder dataset Python DeepFace
-                $pythonFilePath = $pythonDatasetDir.'/'.$fileName;
-                File::copy(storage_path('app/public/'.$path), $pythonFilePath);
 
                 if ($isUpdate) {
                     $existingFace = TeacherFace::where('teacher_id', $teacher->id)->where('label', $label)->first();

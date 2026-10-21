@@ -212,12 +212,6 @@ class StudentController extends Controller
             Storage::disk('public')->deleteDirectory($storagePath);
         }
 
-        // 3. Hapus folder dataset siswa di python-service jika ada
-        $pythonDatasetPath = base_path('python-service/dataset/'.$student->nisn);
-        if (File::exists($pythonDatasetPath)) {
-            File::deleteDirectory($pythonDatasetPath);
-        }
-
         // Hapus embedding di memori dan cache Python DeepFace FaceNet
         try {
             $pythonUrl = config('services.deepface.base_url', 'http://127.0.0.1:5000').'/hapus-siswa/'.$student->nisn;
@@ -236,7 +230,7 @@ class StudentController extends Controller
     }
 
     /**
-     * Helper penyimpanan foto ke storage public dan sinkronisasi ke python-service/dataset.
+     * Helper penyimpanan foto ke storage public (faces/{nisn}) dan ekstraksi embedding di microservice Python.
      */
     private function saveStudentPhotos(Request $request, Student $student, bool $isUpdate = false): void
     {
@@ -258,12 +252,6 @@ class StudentController extends Controller
             return;
         }
 
-        // Folder tujuan sinkronisasi DeepFace Python
-        $pythonDatasetDir = base_path('python-service/dataset/'.$student->nisn);
-        if (! File::exists($pythonDatasetDir)) {
-            File::makeDirectory($pythonDatasetDir, 0755, true);
-        }
-
         foreach ($uploadedFiles as $idx => $file) {
             if (! $file || ! $file->isValid()) {
                 continue;
@@ -271,13 +259,6 @@ class StudentController extends Controller
 
             $fileName = time().'_'.($idx + 1).'_'.uniqid().'.'.$file->getClientOriginalExtension();
             $path = $file->storeAs('faces/'.$student->nisn, $fileName, 'public');
-
-            // Salin juga langsung ke folder dataset Python DeepFace jika berkas tersedia di storage disk
-            $pythonFilePath = $pythonDatasetDir.'/'.$fileName;
-            $realSourcePath = Storage::disk('public')->path($path);
-            if (File::exists($realSourcePath)) {
-                File::copy($realSourcePath, $pythonFilePath);
-            }
 
             StudentFace::create([
                 'student_id' => $student->id,

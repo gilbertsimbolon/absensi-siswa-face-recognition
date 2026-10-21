@@ -34,10 +34,22 @@ if not os.path.exists(YUNET_MODEL_PATH):
 # Untuk model Facenet dengan metrik cosine pada webcam beragam pencahayaan: 0.78
 THRESHOLD = float(os.getenv('FACE_THRESHOLD', 0.78))
 
-# Path Dataset Wajah
-# Prioritaskan folder dataset internal python-service, jika tidak ada gunakan storage/app/public/faces
-DATASET_PATH = os.path.abspath(os.path.join(BASE_DIR, 'dataset'))
-STORAGE_FACES_PATH = os.path.abspath(os.path.join(BASE_DIR, '..', 'storage', 'app', 'public', 'faces'))
+# Path Penyimpanan Foto Wajah Laravel Storage (Single Source of Truth via php artisan storage:link)
+# Seluruh foto disimpan murni di Laravel storage/app/public/faces, tanpa duplikasi di python
+STORAGE_FACES_PATH = os.path.abspath(os.path.join(ROOT_DIR, 'storage', 'app', 'public', 'faces'))
+if not os.path.exists(STORAGE_FACES_PATH):
+    # Fallback symlink public/storage/faces
+    STORAGE_FACES_PATH = os.path.abspath(os.path.join(ROOT_DIR, 'public', 'storage', 'faces'))
+
+# Pastikan folder target selalu terdefinisi
+if not os.path.exists(STORAGE_FACES_PATH):
+    try:
+        os.makedirs(STORAGE_FACES_PATH, exist_ok=True)
+    except Exception:
+        pass
+
+# DATASET_PATH diarahkan langsung ke STORAGE_FACES_PATH agar tidak ada duplikasi berkas
+DATASET_PATH = STORAGE_FACES_PATH
 
 # Penyimpanan Embeddings: Database MySQL (tabel student_faces) sebagai Single Source of Truth
 CACHE_EMBEDDINGS_FILE = None

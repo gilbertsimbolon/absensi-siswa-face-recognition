@@ -46,8 +46,8 @@ class LayananWajah:
         self.model_name = konfigurasi.MODEL_NAME
         self.detector_backend = konfigurasi.DETECTOR_BACKEND
         self.threshold = konfigurasi.THRESHOLD
-        self.dataset_path = konfigurasi.DATASET_PATH
         self.storage_path = konfigurasi.STORAGE_FACES_PATH
+        self.dataset_path = self.storage_path
         raw_laravel_url = getattr(konfigurasi, 'LARAVEL_BASE_URL', None) or os.getenv('LARAVEL_BASE_URL') or os.getenv('APP_URL', 'http://127.0.0.1:8000')
         self.laravel_api_url = str(raw_laravel_url).rstrip('/')
         
@@ -263,8 +263,6 @@ class LayananWajah:
         self.embeddings_db = []
         
         folders_to_scan = []
-        if os.path.exists(self.dataset_path):
-            folders_to_scan.append(self.dataset_path)
         if os.path.exists(self.storage_path):
             folders_to_scan.append(self.storage_path)
 
@@ -679,8 +677,6 @@ class LayananWajah:
     def sinkronisasi_dataset_baru(self):
         """Memeriksa folder dataset di disk dan mengekstrak wajah baru yang belum ada di cache FaceNet."""
         folders_to_scan = []
-        if os.path.exists(self.dataset_path):
-            folders_to_scan.append(self.dataset_path)
         if os.path.exists(self.storage_path):
             folders_to_scan.append(self.storage_path)
 
@@ -766,26 +762,21 @@ class LayananWajah:
         Dipanggil otomatis oleh Laravel saat Admin menambah atau memperbarui foto siswa.
         """
         nisn = str(nisn).strip()
-        folder_siswa = os.path.join(self.dataset_path, nisn)
-        if not os.path.exists(folder_siswa):
-            folder_siswa = os.path.join(self.storage_path, nisn)
+        folder_siswa = os.path.join(self.storage_path, nisn)
 
         if not os.path.exists(folder_siswa) or not os.path.isdir(folder_siswa):
-            return {"status": "error", "pesan": f"Folder dataset untuk NISN {nisn} tidak ditemukan."}
+            return {"status": "error", "pesan": f"Folder foto untuk NISN {nisn} tidak ditemukan di storage."}
 
         foto_files = [f for f in os.listdir(folder_siswa) if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
         if not foto_files:
-            return {"status": "error", "pesan": f"Tidak ada berkas foto di folder dataset NISN {nisn}."}
+            return {"status": "error", "pesan": f"Tidak ada berkas foto di folder storage NISN {nisn}."}
 
         new_embeddings = []
         for file_name in foto_files:
             img_path = os.path.join(folder_siswa, file_name)
-            storage_img_path = os.path.join(self.storage_path, nisn, file_name)
 
-            # Terapkan teknik auto-crop & zoom wajah (baik pada folder dataset maupun storage publik)
+            # Terapkan teknik auto-crop & zoom wajah langsung pada berkas foto di storage publik
             self.potong_dan_zoom_wajah(img_path)
-            if os.path.exists(storage_img_path):
-                self.potong_dan_zoom_wajah(storage_img_path)
 
             try:
                 with self.model_lock:
