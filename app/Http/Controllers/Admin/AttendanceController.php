@@ -815,6 +815,11 @@ class AttendanceController extends Controller
         if (! $nisn && $gambarBase64) {
             try {
                 $pythonUrl = config('services.deepface.url', 'http://127.0.0.1:5000/proses-frame');
+
+                if (! PythonServiceManager::isRunning()) {
+                    PythonServiceManager::startService();
+                }
+
                 $response = Http::timeout(8)->post($pythonUrl, [
                     'gambar' => $gambarBase64,
                 ]);

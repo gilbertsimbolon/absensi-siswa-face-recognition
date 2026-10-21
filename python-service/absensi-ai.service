@@ -1,0 +1,18 @@
+[Unit]
+Description=Layanan AI Face Recognition Presensi Siswa (SMAN 2 Tondano)
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/var/www/absensi-siswa/python-service
+ExecStart=/var/www/absensi-siswa/python-service/venv/bin/python aplikasi.py
+Restart=always
+RestartSec=5
+StandardOutput=append:/var/log/absensi-ai.log
+StandardError=append:/var/log/absensi-ai-error.log
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
+
