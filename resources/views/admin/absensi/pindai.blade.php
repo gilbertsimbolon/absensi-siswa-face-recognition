@@ -5,11 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pindai Wajah Presensi Otomatis - SMAN 2 Tondano</title>
 
-    @if(! ($pythonStatus['online'] ?? false))
-        <!-- Muat ulang otomatis saat kamera sedang disiapkan -->
-        <meta http-equiv="refresh" content="5">
-    @endif
-
     <!-- Bootstrap 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Boxicons -->
@@ -485,34 +480,27 @@
         <!-- 1 Frame Kamera Presensi -->
         <div class="camera-container">
 
-            @if($pythonStatus['online'] ?? false)
-                <!-- Tampilan Kamera OpenCV Python Native -->
-                <img id="opencv-feed" 
-                     src="{{ $streamUrl ?? '/scanner/video_feed' }}" 
-                     alt="Kamera Presensi Siswa" 
-                     class="video-feed">
+            <!-- Video Kamera Klien (Webcam / Kamera HP) -->
+            <video id="webcam-video" 
+                   autoplay 
+                   playsinline 
+                   muted 
+                   class="video-feed"
+                   style="transform: scaleX(-1);">
+            </video>
+            <canvas id="capture-canvas" class="d-none"></canvas>
 
-                <!-- Video Kamera Klien (Fallback tersembunyi) -->
-                <video id="webcam-video" 
-                       autoplay 
-                       playsinline 
-                       muted 
-                       class="video-feed d-none"
-                       style="transform: scaleX(-1);">
-                </video>
-            @else
-                <!-- Tampilan Saat Kamera Tidak Aktif -->
-                <div class="offline-box">
-                    <i class="bx bx-camera-off offline-icon"></i>
-                    <div class="offline-title">Kamera Sedang Tidak Aktif</div>
-                    <div class="offline-desc">
-                        Layanan kamera belum dijalankan di komputer sekolah.
-                    </div>
-                    <a href="{{ url()->current() }}" class="btn-segarkan">
-                        <i class="bx bx-refresh"></i> Segarkan Halaman
-                    </a>
+            <!-- Tampilan Saat Kamera Tidak Aktif / Akses Ditolak -->
+            <div class="offline-box d-none" id="camera-offline-box">
+                <i class="bx bx-camera-off offline-icon"></i>
+                <div class="offline-title" id="camera-offline-title">Kamera Belum Aktif</div>
+                <div class="offline-desc" id="camera-offline-desc">
+                    Pastikan Anda telah memberikan izin akses kamera di peramban (browser) Anda.
                 </div>
-            @endif
+                <button type="button" class="btn-segarkan" onclick="mulaiKamera()">
+                    <i class="bx bx-refresh"></i> Aktifkan Kamera
+                </button>
+            </div>
 
             <!-- Kartu Detail Informasi Presensi Siswa di Bawah Frame Kamera -->
             <div class="notification-overlay text-center" id="notif-container">
@@ -552,43 +540,33 @@
             <div class="camera-options">
                 <span class="camera-options-label"><i class="bx bx-camera me-1"></i> Pilihan Kamera:</span>
 
-                <form method="POST" action="{{ route('admin.attendance.pindai.kamera') }}" class="d-inline">
-                    @csrf
-                    <input type="hidden" name="sumber" value="0">
-                    <button type="submit" class="btn-kamera-pilihan {{ ($pythonStatus['camera_source'] ?? 0) === 0 || ($pythonStatus['camera_source'] ?? 0) === '0' ? 'active' : '' }}">
-                        <i class="bx bx-video me-1"></i> Kamera 1 (Internal)
-                    </button>
-                </form>
+                <button type="button" id="btn-cam-user" class="btn-kamera-pilihan active" onclick="setKameraFacing('user')">
+                    <i class="bx bx-user me-1"></i> Kamera Depan
+                </button>
 
-                <form method="POST" action="{{ route('admin.attendance.pindai.kamera') }}" class="d-inline">
-                    @csrf
-                    <input type="hidden" name="sumber" value="1">
-                    <button type="submit" class="btn-kamera-pilihan {{ ($pythonStatus['camera_source'] ?? null) === 1 || ($pythonStatus['camera_source'] ?? null) === '1' ? 'active' : '' }}">
-                        <i class="bx bx-video-recording me-1"></i> Kamera 2 (Eksternal)
-                    </button>
-                </form>
+                <button type="button" id="btn-cam-env" class="btn-kamera-pilihan" onclick="setKameraFacing('environment')">
+                    <i class="bx bx-camera me-1"></i> Kamera Belakang
+                </button>
 
-                <button type="button" 
-                        class="btn-kamera-pilihan {{ !is_numeric($pythonStatus['camera_source'] ?? 0) && !empty($pythonStatus['camera_source']) ? 'active' : '' }}" 
-                        style="background: #e0f2fe; color: #0369a1; border-color: #bae6fd;"
-                        onclick="dialogAturIpKamera()"
-                        title="Atur URL Streaming IP Kamera / CCTV (RTSP atau HTTP)">
-                    <i class="bx bx-cctv me-1"></i> IP Kamera / CCTV
+                <button type="button" class="btn-kamera-pilihan" onclick="toggleKamera()" title="Ganti Kamera">
+                    <i class="bx bx-refresh me-1"></i> Putar Kamera
                 </button>
             </div>
             <div class="d-flex align-items-center gap-2">
-                <span class="badge {{ ($pythonStatus['online'] ?? false) ? 'bg-success bg-opacity-10 text-success border border-success border-opacity-25' : 'bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25' }} py-1 px-2" style="font-size: 11px;">
-                    <i class="bx {{ ($pythonStatus['online'] ?? false) ? 'bx-broadcast' : 'bx-x-circle' }} me-1"></i>
-                    {{ ($pythonStatus['online'] ?? false) ? 'Python OpenCV Live' : 'Server Offline' }}
+                <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 py-1 px-2" style="font-size: 11px;" id="badge-status-kamera">
+                    <i class="bx bx-video me-1"></i> Kamera Aktif
+                </span>
+                <span class="badge {{ ($pythonStatus['online'] ?? false) ? 'bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25' : 'bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25' }} py-1 px-2" style="font-size: 11px;" id="badge-status-ai">
+                    <i class="bx bx-chip me-1"></i> {{ ($pythonStatus['online'] ?? false) ? 'AI DeepFace Siap' : 'AI Backend Standby' }}
                 </span>
             </div>
         </div>
 
     </div>
 
-    <!-- Script Jam Digital & Pembaruan Status Detail Presensi Real-Time -->
+    <!-- Script Jam Digital, Kamera HTML5 & Penangkapan Frame Citra ke AI Python -->
     <script>
-        // Jam Digital
+        // 1. Jam Digital
         setInterval(() => {
             const now = new Date();
             const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WITA';
@@ -596,11 +574,12 @@
             if (el) el.textContent = timeStr;
         }, 1000);
 
-        const statusPollUrl = "{{ $statusPollUrl ?? 'http://127.0.0.1:5000/status-scanner' }}";
-        let lastResultKey = '';
-        let lastScanId = -1;
-        let hideNotifTimer = null;
-        let isShowingSuccess = false;
+        // 2. Elemen DOM
+        const videoEl = document.getElementById('webcam-video');
+        const canvasEl = document.getElementById('capture-canvas');
+        const offlineBox = document.getElementById('camera-offline-box');
+        const offlineTitle = document.getElementById('camera-offline-title');
+        const offlineDesc = document.getElementById('camera-offline-desc');
 
         const notifLive = document.getElementById('notif-live');
         const liveIconBox = document.getElementById('live-icon-box');
@@ -612,97 +591,248 @@
         const notifDetail = document.getElementById('notif-detail');
         const notifStatusBadge = document.getElementById('notif-status-badge');
         const notifJam = document.getElementById('notif-jam');
+        const notifIconBox = document.getElementById('notif-icon-box');
 
-        let isPolling = false;
+        const btnCamUser = document.getElementById('btn-cam-user');
+        const btnCamEnv = document.getElementById('btn-cam-env');
+        const badgeStatusKamera = document.getElementById('badge-status-kamera');
 
-        async function periksaStatusAbsensi() {
-            if (isPolling) return;
-            isPolling = true;
+        const prosesPindaiUrl = "{{ route('admin.attendance.proses-pindai') }}";
+        const csrfToken = "{{ csrf_token() }}";
 
+        let currentStream = null;
+        let currentFacingMode = 'user'; // 'user' (depan) atau 'environment' (belakang)
+        let isProcessingFrame = false;
+        let isCoolingDown = false;
+        let cooldownTimer = null;
+        let loopIntervalId = null;
+        let lastScannedNisn = '';
+        let lastScannedTime = 0;
+
+        // 3. Audio Chime (Web Audio API Synthesizer - Ringan & Tanpa File Eksternal)
+        function playChime(isSuccess = true) {
             try {
-                const res = await fetch(statusPollUrl, { cache: 'no-store' });
-                if (res.ok) {
-                    const data = await res.json();
-                    const h = data.latest_result || data.hasil_terakhir;
-
-                    // 1. Cek apakah ada hasil presensi siswa yang sukses / tercatat
-                    if (h && (h.status === 'sukses' || h.status === 'sudah_absen' || h.status === 'diluar_waktu' || h.status === 'alpa')) {
-                        const scanId = h.scan_id !== undefined ? h.scan_id : 0;
-                        const key = `${scanId}_${h.timestamp || ''}_${h.nisn || ''}_${h.status_absen || ''}`;
-                        if (key !== lastResultKey) {
-                            lastResultKey = key;
-                            lastScanId = scanId;
-                            tampilkanDetailPresensi(h);
-                        }
-                    }
-
-                    // 2. Jika tidak sedang menampilkan kartu sukses, perbarui status alert pemindaian secara real-time
-                    if (!isShowingSuccess) {
-                        perbaruiStatusLive(data);
-                    }
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (!AudioContext) return;
+                const ctx = new AudioContext();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                
+                if (isSuccess) {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+                    osc.frequency.setValueAtTime(880, ctx.currentTime + 0.12); // A5
+                    gain.gain.setValueAtTime(0.25, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
+                    osc.start(ctx.currentTime);
+                    osc.stop(ctx.currentTime + 0.4);
+                } else {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(320, ctx.currentTime);
+                    gain.gain.setValueAtTime(0.2, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.25);
+                    osc.start(ctx.currentTime);
+                    osc.stop(ctx.currentTime + 0.25);
                 }
-            } catch (err) {
-                // Abaikan kesalahan koneksi sesaat
-            } finally {
-                isPolling = false;
-                setTimeout(periksaStatusAbsensi, 250);
+            } catch (e) {
+                // Abaikan jika audio tidak didukung
             }
         }
 
-        // Jalankan polling loop pertama
-        periksaStatusAbsensi();
+        // 4. Inisialisasi Kamera Klien (WebRTC getUserMedia)
+        async function mulaiKamera() {
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => track.stop());
+                currentStream = null;
+            }
 
-        function perbaruiStatusLive(data) {
-            if (!notifLive || isShowingSuccess) return;
-
-            const st = data.status_scanner || 'standby';
-            const pesan = data.pesan_scanner || 'Arahkan Wajah ke Kamera';
-            const detail = data.detail_scanner || 'Posisikan wajah Anda di dalam frame untuk presensi otomatis';
-
-            let stateClass = 'state-standby';
-            let iconHtml = '<i class="bx bx-scan"></i>';
-
-            if (st === 'memproses') {
-                stateClass = 'state-memproses';
-                iconHtml = '<i class="bx bx-loader-alt bx-spin"></i>';
-            } else if (st === 'memproses_lama') {
-                stateClass = 'state-memproses-lama';
-                iconHtml = '<i class="bx bx-time-five bx-tada"></i>';
-            } else if (st === 'gagal_akurasi') {
-                stateClass = 'state-gagal-akurasi';
-                iconHtml = '<i class="bx bx-error-circle bx-burst"></i>';
-            } else if (st === 'tidak_dikenali') {
-                stateClass = 'state-tidak-dikenali';
-                iconHtml = '<i class="bx bx-user-x"></i>';
-            } else if (st === 'peringatan') {
-                stateClass = 'state-peringatan';
-                iconHtml = '<i class="bx bx-zoom-in"></i>';
-            } else if (st === 'sukses') {
-                // Biarkan kartu sukses yang menanganinya
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                tampilkanErrorKamera("Browser Tidak Mendukung", "Browser Anda tidak mendukung akses kamera HTML5 atau koneksi tidak menggunakan HTTPS.");
                 return;
             }
 
+            try {
+                offlineBox.classList.add('d-none');
+                videoEl.classList.remove('d-none');
+
+                const constraints = {
+                    audio: false,
+                    video: {
+                        facingMode: { ideal: currentFacingMode },
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    }
+                };
+
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                currentStream = stream;
+                videoEl.srcObject = stream;
+
+                // Cermin video jika kamera depan, normal jika kamera belakang
+                videoEl.style.transform = (currentFacingMode === 'user') ? 'scaleX(-1)' : 'none';
+
+                videoEl.onloadedmetadata = () => {
+                    videoEl.play();
+                    perbaruiTombolKamera();
+                    mulaiSiklusPemindaian();
+                };
+
+                if (badgeStatusKamera) {
+                    badgeStatusKamera.innerHTML = '<i class="bx bx-video me-1"></i> Kamera Aktif';
+                    badgeStatusKamera.className = 'badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 py-1 px-2';
+                }
+            } catch (err) {
+                console.error("Gagal membuka kamera:", err);
+                let pesan = "Pastikan izin akses kamera diberikan pada peramban Anda.";
+                if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+                    pesan = "Akses kamera ditolak oleh pengguna atau browser. Harap izinkan akses kamera di ikon gembok bilah URL.";
+                } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+                    pesan = "Kamera tidak ditemukan pada perangkat Anda.";
+                }
+                tampilkanErrorKamera("Izin Kamera Diperlukan", pesan);
+            }
+        }
+
+        function tampilkanErrorKamera(judul, desc) {
+            videoEl.classList.add('d-none');
+            offlineBox.classList.remove('d-none');
+            if (offlineTitle) offlineTitle.textContent = judul;
+            if (offlineDesc) offlineDesc.textContent = desc;
+            if (badgeStatusKamera) {
+                badgeStatusKamera.innerHTML = '<i class="bx bx-video-off me-1"></i> Kamera Terhenti';
+                badgeStatusKamera.className = 'badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 py-1 px-2';
+            }
+        }
+
+        function setKameraFacing(mode) {
+            if (currentFacingMode === mode) return;
+            currentFacingMode = mode;
+            mulaiKamera();
+        }
+
+        function toggleKamera() {
+            currentFacingMode = (currentFacingMode === 'user') ? 'environment' : 'user';
+            mulaiKamera();
+        }
+
+        function perbaruiTombolKamera() {
+            if (btnCamUser) {
+                btnCamUser.classList.toggle('active', currentFacingMode === 'user');
+            }
+            if (btnCamEnv) {
+                btnCamEnv.classList.toggle('active', currentFacingMode === 'environment');
+            }
+        }
+
+        // 5. Siklus Penangkapan Citra & Pengiriman ke Backend Python
+        function mulaiSiklusPemindaian() {
+            if (loopIntervalId) clearInterval(loopIntervalId);
+            loopIntervalId = setInterval(tangkapDanProsesFrame, 800);
+        }
+
+        async function tangkapDanProsesFrame() {
+            // Jangan memproses jika sedang ada request aktif, sedang jeda sukses, atau video belum siap
+            if (isProcessingFrame || isCoolingDown || !videoEl || videoEl.readyState !== 4) {
+                return;
+            }
+
+            const videoW = videoEl.videoWidth;
+            const videoH = videoEl.videoHeight;
+            if (!videoW || !videoH) return;
+
+            isProcessingFrame = true;
+
+            try {
+                // Skala frame citra optimal untuk pengiriman cepat ke backend (640x480)
+                const targetW = 640;
+                const targetH = Math.round((videoH / videoW) * targetW);
+                canvasEl.width = targetW;
+                canvasEl.height = targetH;
+
+                const ctx = canvasEl.getContext('2d');
+                ctx.drawImage(videoEl, 0, 0, targetW, targetH);
+
+                // Ekstrak JPEG Base64
+                const base64Image = canvasEl.toDataURL('image/jpeg', 0.82);
+
+                // Kirim ke Laravel -> diteruskan ke Python DeepFace
+                const response = await fetch(prosesPindaiUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken
+                    },
+                    body: JSON.stringify({
+                        gambar: base64Image
+                    })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    tanganiResponPresensi(data);
+                } else {
+                    if (response.status === 502 || response.status === 503) {
+                        perbaruiNotifLive('state-peringatan', '<i class="bx bx-chip bx-spin"></i>', 'Server AI Sedang Memuat', 'Menghubungkan ke layanan FaceNet di server...');
+                    }
+                }
+            } catch (err) {
+                // Abaikan kesalahan koneksi sementara
+            } finally {
+                isProcessingFrame = false;
+            }
+        }
+
+        // 6. Tangani Respon Backend
+        function tanganiResponPresensi(data) {
+            if (isCoolingDown) return;
+
+            const st = data.status;
+
+            if (st === 'sukses' || st === 'sudah_absen') {
+                const siswa = data.siswa || {};
+                const nowSec = Date.now() / 1000;
+
+                // Hindari duplikasi rekaman berulang untuk siswa yang sama berturut-turut dalam 10 detik
+                if (siswa.nisn === lastScannedNisn && (nowSec - lastScannedTime) < 10) {
+                    return;
+                }
+
+                lastScannedNisn = siswa.nisn;
+                lastScannedTime = nowSec;
+
+                playChime(true);
+                tampilkanDetailSukses(siswa, st, data.pesan);
+            } else if (st === 'tidak_ada_wajah') {
+                perbaruiNotifLive('state-standby', '<i class="bx bx-scan"></i>', 'Arahkan Wajah ke Kamera', 'Posisikan wajah Anda di dalam frame untuk presensi otomatis');
+            } else if (st === 'tidak_dikenali') {
+                perbaruiNotifLive('state-tidak-dikenali', '<i class="bx bx-user-x"></i>', 'Wajah Belum Terdaftar', data.pesan || 'Wajah tidak cocok dengan data siswa terdaftar');
+            } else if (st === 'gagal_akurasi') {
+                perbaruiNotifLive('state-gagal-akurasi', '<i class="bx bx-error-circle"></i>', 'Akurasi Wajah Kurang', data.pesan || 'Posisikan wajah lebih jelas tegak lurus ke kamera');
+            }
+        }
+
+        function perbaruiNotifLive(stateClass, iconHtml, title, desc) {
+            if (!notifLive || isCoolingDown) return;
             notifLive.className = 'notif-live ' + stateClass;
             if (liveIconBox) liveIconBox.innerHTML = iconHtml;
-            if (liveTitle) liveTitle.textContent = pesan;
-            if (liveDesc) liveDesc.textContent = detail;
+            if (liveTitle) liveTitle.textContent = title;
+            if (liveDesc) liveDesc.textContent = desc;
 
             notifLive.classList.remove('d-none');
             if (notifSukses) notifSukses.classList.add('d-none');
         }
 
-        function tampilkanDetailPresensi(h) {
-            if (hideNotifTimer) clearTimeout(hideNotifTimer);
-            isShowingSuccess = true;
+        function tampilkanDetailSukses(siswa, statusKode, pesanCustom) {
+            if (cooldownTimer) clearTimeout(cooldownTimer);
+            isCoolingDown = true;
 
-            if (notifNama) {
-                notifNama.textContent = h.nama || 'Siswa';
-            }
-            if (notifDetail) {
-                notifDetail.textContent = `${h.kelas || '-'} • NISN: ${h.nisn || '-'}`;
-            }
+            if (notifNama) notifNama.textContent = siswa.nama || 'Siswa';
+            if (notifDetail) notifDetail.textContent = `${siswa.kelas || '-'} • NISN: ${siswa.nisn || '-'}`;
 
-            const rawStatus = (h.status_absen || 'HADIR').toUpperCase();
+            const rawStatus = (siswa.status || 'HADIR').toUpperCase();
             let statusLabel = rawStatus;
             let badgeClass = 'badge-hadir';
             let borderColor = '#16a34a';
@@ -717,7 +847,7 @@
                 iconHtml = '<i class="bx bx-time"></i>';
                 iconBg = '#fef9c3';
                 iconColor = '#ca8a04';
-            } else if (rawStatus.includes('SUDAH')) {
+            } else if (rawStatus.includes('SUDAH') || statusKode === 'sudah_absen') {
                 statusLabel = 'SUDAH ABSEN';
                 badgeClass = 'badge-sudah-absen';
                 borderColor = '#0284c7';
@@ -742,56 +872,33 @@
                 notifSukses.style.borderLeftColor = borderColor;
             }
 
-            const iconBox = document.getElementById('notif-icon-box');
-            if (iconBox) {
-                iconBox.innerHTML = iconHtml;
-                iconBox.style.background = iconBg;
-                iconBox.style.color = iconColor;
+            if (notifIconBox) {
+                notifIconBox.innerHTML = iconHtml;
+                notifIconBox.style.background = iconBg;
+                notifIconBox.style.color = iconColor;
             }
 
             if (notifJam) {
-                notifJam.textContent = (h.timestamp || '') + ' WITA';
+                const jamStr = siswa.jam ? siswa.jam.substring(0, 5) : '';
+                notifJam.textContent = (jamStr || new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })) + ' WITA';
             }
 
             if (notifLive) notifLive.classList.add('d-none');
             if (notifSukses) notifSukses.classList.remove('d-none');
 
-            // Tampilkan detail siswa selama 5 detik, lalu kembali ke status live scanner
-            hideNotifTimer = setTimeout(() => {
-                isShowingSuccess = false;
+            // Tampilkan kartu sukses selama 4.5 detik untuk siswa, lalu kembali ke standby
+            cooldownTimer = setTimeout(() => {
+                isCoolingDown = false;
                 if (notifSukses) notifSukses.classList.add('d-none');
                 if (notifLive) notifLive.classList.remove('d-none');
-            }, 5000);
+                perbaruiNotifLive('state-standby', '<i class="bx bx-scan"></i>', 'Arahkan Wajah ke Kamera', 'Posisikan wajah Anda di dalam frame untuk presensi otomatis');
+            }, 4500);
         }
 
-        // Dialog Konfigurasi URL IP Camera / CCTV RTSP
-        function dialogAturIpKamera() {
-            const urlSekarang = prompt(
-                "Masukkan URL Streaming IP Camera / CCTV:\n\nContoh Aplikasi HP 'IP Webcam':\nhttp://192.168.1.15:8080/video\n\nContoh RTSP CCTV (Hikvision/Dahua/Tapo):\nrtsp://admin:password@192.168.1.100:554/stream1\n\nAtau masukkan '0' untuk kembali ke Kamera Internal Laptop:",
-                "{{ is_string($pythonStatus['camera_source'] ?? null) ? $pythonStatus['camera_source'] : 'http://192.168.1.' }}"
-            );
-
-            if (!urlSekarang || urlSekarang.trim() === '') return;
-
-            const form = document.createElement('form');
-            form.method = 'POST';
-            form.action = "{{ route('admin.attendance.pindai.kamera') }}";
-
-            const csrfInput = document.createElement('input');
-            csrfInput.type = 'hidden';
-            csrfInput.name = '_token';
-            csrfInput.value = "{{ csrf_token() }}";
-            form.appendChild(csrfInput);
-
-            const sumberInput = document.createElement('input');
-            sumberInput.type = 'hidden';
-            sumberInput.name = 'sumber';
-            sumberInput.value = urlSekarang.trim();
-            form.appendChild(sumberInput);
-
-            document.body.appendChild(form);
-            form.submit();
-        }
+        // Jalankan inisialisasi kamera saat halaman dimuat
+        document.addEventListener('DOMContentLoaded', () => {
+            mulaiKamera();
+        });
     </script>
 </body>
 </html>
