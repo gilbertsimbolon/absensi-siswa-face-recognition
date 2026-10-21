@@ -140,78 +140,34 @@ class PythonServiceManager
     }
 
     /**
-     * Dapatkan status scanner dan deteksi terakhir dari layanan Python.
+     * Dapatkan status ketersediaan layanan AI DeepFace Python.
      *
      * @return array{online: bool, fps: int, camera_source: mixed, latest_result: ?array, message: string}
      */
     public static function getStatus(): array
     {
-        if (! self::isRunning()) {
-            return [
-                'online' => false,
-                'fps' => 0,
-                'camera_source' => 0,
-                'latest_result' => null,
-                'message' => 'Layanan kamera OpenCV sedang tidak aktif.',
-            ];
-        }
-
-        try {
-            $baseUrl = self::getBaseUrl();
-            $response = Http::timeout(1)->get("{$baseUrl}/status-scanner");
-
-            if ($response->successful()) {
-                $data = $response->json();
-
-                return [
-                    'online' => (bool) ($data['aktif'] ?? true),
-                    'fps' => (int) ($data['fps'] ?? 0),
-                    'camera_source' => $data['sumber'] ?? 0,
-                    'latest_result' => $data['hasil_terakhir'] ?? null,
-                    'message' => 'Kamera aktif',
-                ];
-            }
-        } catch (\Throwable $e) {
-            // Lewati jika timeout
-        }
+        $running = self::isRunning();
 
         return [
-            'online' => false,
+            'online' => $running,
             'fps' => 0,
-            'camera_source' => 0,
+            'camera_source' => 'client',
             'latest_result' => null,
-            'message' => 'Gagal membaca status scanner kamera.',
+            'message' => $running ? 'Layanan AI DeepFace aktif dan siap.' : 'Layanan AI DeepFace sedang tidak aktif.',
         ];
     }
 
     /**
-     * Ubah sumber kamera OpenCV (Webcam 0, iPhone USB 1, USB 2, atau URL IP Camera).
+     * Ganti sumber kamera (kini dikelola langsung oleh klien browser).
      *
      * @return array{status: string, pesan: string, sumber_sekarang: mixed}
      */
     public static function changeCamera(int|string $source): array
     {
-        try {
-            $baseUrl = self::getBaseUrl();
-            $response = Http::timeout(10)->post("{$baseUrl}/ganti-kamera", [
-                'sumber' => $source,
-            ]);
-
-            if ($response->successful()) {
-                return $response->json();
-            }
-
-            return [
-                'status' => 'error',
-                'pesan' => 'Layanan Python merespons dengan kesalahan.',
-                'sumber_sekarang' => $source,
-            ];
-        } catch (\Throwable $e) {
-            return [
-                'status' => 'error',
-                'pesan' => 'Tidak dapat terhubung ke server kamera Python: '.$e->getMessage(),
-                'sumber_sekarang' => $source,
-            ];
-        }
+        return [
+            'status' => 'sukses',
+            'pesan' => 'Kamera dikelola langsung oleh peramban klien (HTML5 WebRTC).',
+            'sumber_sekarang' => $source,
+        ];
     }
 }

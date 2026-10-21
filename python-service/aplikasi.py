@@ -13,24 +13,17 @@ import json
 import base64
 import time
 from functools import wraps
-from flask import Flask, request, jsonify, render_template, Response
+from flask import Flask, request, jsonify
 from flask_cors import CORS
 import konfigurasi
 from layanan_wajah import LayananWajah
-from stream_scanner import ScannerOpenCV
 
 # Inisialisasi Flask
-template_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'templates')
-app = Flask(__name__, template_folder=template_dir)
+app = Flask(__name__)
 CORS(app)
 
-# Inisialisasi Service AI dan Pemindai OpenCV (Mendukung index USB 0/1 atau string URL IP Camera RTSP/HTTP)
-default_camera = getattr(konfigurasi, 'CAMERA_SOURCE', '0')
-if str(default_camera).isdigit():
-    default_camera = int(default_camera)
-
+# Inisialisasi Layanan AI Wajah (DeepFace & FaceNet)
 layanan = LayananWajah()
-scanner = ScannerOpenCV(layanan_wajah=layanan, camera_source=default_camera)
 
 def get_app_key_bytes():
     """Mengambil byte secret APP_KEY Laravel dari environment."""
@@ -124,61 +117,25 @@ def login_diperlukan(f):
 @app.route('/', methods=['GET'])
 @app.route('/scanner', methods=['GET'])
 @app.route('/scanner/', methods=['GET'])
-@login_diperlukan
 def index():
-    """Halaman scanner OpenCV - stream video OpenCV native tanpa JavaScript scanner."""
-    return render_template(
-        'scanner.html',
-        model_name=konfigurasi.MODEL_NAME,
-        total_wajah=len(layanan.embeddings_db),
-        kamera_aktif=scanner.camera_source
-    )
-
-@app.route('/video_feed')
-@app.route('/scanner/video_feed')
-@login_diperlukan
-def video_feed():
-    """
-    Stream MJPEG langsung dari kamera OpenCV.
-    Setiap frame diproses dan digambar kotak deteksi wajah oleh OpenCV & FaceNet.
-    Ditampilkan di tag <img> secara native di browser mana pun tanpa JS.
-    """
-    if not scanner.is_running:
-        scanner.mulai()
-    return Response(
-        scanner.generate_mjpeg_stream(),
-        mimetype='multipart/x-mixed-replace; boundary=frame'
-    )
-
-@app.route('/ganti-kamera', methods=['POST'])
-@app.route('/scanner/ganti-kamera', methods=['POST'])
-@login_diperlukan
-def ganti_kamera():
-    """Mengubah sumber kamera OpenCV (Webcam 0, USB 1/2, atau URL IP Camera)."""
-    data = request.get_json(silent=True) or {}
-    sumber = data.get('sumber', 0)
-    sukses = scanner.ganti_sumber_kamera(sumber)
+    """Endpoint root - informasi status layanan AI."""
     return jsonify({
-        "status": "sukses" if sukses else "error",
-        "sumber_sekarang": scanner.camera_source,
-        "pesan": f"Kamera berhasil diubah ke {sumber}" if sukses else f"Perangkat Kamera {sumber} tidak ditemukan di sistem Windows."
+        "status": "aktif",
+        "layanan": "Layanan AI DeepFace FaceNet Presensi SMAN 2 Tondano",
+        "model": konfigurasi.MODEL_NAME,
+        "total_wajah_terindeks": len(layanan.embeddings_db),
+        "siap_digunakan": layanan.is_ready
     })
 
 @app.route('/status-scanner', methods=['GET'])
 @app.route('/scanner/status-scanner', methods=['GET'])
-@login_diperlukan
 def status_scanner():
-    """Mendapatkan hasil scan terakhir dan status kamera secara komprehensif."""
+    """Status ketersediaan AI scanner (kompatibilitas)."""
     return jsonify({
-        "aktif": scanner.is_running,
-        "fps": scanner.fps,
-        "sumber": scanner.camera_source,
-        "wajah_terdeteksi": bool(scanner.smooth_box is not None),
-        "sedang_memproses": scanner.is_recognizing,
-        "status_scanner": getattr(scanner, 'status_scanner', 'standby'),
-        "pesan_scanner": getattr(scanner, 'pesan_scanner', 'Arahkan Wajah ke Kamera'),
-        "detail_scanner": getattr(scanner, 'detail_scanner', 'Posisikan wajah Anda di dalam frame untuk presensi otomatis'),
-        "hasil_terakhir": scanner.latest_result
+        "aktif": layanan.is_ready,
+        "status_scanner": "standby",
+        "pesan_scanner": "Arahkan Wajah ke Kamera",
+        "detail_scanner": "Posisikan wajah Anda di dalam frame untuk presensi otomatis"
     })
 
 @app.route('/status', methods=['GET'])
@@ -253,7 +210,6 @@ def update_konfigurasi_api():
         try:
             val = float(data['min_face_accuracy'])
             layanan.min_face_accuracy = val
-            scanner.min_face_accuracy = val
             print(f"[+] Batas minimum akurasi pemindaian diperbarui ke: {val:.2f}%")
             return jsonify({"status": "sukses", "min_face_accuracy": val})
         except Exception as e:
@@ -262,11 +218,10 @@ def update_konfigurasi_api():
 
 if __name__ == '__main__':
     print("====================================================")
-    print("  Server Scanner OpenCV Presensi Wajah SMAN 2 Tondano")
+    print("  Server AI DeepFace Presensi Wajah SMAN 2 Tondano")
     print(f"  Berjalan di http://{konfigurasi.HOST}:{konfigurasi.PORT}")
     print("====================================================")
     layanan.inisialisasi()
-    scanner.mulai()
     try:
         app.run(host=konfigurasi.HOST, port=konfigurasi.PORT, debug=False, threaded=True)
     except BaseException as e:
