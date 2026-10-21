@@ -51,11 +51,11 @@
                     <thead>
                         <tr>
                             <th class="text-center" style="width: 5%;">No.</th>
-                            <th style="width: 20%;">Kelas</th>
-                            <th style="width: 20%;">Wali Kelas</th>
-                            <th class="text-center" style="width: 15%;">Jam Masuk</th>
+                            <th style="width: 22%;">Kelas</th>
+                            <th style="width: 23%;">Wali Kelas</th>
+                            <th class="text-center" style="width: 15%;">Mulai Presensi</th>
+                            <th class="text-center" style="width: 15%;">Batas Hadir</th>
                             <th class="text-center" style="width: 15%;">Batas Terlambat</th>
-                            <th class="text-center" style="width: 15%;">Batas Alpa</th>
                             <th class="text-center" style="width: 10%;">Aksi</th>
                         </tr>
                     </thead>
@@ -71,13 +71,13 @@
                                     {{ $cls->teacher ? $cls->teacher->user->name : '-' }}
                                 </td>
                                 <td class="text-center text-nowrap">
-                                    {{ \Carbon\Carbon::parse($cls->jam_masuk ?? '07:00:00')->format('H:i') }} WITA
+                                    {{ \Carbon\Carbon::parse($cls->jam_mulai ?? '06:30:00')->format('H:i') }} WITA
                                 </td>
                                 <td class="text-center text-nowrap">
-                                    {{ \Carbon\Carbon::parse($cls->batas_terlambat ?? '07:15:00')->format('H:i') }} WITA
+                                    {{ \Carbon\Carbon::parse($cls->jam_masuk ?? '07:15:00')->format('H:i') }} WITA
                                 </td>
                                 <td class="text-center text-nowrap">
-                                    {{ \Carbon\Carbon::parse($cls->batas_alpa ?? '08:30:00')->format('H:i') }} WITA
+                                    {{ \Carbon\Carbon::parse($cls->batas_terlambat ?? '07:30:00')->format('H:i') }} WITA
                                 </td>
                                 <td class="text-center">
                                     <button type="button" class="btn btn-sm btn-outline-primary py-1 px-2"
@@ -112,25 +112,25 @@
                     @csrf
                     <div class="modal-body">
                         <p class="text-muted small mb-3">
-                            Pengaturan ini akan diterapkan ke semua kelas secara bersamaan.
+                            Pengaturan jam ini akan diterapkan serentak ke semua kelas.
                         </p>
 
                         <div class="mb-3">
-                            <label class="form-label" for="all_jam_masuk">Jam Masuk <span class="text-danger">*</span></label>
-                            <input type="time" name="jam_masuk" id="all_jam_masuk" class="form-control" value="07:00" required>
-                            <small class="text-muted" style="font-size: 11px;">Waktu dimulainya jam kehadiran sekolah.</small>
+                            <label class="form-label" for="all_jam_mulai">Jam Mulai Presensi <span class="text-danger">*</span></label>
+                            <input type="time" name="jam_mulai" id="all_jam_mulai" class="form-control" value="06:30" required>
+                            <small class="text-muted" style="font-size: 11px;">Waktu sistem mulai membuka presensi. Sebelum jam ini kamera belum menerima absen.</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label" for="all_jam_masuk">Batas Hadir (Jam Masuk) <span class="text-danger">*</span></label>
+                            <input type="time" name="jam_masuk" id="all_jam_masuk" class="form-control" value="07:15" required>
+                            <small class="text-muted" style="font-size: 11px;">Siswa yang scan antara jam mulai s/d jam masuk ini berstatus <strong>HADIR</strong>.</small>
                         </div>
 
                         <div class="mb-3">
                             <label class="form-label" for="all_batas_terlambat">Batas Terlambat <span class="text-danger">*</span></label>
-                            <input type="time" name="batas_terlambat" id="all_batas_terlambat" class="form-control" value="07:15" required>
-                            <small class="text-muted" style="font-size: 11px;">Siswa yang scan setelah jam ini akan berstatus <strong>TERLAMBAT</strong>.</small>
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="form-label" for="all_batas_alpa">Batas Alpa <span class="text-danger">*</span></label>
-                            <input type="time" name="batas_alpa" id="all_batas_alpa" class="form-control" value="08:30" required>
-                            <small class="text-muted" style="font-size: 11px;">Siswa yang scan setelah jam ini otomatis berstatus <strong>ALPA</strong>.</small>
+                            <input type="time" name="batas_terlambat" id="all_batas_terlambat" class="form-control" value="07:30" required>
+                            <small class="text-muted" style="font-size: 11px;">Siswa yang scan setelah jam masuk s/d batas ini berstatus <strong>TERLAMBAT</strong>. Lewat dari jam ini otomatis <strong>ALPA</strong>.</small>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -156,23 +156,24 @@
                         @method('PUT')
                         <div class="modal-body">
                             <div class="mb-3">
-                                <label class="form-label" for="jam_masuk_{{ $cls->id }}">Jam Masuk <span class="text-danger">*</span></label>
+                                <label class="form-label" for="jam_mulai_{{ $cls->id }}">Jam Mulai Presensi <span class="text-danger">*</span></label>
+                                <input type="time" name="jam_mulai" id="jam_mulai_{{ $cls->id }}" class="form-control"
+                                    value="{{ \Carbon\Carbon::parse($cls->jam_mulai ?? '06:30:00')->format('H:i') }}" required>
+                                <small class="text-muted" style="font-size: 11px;">Sistem mulai menerima presensi.</small>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label" for="jam_masuk_{{ $cls->id }}">Batas Hadir (Jam Masuk) <span class="text-danger">*</span></label>
                                 <input type="time" name="jam_masuk" id="jam_masuk_{{ $cls->id }}" class="form-control"
-                                    value="{{ \Carbon\Carbon::parse($cls->jam_masuk ?? '07:00:00')->format('H:i') }}" required>
+                                    value="{{ \Carbon\Carbon::parse($cls->jam_masuk ?? '07:15:00')->format('H:i') }}" required>
+                                <small class="text-muted" style="font-size: 11px;">Scan s/d jam ini berstatus Hadir.</small>
                             </div>
 
                             <div class="mb-3">
                                 <label class="form-label" for="batas_terlambat_{{ $cls->id }}">Batas Terlambat <span class="text-danger">*</span></label>
                                 <input type="time" name="batas_terlambat" id="batas_terlambat_{{ $cls->id }}" class="form-control"
-                                    value="{{ \Carbon\Carbon::parse($cls->batas_terlambat ?? '07:15:00')->format('H:i') }}" required>
-                                <small class="text-muted" style="font-size: 11px;">Scan setelah jam ini berstatus Terlambat.</small>
-                            </div>
-
-                            <div class="mb-3">
-                                <label class="form-label" for="batas_alpa_{{ $cls->id }}">Batas Alpa <span class="text-danger">*</span></label>
-                                <input type="time" name="batas_alpa" id="batas_alpa_{{ $cls->id }}" class="form-control"
-                                    value="{{ \Carbon\Carbon::parse($cls->batas_alpa ?? '08:30:00')->format('H:i') }}" required>
-                                <small class="text-muted" style="font-size: 11px;">Scan setelah jam ini berstatus Alpa.</small>
+                                    value="{{ \Carbon\Carbon::parse($cls->batas_terlambat ?? '07:30:00')->format('H:i') }}" required>
+                                <small class="text-muted" style="font-size: 11px;">Scan s/d jam ini berstatus Terlambat. Lewat dari ini otomatis Alpa.</small>
                             </div>
                         </div>
                         <div class="modal-footer">

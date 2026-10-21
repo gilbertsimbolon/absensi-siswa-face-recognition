@@ -890,15 +890,85 @@ class AttendanceController extends Controller
         $now = Carbon::now();
         $today = Carbon::today()->format('Y-m-d');
 
-        // Tentukan status kehadiran berdasarkan jam kelas siswa (Hadir, Terlambat, Alpa)
-        // Hanya 2 acuan: Jam Masuk (Hadir) dan Batas Terlambat (Terlambat). Lewat dari itu otomatis Alpa.
-        $studentClass = $student->classes;
-        $strJamMasuk = $studentClass?->jam_masuk ?? '07:00:00';
-        $strBatasTerlambat = $studentClass?->batas_terlambat ?? '07:15:00';
+        // Format data wajah untuk frontend visual bounding box
+        if ($wajah) {
+            $wajah['nama'] = $student->name;
+            $wajah['status'] = 'sukses';
+            if ($skorAkurasi) {
+                $wajah['skor'] = $skorAkurasi.'%';
+            }
+        }
 
+        // 1. Cek apakah siswa sudah tercatat presensi hari ini
+        $attendance = Attendance::where('student_id', $student->id)
+            ->whereDate('date', $today)
+            ->first();
+
+        if ($attendance) {
+            $statusDisplay = match ($attendance->status) {
+                Attendance::STATUS_HADIR => 'Hadir',
+                Attendance::STATUS_TERLAMBAT => 'Terlambat',
+                Attendance::STATUS_ALPA => 'Alpa',
+                Attendance::STATUS_IZIN => 'Izin',
+                Attendance::STATUS_SAKIT => 'Sakit',
+                default => ucfirst($attendance->status),
+            };
+
+            return response()->json([
+                'status' => 'sudah_absen',
+                'tipe' => 'masuk',
+                'pesan' => "{$student->name} sudah tercatat {$statusDisplay} hari ini pukul ".Carbon::parse($attendance->check_in_time)->format('H:i').' WITA.',
+                'wajah' => $wajah,
+                'frame_annotated' => $frameAnnotated,
+                'siswa' => [
+                    'id' => $student->id,
+                    'nama' => $student->name,
+                    'nisn' => $student->nisn,
+                    'kelas' => $student->classes?->name ?? '-',
+                    'status' => $statusDisplay,
+                    'status_kode' => $attendance->status,
+                    'jam' => Carbon::parse($attendance->check_in_time)->format('H:i:s'),
+                    'sudah_absen' => true,
+                    'foto' => $student->faces->first()?->file_path ? asset('storage/'.$student->faces->first()->file_path) : null,
+                ],
+            ]);
+        }
+
+        // 2. Evaluasi jam presensi kelas
+        $studentClass = $student->classes;
+        $strJamMulai = $studentClass?->jam_mulai ?? '06:30:00';
+        $strJamMasuk = $studentClass?->jam_masuk ?? '07:15:00';
+        $strBatasTerlambat = $studentClass?->batas_terlambat ?? '07:30:00';
+
+        $jamMulai = Carbon::today()->setTimeFromTimeString($strJamMulai);
         $jamMasuk = Carbon::today()->setTimeFromTimeString($strJamMasuk);
         $jamBatasTerlambat = Carbon::today()->setTimeFromTimeString($strBatasTerlambat);
 
+        // Jika scan dilakukan sebelum jam mulai presensi dibuka
+        if ($now->lt($jamMulai)) {
+            return response()->json([
+                'status' => 'diluar_waktu',
+                'pesan' => 'Presensi belum dibuka. Presensi dimulai pukul '.Carbon::parse($strJamMulai)->format('H:i').' WITA.',
+                'wajah' => $wajah,
+                'frame_annotated' => $frameAnnotated,
+                'siswa' => [
+                    'id' => $student->id,
+                    'nama' => $student->name,
+                    'nisn' => $student->nisn,
+                    'kelas' => $student->classes?->name ?? '-',
+                    'status' => 'Belum Dibuka',
+                    'status_kode' => 'diluar_waktu',
+                    'jam' => $now->format('H:i:s'),
+                    'sudah_absen' => false,
+                    'foto' => $student->faces->first()?->file_path ? asset('storage/'.$student->faces->first()->file_path) : null,
+                ],
+            ]);
+        }
+
+        // 3. Tentukan status kehadiran siswa:
+        // - Antara Jam Mulai s/d Jam Masuk -> HADIR
+        // - Antara Jam Masuk s/d Batas Terlambat -> TERLAMBAT
+        // - Lewat Batas Terlambat -> ALPA
         if ($now->lte($jamMasuk)) {
             $statusKehadiran = Attendance::STATUS_HADIR;
             $statusDisplay = 'Hadir';
@@ -922,41 +992,6 @@ class AttendanceController extends Controller
             } catch (\Exception $e) {
                 // Lanjut jika penyimpanan snapshot gagal
             }
-        }
-
-        // Cek data presensi hari ini
-        $attendance = Attendance::where('student_id', $student->id)
-            ->whereDate('date', $today)
-            ->first();
-
-        // Format data wajah untuk frontend visual bounding box
-        if ($wajah) {
-            $wajah['nama'] = $student->name;
-            $wajah['status'] = 'sukses';
-            if ($skorAkurasi) {
-                $wajah['skor'] = $skorAkurasi.'%';
-            }
-        }
-
-        // 1. Skenario jika sudah tercatat presensi hari ini (cukup presensi masuk, tidak ada validasi pulang)
-        if ($attendance) {
-            return response()->json([
-                'status' => 'sudah_absen',
-                'tipe' => 'masuk',
-                'pesan' => "{$student->name} sudah melakukan presensi hari ini pukul ".Carbon::parse($attendance->check_in_time)->format('H:i').' WITA.',
-                'wajah' => $wajah,
-                'frame_annotated' => $frameAnnotated,
-                'siswa' => [
-                    'id' => $student->id,
-                    'nama' => $student->name,
-                    'nisn' => $student->nisn,
-                    'kelas' => $student->classes?->name ?? '-',
-                    'status' => 'Sudah Absen',
-                    'status_kode' => $attendance->status,
-                    'jam' => Carbon::parse($attendance->check_in_time)->format('H:i:s'),
-                    'foto' => $student->faces->first()?->file_path ? asset('storage/'.$student->faces->first()->file_path) : null,
-                ],
-            ]);
         }
 
         // 3. Simpan Presensi Masuk Baru jika belum presensi hari ini

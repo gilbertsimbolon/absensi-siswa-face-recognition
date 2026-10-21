@@ -702,46 +702,54 @@ class ClassesController extends Controller
     }
 
     /**
-     * Perbarui jam kelas untuk kelas tertentu (Jam Masuk & Batas Terlambat).
+     * Perbarui jam kelas untuk kelas tertentu (Jam Mulai, Jam Masuk, & Batas Terlambat).
      */
     public function updateSchedule(Request $request, Classes $class)
     {
         $validated = $request->validate([
-            'jam_masuk' => 'required|date_format:H:i',
+            'jam_mulai' => 'required|date_format:H:i',
+            'jam_masuk' => 'required|date_format:H:i|after:jam_mulai',
             'batas_terlambat' => 'required|date_format:H:i|after:jam_masuk',
         ], [
+            'jam_mulai.required' => 'Jam mulai presensi wajib diisi.',
             'jam_masuk.required' => 'Jam masuk wajib diisi.',
+            'jam_masuk.after' => 'Jam masuk harus setelah jam mulai presensi.',
             'batas_terlambat.required' => 'Batas terlambat wajib diisi.',
             'batas_terlambat.after' => 'Batas terlambat harus setelah jam masuk.',
         ]);
 
         $class->update([
+            'jam_mulai' => $validated['jam_mulai'].':00',
             'jam_masuk' => $validated['jam_masuk'].':00',
             'batas_terlambat' => $validated['batas_terlambat'].':00',
         ]);
 
-        return redirect()->back()->with('success', "Jam masuk dan batas terlambat untuk {$class->name} berhasil diperbarui.");
+        return redirect()->back()->with('success', "Pengaturan jam presensi untuk {$class->name} berhasil diperbarui.");
     }
 
     /**
-     * Terapkan jam kelas serentak ke seluruh kelas (Jam Masuk & Batas Terlambat).
+     * Terapkan jam kelas serentak ke seluruh kelas (Jam Mulai, Jam Masuk, & Batas Terlambat).
      */
     public function updateAllSchedules(Request $request)
     {
         $validated = $request->validate([
-            'jam_masuk' => 'required|date_format:H:i',
+            'jam_mulai' => 'required|date_format:H:i',
+            'jam_masuk' => 'required|date_format:H:i|after:jam_mulai',
             'batas_terlambat' => 'required|date_format:H:i|after:jam_masuk',
         ], [
+            'jam_mulai.required' => 'Jam mulai presensi wajib diisi.',
             'jam_masuk.required' => 'Jam masuk wajib diisi.',
+            'jam_masuk.after' => 'Jam masuk harus setelah jam mulai presensi.',
             'batas_terlambat.required' => 'Batas terlambat wajib diisi.',
             'batas_terlambat.after' => 'Batas terlambat harus setelah jam masuk.',
         ]);
 
         Classes::query()->update([
+            'jam_mulai' => $validated['jam_mulai'].':00',
             'jam_masuk' => $validated['jam_masuk'].':00',
             'batas_terlambat' => $validated['batas_terlambat'].':00',
         ]);
 
-        return redirect()->back()->with('success', 'Jam masuk dan batas terlambat berhasil diterapkan ke seluruh kelas.');
+        return redirect()->back()->with('success', 'Pengaturan jam presensi berhasil diterapkan serentak ke seluruh kelas.');
     }
 }

@@ -843,7 +843,6 @@
             isCoolingDown = true;
 
             if (notifNama) notifNama.textContent = siswa.nama || 'Siswa';
-            if (notifDetail) notifDetail.textContent = `${siswa.kelas || '-'} • NISN: ${siswa.nisn || '-'}`;
 
             const rawStatus = (siswa.status || 'HADIR').toUpperCase();
             let statusLabel = rawStatus;
@@ -853,27 +852,36 @@
             let iconBg = '#dcfce7';
             let iconColor = '#16a34a';
 
-            if (rawStatus.includes('TERLAMBAT')) {
-                statusLabel = 'TERLAMBAT';
-                badgeClass = 'badge-terlambat';
-                borderColor = '#ca8a04';
-                iconHtml = '<i class="bx bx-time"></i>';
-                iconBg = '#fef9c3';
-                iconColor = '#ca8a04';
-            } else if (rawStatus.includes('SUDAH') || statusKode === 'sudah_absen') {
-                statusLabel = 'SUDAH ABSEN';
-                badgeClass = 'badge-sudah-absen';
-                borderColor = '#0284c7';
-                iconHtml = '<i class="bx bx-check-double"></i>';
-                iconBg = '#e0f2fe';
-                iconColor = '#0284c7';
-            } else if (rawStatus.includes('DILUAR') || rawStatus.includes('ALPA')) {
+            if (rawStatus.includes('ALPA')) {
                 statusLabel = 'ALPA';
                 badgeClass = 'badge-alpa';
                 borderColor = '#dc2626';
                 iconHtml = '<i class="bx bx-x-circle"></i>';
                 iconBg = '#fee2e2';
                 iconColor = '#dc2626';
+            } else if (rawStatus.includes('TERLAMBAT')) {
+                statusLabel = 'TERLAMBAT';
+                badgeClass = 'badge-terlambat';
+                borderColor = '#ca8a04';
+                iconHtml = '<i class="bx bx-time"></i>';
+                iconBg = '#fef9c3';
+                iconColor = '#ca8a04';
+            } else if (rawStatus.includes('HADIR')) {
+                statusLabel = 'HADIR';
+                badgeClass = 'badge-hadir';
+                borderColor = '#16a34a';
+                iconHtml = '<i class="bx bx-check"></i>';
+                iconBg = '#dcfce7';
+                iconColor = '#16a34a';
+            } else if (rawStatus.includes('BELUM') || rawStatus.includes('DILUAR')) {
+                statusLabel = 'BELUM DIBUKA';
+                badgeClass = 'badge-diluar-waktu';
+                borderColor = '#64748b';
+                iconHtml = '<i class="bx bx-time-five"></i>';
+                iconBg = '#f1f5f9';
+                iconColor = '#475569';
+            } else {
+                statusLabel = rawStatus;
             }
 
             if (notifStatusBadge) {
@@ -891,9 +899,22 @@
                 notifIconBox.style.color = iconColor;
             }
 
+            if (notifDetail) {
+                if (pesanCustom && (siswa.sudah_absen || statusKode === 'sudah_absen')) {
+                    notifDetail.textContent = pesanCustom;
+                } else {
+                    notifDetail.textContent = `${siswa.kelas || '-'} • NISN: ${siswa.nisn || '-'}`;
+                }
+            }
+
             if (notifJam) {
                 const jamStr = siswa.jam ? siswa.jam.substring(0, 5) : '';
-                notifJam.textContent = (jamStr || new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })) + ' WITA';
+                const waktuTeks = (jamStr || new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })) + ' WITA';
+                if (siswa.sudah_absen || statusKode === 'sudah_absen') {
+                    notifJam.innerHTML = `<span class="badge bg-secondary bg-opacity-25 text-secondary me-1" style="font-size:10px;">SUDAH TERCATAT</span> ${waktuTeks}`;
+                } else {
+                    notifJam.textContent = waktuTeks;
+                }
             }
 
             if (notifLive) notifLive.classList.add('d-none');

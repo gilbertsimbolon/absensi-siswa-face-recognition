@@ -13,6 +13,7 @@ class Classes extends Model
         'teacher_id',
         'name',
         'grade_level',
+        'jam_mulai',
         'jam_masuk',
         'batas_terlambat',
         'batas_alpa',
