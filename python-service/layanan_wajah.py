@@ -490,77 +490,92 @@ class LayananWajah:
                     if query_norm > 0:
                         query_emb = query_emb / query_norm
 
-                    if self.embeddings_matrix is not None and len(self.embeddings_matrix) > 0:
-                        cosine_distances = 1.0 - np.dot(self.embeddings_matrix, query_emb)
-                        best_idx = int(np.argmin(cosine_distances))
-                        min_dist = float(cosine_distances[best_idx])
-                        nisn = self.labels_list[best_idx]
-                    else:
-                        db_embeddings = np.array([item["embedding"] for item in self.embeddings_db])
-                        dot_products = np.dot(db_embeddings, query_emb)
-                        cosine_distances = 1.0 - dot_products
-                        best_idx = int(np.argmin(cosine_distances))
-                        min_dist = float(cosine_distances[best_idx])
-                        nisn = self.embeddings_db[best_idx]["label"]
-
-                    # Hitung skor akurasi proporsional
-                    skor_persen = hitung_persentase_akurasi(min_dist, self.threshold)
-                    persentase_skor = f"{skor_persen:.2f}%"
-
-                    # Ambil nama siswa dari cache data siswa
-                    siswa_data = self.data_siswa.get(nisn, {})
-                    nama_siswa = siswa_data.get("nama", f"Siswa {nisn}")
-                    kelas_siswa = siswa_data.get("kelas", "-")
+                    has_registered = (self.embeddings_matrix is not None and len(self.embeddings_matrix) > 0) or (len(self.embeddings_db) > 0)
 
                     fa = detected_faces[0]
                     x, y, w, h = fa["x"], fa["y"], fa["w"], fa["h"]
 
-                    min_acc = float(getattr(self, 'min_face_accuracy', 70.0))
-                    if min_dist <= self.threshold and skor_persen >= min_acc:
-                        # Wajah Cocok!
-                        status_scan = "sukses"
-                        hasil_pencocokan = {
-                            "status": "sukses",
-                            "nisn": nisn,
-                            "nama": nama_siswa,
-                            "kelas": kelas_siswa,
-                            "akurasi": persentase_skor,
-                            "jarak": round(min_dist, 4)
-                        }
-
-                        # Kirim presensi ke Laravel jika diminta (default False jika Laravel sendiri yang memanggil)
-                        if catat_laravel:
-                            sekarang = time.time()
-                            last_time = self.last_attendance_time.get(nisn, 0)
-                            if (sekarang - last_time) > self.cooldown_seconds:
-                                res_laravel = self.catat_presensi_ke_laravel(nisn)
-                                self.last_attendance_time[nisn] = sekarang
-                                if res_laravel:
-                                    hasil_pencocokan["presensi"] = res_laravel
-                                    if res_laravel.get("status") == "sudah_absen":
-                                        status_scan = "sudah_absen"
-                                        hasil_pencocokan["status"] = "sudah_absen"
-
-                        # Gambar Kotak Hijau OpenCV
-                        self.gambar_bounding_box_opencv(
-                            frame, x, y, w, h, 
-                            label_text=nama_siswa, 
-                            status=status_scan, 
-                            skor=persentase_skor
-                        )
-                    else:
-                        # Wajah Tidak Dikenal
+                    if not has_registered:
+                        # Belum ada siswa yang didaftarkan wajahnya di database/sistem
                         hasil_pencocokan = {
                             "status": "tidak_dikenali",
-                            "pesan": "Wajah tidak cocok dengan data siswa terdaftar."
+                            "pesan": "Data belum terdaftar. Silahkan hubungi administrator."
                         }
-                        # Gambar Kotak Merah OpenCV
                         self.gambar_bounding_box_opencv(
                             frame, x, y, w, h, 
-                            label_text="TIDAK DIKENAL", 
+                            label_text="BELUM TERDAFTAR", 
                             status="tidak_dikenali", 
-                            skor=persentase_skor
+                            skor=None
                         )
+                    else:
+                        if self.embeddings_matrix is not None and len(self.embeddings_matrix) > 0:
+                            cosine_distances = 1.0 - np.dot(self.embeddings_matrix, query_emb)
+                            best_idx = int(np.argmin(cosine_distances))
+                            min_dist = float(cosine_distances[best_idx])
+                            nisn = self.labels_list[best_idx]
+                        else:
+                            db_embeddings = np.array([item["embedding"] for item in self.embeddings_db])
+                            dot_products = np.dot(db_embeddings, query_emb)
+                            cosine_distances = 1.0 - dot_products
+                            best_idx = int(np.argmin(cosine_distances))
+                            min_dist = float(cosine_distances[best_idx])
+                            nisn = self.embeddings_db[best_idx]["label"]
+
+                        # Hitung skor akurasi proporsional
+                        skor_persen = hitung_persentase_akurasi(min_dist, self.threshold)
+                        persentase_skor = f"{skor_persen:.2f}%"
+
+                        # Ambil nama siswa dari cache data siswa
+                        siswa_data = self.data_siswa.get(nisn, {})
+                        nama_siswa = siswa_data.get("nama", f"Siswa {nisn}")
+                        kelas_siswa = siswa_data.get("kelas", "-")
+
+                        min_acc = float(getattr(self, 'min_face_accuracy', 70.0))
+                        if min_dist <= self.threshold and skor_persen >= min_acc:
+                            # Wajah Cocok!
+                            status_scan = "sukses"
+                            hasil_pencocokan = {
+                                "status": "sukses",
+                                "nisn": nisn,
+                                "nama": nama_siswa,
+                                "kelas": kelas_siswa,
+                                "akurasi": persentase_skor,
+                                "jarak": round(min_dist, 4)
+                            }
+
+                            # Kirim presensi ke Laravel jika diminta (default False jika Laravel sendiri yang memanggil)
+                            if catat_laravel:
+                                sekarang = time.time()
+                                last_time = self.last_attendance_time.get(nisn, 0)
+                                if (sekarang - last_time) > self.cooldown_seconds:
+                                    res_laravel = self.catat_presensi_ke_laravel(nisn)
+                                    self.last_attendance_time[nisn] = sekarang
+                                    if res_laravel:
+                                        hasil_pencocokan["presensi"] = res_laravel
+                                        if res_laravel.get("status") == "sudah_absen":
+                                            status_scan = "sudah_absen"
+                                            hasil_pencocokan["status"] = "sudah_absen"
+
+                            # Gambar Kotak Hijau OpenCV
+                            self.gambar_bounding_box_opencv(
+                                frame, x, y, w, h, 
+                                label_text=nama_siswa, 
+                                status=status_scan, 
+                                skor=persentase_skor
+                            )
+                        else:
+                            # Wajah Tidak Dikenal / Belum Terdaftar
+                            hasil_pencocokan = {
+                                "status": "tidak_dikenali",
+                                "pesan": "Data belum terdaftar. Silahkan hubungi administrator."
+                            }
+                            # Gambar Kotak Merah OpenCV
+                            self.gambar_bounding_box_opencv(
+                                frame, x, y, w, h, 
+                                label_text="BELUM TERDAFTAR", 
+                                status="tidak_dikenali", 
+                                skor=persentase_skor
+                            )
                 else:
                     # Gambar kotak kuning memindai
                     fa = detected_faces[0]

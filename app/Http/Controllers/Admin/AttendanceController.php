@@ -838,7 +838,7 @@ class AttendanceController extends Controller
                     } else {
                         return response()->json([
                             'status' => 'tidak_dikenali',
-                            'pesan' => $hasil['pesan'] ?? $aiData['pesan'] ?? 'Wajah tidak cocok dengan data siswa terdaftar.',
+                            'pesan' => $hasil['pesan'] ?? $aiData['pesan'] ?? 'Data belum terdaftar. Silahkan hubungi administrator.',
                             'wajah' => $wajah,
                             'frame_annotated' => $frameAnnotated,
                         ], 200);
@@ -868,9 +868,9 @@ class AttendanceController extends Controller
 
         if (! $student) {
             return response()->json([
-                'status' => 'tidak_ditemukan',
-                'pesan' => "Data siswa dengan NISN {$nisn} tidak ditemukan di sistem.",
-            ], 404);
+                'status' => 'tidak_dikenali',
+                'pesan' => 'Data belum terdaftar. Silahkan hubungi administrator.',
+            ], 200);
         }
 
         // Validasi hak akses guru
@@ -917,7 +917,7 @@ class AttendanceController extends Controller
             return response()->json([
                 'status' => 'sudah_absen',
                 'tipe' => 'masuk',
-                'pesan' => "{$student->name} sudah tercatat {$statusDisplay} hari ini pukul ".Carbon::parse($attendance->check_in_time)->format('H:i').' WITA.',
+                'pesan' => 'Presensi hari ini sudah tercatat pukul '.Carbon::parse($attendance->check_in_time)->format('H:i').' WITA.',
                 'wajah' => $wajah,
                 'frame_annotated' => $frameAnnotated,
                 'siswa' => [

@@ -408,48 +408,40 @@
             color: #ffffff;
         }
 
-        /* Pilihan Kamera di Bawah Frame */
+        /* Tombol Putar Balik Kamera di Bawah Frame */
         .camera-footer {
             display: flex;
-            justify-content: space-between;
+            justify-content: center;
             align-items: center;
-            padding: 2px 4px;
+            padding: 8px 4px 4px 4px;
         }
 
-        .camera-options {
-            display: flex;
+        .btn-putar-kamera {
+            width: 46px;
+            height: 46px;
+            border-radius: 50%;
+            background: #ffffff;
+            border: 1.5px solid #cbd5e1;
+            color: #0284c7;
+            display: inline-flex;
             align-items: center;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-
-        .camera-options-label {
-            font-size: 0.82rem;
-            color: #64748b;
-            font-weight: 600;
-        }
-
-        .btn-kamera-pilihan {
-            background: #f1f5f9;
-            border: 1px solid #cbd5e1;
-            color: #475569;
-            font-size: 0.8rem;
-            font-weight: 600;
-            padding: 5px 12px;
-            border-radius: 6px;
+            justify-content: center;
+            font-size: 1.55rem;
             cursor: pointer;
-            transition: all 0.2s ease;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+            transition: all 0.25s ease;
         }
 
-        .btn-kamera-pilihan:hover {
-            background: #e2e8f0;
-            color: #0f172a;
-        }
-
-        .btn-kamera-pilihan.active {
+        .btn-putar-kamera:hover {
             background: #0284c7;
-            border-color: #0284c7;
             color: #ffffff;
+            border-color: #0284c7;
+            transform: rotate(180deg);
+            box-shadow: 0 4px 12px rgba(2, 132, 199, 0.3);
+        }
+
+        .btn-putar-kamera:active {
+            transform: rotate(360deg) scale(0.95);
         }
     </style>
 </head>
@@ -535,31 +527,11 @@
 
         </div>
 
-        <!-- Pilihan Kamera di Bawah Frame -->
+        <!-- Tombol Putar Balik Kamera (Hanya Icon) -->
         <div class="camera-footer">
-            <div class="camera-options">
-                <span class="camera-options-label"><i class="bx bx-camera me-1"></i> Pilihan Kamera:</span>
-
-                <button type="button" id="btn-cam-user" class="btn-kamera-pilihan active" onclick="setKameraFacing('user')">
-                    <i class="bx bx-user me-1"></i> Kamera Depan
-                </button>
-
-                <button type="button" id="btn-cam-env" class="btn-kamera-pilihan" onclick="setKameraFacing('environment')">
-                    <i class="bx bx-camera me-1"></i> Kamera Belakang
-                </button>
-
-                <button type="button" class="btn-kamera-pilihan" onclick="toggleKamera()" title="Ganti Kamera">
-                    <i class="bx bx-refresh me-1"></i> Putar Kamera
-                </button>
-            </div>
-            <div class="d-flex align-items-center gap-2">
-                <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 py-1 px-2" style="font-size: 11px;" id="badge-status-kamera">
-                    <i class="bx bx-video me-1"></i> Kamera Aktif
-                </span>
-                <span class="badge {{ ($pythonStatus['online'] ?? false) ? 'bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25' : 'bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25' }} py-1 px-2" style="font-size: 11px;" id="badge-status-ai">
-                    <i class="bx bx-chip me-1"></i> {{ ($pythonStatus['online'] ?? false) ? 'AI DeepFace Siap' : 'AI Backend Standby' }}
-                </span>
-            </div>
+            <button type="button" class="btn-putar-kamera" id="btn-toggle-kamera" onclick="toggleKamera()" title="Putar Balik Kamera (Depan / Belakang)" aria-label="Putar Kamera">
+                <i class="bx bx-sync"></i>
+            </button>
         </div>
 
     </div>
@@ -592,10 +564,7 @@
         const notifStatusBadge = document.getElementById('notif-status-badge');
         const notifJam = document.getElementById('notif-jam');
         const notifIconBox = document.getElementById('notif-icon-box');
-
-        const btnCamUser = document.getElementById('btn-cam-user');
-        const btnCamEnv = document.getElementById('btn-cam-env');
-        const badgeStatusKamera = document.getElementById('badge-status-kamera');
+        const btnToggleKamera = document.getElementById('btn-toggle-kamera');
 
         const prosesPindaiUrl = "{{ route('admin.attendance.proses-pindai') }}";
         const csrfToken = "{{ csrf_token() }}";
@@ -678,11 +647,6 @@
                     perbaruiTombolKamera();
                     mulaiSiklusPemindaian();
                 };
-
-                if (badgeStatusKamera) {
-                    badgeStatusKamera.innerHTML = '<i class="bx bx-video me-1"></i> Kamera Aktif';
-                    badgeStatusKamera.className = 'badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 py-1 px-2';
-                }
             } catch (err) {
                 console.error("Gagal membuka kamera:", err);
                 let pesan = "Pastikan izin akses kamera diberikan pada peramban Anda.";
@@ -700,16 +664,6 @@
             offlineBox.classList.remove('d-none');
             if (offlineTitle) offlineTitle.textContent = judul;
             if (offlineDesc) offlineDesc.textContent = desc;
-            if (badgeStatusKamera) {
-                badgeStatusKamera.innerHTML = '<i class="bx bx-video-off me-1"></i> Kamera Terhenti';
-                badgeStatusKamera.className = 'badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 py-1 px-2';
-            }
-        }
-
-        function setKameraFacing(mode) {
-            if (currentFacingMode === mode) return;
-            currentFacingMode = mode;
-            mulaiKamera();
         }
 
         function toggleKamera() {
@@ -718,11 +672,8 @@
         }
 
         function perbaruiTombolKamera() {
-            if (btnCamUser) {
-                btnCamUser.classList.toggle('active', currentFacingMode === 'user');
-            }
-            if (btnCamEnv) {
-                btnCamEnv.classList.toggle('active', currentFacingMode === 'environment');
+            if (btnToggleKamera) {
+                btnToggleKamera.setAttribute('title', currentFacingMode === 'user' ? 'Putar ke Kamera Belakang' : 'Putar ke Kamera Depan');
             }
         }
 
@@ -820,8 +771,8 @@
                 tampilkanDetailSukses(siswa, st, data.pesan);
             } else if (st === 'tidak_ada_wajah') {
                 perbaruiNotifLive('state-standby', '<i class="bx bx-scan"></i>', 'Arahkan Wajah ke Kamera', 'Posisikan wajah Anda di dalam frame untuk presensi otomatis');
-            } else if (st === 'tidak_dikenali') {
-                perbaruiNotifLive('state-tidak-dikenali', '<i class="bx bx-user-x"></i>', 'Wajah Belum Terdaftar', data.pesan || 'Wajah tidak cocok dengan data siswa terdaftar');
+            } else if (st === 'tidak_dikenali' || st === 'tidak_ditemukan') {
+                tampilkanBelumTerdaftar(data.pesan || 'Data belum terdaftar. Silahkan hubungi administrator.');
             } else if (st === 'gagal_akurasi') {
                 perbaruiNotifLive('state-gagal-akurasi', '<i class="bx bx-error-circle"></i>', 'Akurasi Wajah Kurang', data.pesan || 'Posisikan wajah lebih jelas tegak lurus ke kamera');
             }
@@ -836,6 +787,48 @@
 
             notifLive.classList.remove('d-none');
             if (notifSukses) notifSukses.classList.add('d-none');
+        }
+
+        function tampilkanBelumTerdaftar(pesanCustom = 'Silahkan hubungi administrator') {
+            if (cooldownTimer) clearTimeout(cooldownTimer);
+            isCoolingDown = true;
+
+            playChime(false);
+
+            if (notifNama) notifNama.textContent = 'Data Belum Terdaftar';
+            if (notifDetail) notifDetail.textContent = 'Silahkan hubungi administrator';
+
+            if (notifStatusBadge) {
+                notifStatusBadge.textContent = 'BELUM TERDAFTAR';
+                notifStatusBadge.className = 'notif-badge-label badge-tidak-dikenal';
+            }
+
+            if (notifSukses) {
+                notifSukses.style.borderLeftColor = '#dc2626';
+            }
+
+            if (notifIconBox) {
+                notifIconBox.innerHTML = '<i class="bx bx-user-x"></i>';
+                notifIconBox.style.background = '#fee2e2';
+                notifIconBox.style.color = '#dc2626';
+            }
+
+            if (notifJam) {
+                const waktuTeks = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WITA';
+                notifJam.textContent = waktuTeks;
+            }
+
+            if (notifLive) notifLive.classList.add('d-none');
+            if (notifSukses) notifSukses.classList.remove('d-none');
+
+            // Tahan tampilan selama 3.5 detik agar terbaca dengan jelas oleh pengguna
+            cooldownTimer = setTimeout(() => {
+                isCoolingDown = false;
+                if (notifSukses) notifSukses.classList.add('d-none');
+                if (notifLive) notifLive.classList.remove('d-none');
+                perbaruiNotifLive('state-standby', '<i class="bx bx-scan"></i>', 'Arahkan Wajah ke Kamera', 'Posisikan wajah Anda di dalam frame untuk presensi otomatis');
+                jadwalkanFrameBerikutnya(80);
+            }, 3500);
         }
 
         function tampilkanDetailSukses(siswa, statusKode, pesanCustom) {
@@ -899,28 +892,22 @@
                 notifIconBox.style.color = iconColor;
             }
 
+            // Keterangan: Hanya menampilkan Kelas & NISN tanpa mengulang nama siswa
             if (notifDetail) {
-                if (pesanCustom && (siswa.sudah_absen || statusKode === 'sudah_absen')) {
-                    notifDetail.textContent = pesanCustom;
-                } else {
-                    notifDetail.textContent = `${siswa.kelas || '-'} • NISN: ${siswa.nisn || '-'}`;
-                }
+                notifDetail.textContent = `${siswa.kelas || '-'} • NISN: ${siswa.nisn || '-'}`;
             }
 
+            // Waktu di bawah/samping badge: Hanya jam tanpa teks sudah absen
             if (notifJam) {
                 const jamStr = siswa.jam ? siswa.jam.substring(0, 5) : '';
                 const waktuTeks = (jamStr || new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })) + ' WITA';
-                if (siswa.sudah_absen || statusKode === 'sudah_absen') {
-                    notifJam.innerHTML = `<span class="badge bg-secondary bg-opacity-25 text-secondary me-1" style="font-size:10px;">SUDAH TERCATAT</span> ${waktuTeks}`;
-                } else {
-                    notifJam.textContent = waktuTeks;
-                }
+                notifJam.textContent = waktuTeks;
             }
 
             if (notifLive) notifLive.classList.add('d-none');
             if (notifSukses) notifSukses.classList.remove('d-none');
 
-            // Tampilkan kartu sukses selama 3.5 detik untuk siswa, lalu kembali ke standby & lanjut memindai instan
+            // Tampilkan kartu status selama 3.5 detik untuk siswa, lalu kembali ke standby & lanjut memindai instan
             cooldownTimer = setTimeout(() => {
                 isCoolingDown = false;
                 if (notifSukses) notifSukses.classList.add('d-none');
