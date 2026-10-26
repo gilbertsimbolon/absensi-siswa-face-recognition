@@ -1419,42 +1419,14 @@
 
             ctx.save();
 
-            // Efek bayangan halus agar kotak putih terlihat kontras di latar belakang terang maupun gelap
+            // Efek bayangan kontras tipis agar garis putih terlihat tajam dan jelas di berbagai kondisi cahaya
             ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
-            ctx.shadowBlur = 5;
+            ctx.shadowBlur = 4;
 
-            // Garis tipis kotak pembungkus (Pure White Border khas OpenCV)
+            // Kotak persegi panjang putih persis seperti cv2.rectangle() khas Python OpenCV
             ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 1.8;
+            ctx.lineWidth = 2.8;
             ctx.strokeRect(x, y, w, h);
-
-            // Aksen sudut tebal khas Python OpenCV (Corner Brackets)
-            const cornerLen = Math.min(w, h) * 0.22;
-            ctx.lineWidth = 3.8;
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
-
-            ctx.beginPath();
-            // Pojok Kiri Atas
-            ctx.moveTo(x, y + cornerLen);
-            ctx.lineTo(x, y);
-            ctx.lineTo(x + cornerLen, y);
-
-            // Pojok Kanan Atas
-            ctx.moveTo(x + w - cornerLen, y);
-            ctx.lineTo(x + w, y);
-            ctx.lineTo(x + w, y + cornerLen);
-
-            // Pojok Kanan Bawah
-            ctx.moveTo(x + w, y + h - cornerLen);
-            ctx.lineTo(x + w, y + h);
-            ctx.lineTo(x + w - cornerLen, y + h);
-
-            // Pojok Kiri Bawah
-            ctx.moveTo(x + cornerLen, y + h);
-            ctx.lineTo(x, y + h);
-            ctx.lineTo(x, y + h - cornerLen);
-            ctx.stroke();
 
             ctx.restore();
         }
