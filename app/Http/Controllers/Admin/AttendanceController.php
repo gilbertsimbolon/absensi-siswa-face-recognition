@@ -882,6 +882,8 @@ class AttendanceController extends Controller
             return response()->json([
                 'status' => 'tidak_dikenali',
                 'pesan' => 'Data belum terdaftar. Silahkan hubungi administrator.',
+                'wajah' => $wajah,
+                'frame_annotated' => $frameAnnotated,
             ], 200);
         }
 

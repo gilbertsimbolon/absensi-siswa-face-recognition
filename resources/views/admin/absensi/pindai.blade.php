@@ -919,6 +919,10 @@
 
     </div>
 
+    <!-- Script Real-time Client-Side Face Tracker (Viola-Jones Haar Cascade khas OpenCV) -->
+    <script src="{{ asset('js/tracking-min.js') }}"></script>
+    <script src="{{ asset('js/face-min.js') }}"></script>
+
     <!-- Script Jam Digital, Kamera HTML5 & Penangkapan Frame Citra ke Python DeepFace -->
     <script>
         // 1. Jam Digital
@@ -1044,18 +1048,18 @@
                     boxCanvas.style.transform = (currentFacingMode === 'user') ? 'scaleX(-1)' : 'none';
                 }
 
-                videoEl.onloadedmetadata = () => {
+                const onVideoReady = () => {
                     videoEl.play();
                     perbaruiTombolKamera();
                     mulaiSiklusPemindaian();
-                    if (!isBoxRenderLoopStarted) {
-                        isBoxRenderLoopStarted = true;
-                        renderFaceBoundingBox();
-                        if (localFaceDetector) {
-                            mulaiDeteksiWajahLokal();
-                        }
-                    }
+                    mulaiDeteksiWajahClient();
                 };
+
+                if (videoEl.readyState >= 1) {
+                    onVideoReady();
+                } else {
+                    videoEl.onloadedmetadata = onVideoReady;
+                }
             } catch (err) {
                 console.error("Gagal membuka kamera:", err);
                 let pesan = "Pastikan izin akses kamera diberikan pada peramban Anda.";
@@ -1167,15 +1171,20 @@
 
         // 6. Tangani Respon Backend
         function tanganiResponPresensi(data) {
-            if (isCoolingDown) return;
-
-            // Perbarui bounding box wajah jika terdeteksi oleh backend Python
+            // Perbarui data koordinat wajah dari backend Python
             if (data.wajah && data.wajah.w > 0) {
-                activeFaceBox = data.wajah;
+                activeFaceBox = {
+                    x: data.wajah.x,
+                    y: data.wajah.y,
+                    w: data.wajah.w,
+                    h: data.wajah.h,
+                    frame_w: data.wajah.frame_w || 400,
+                    frame_h: data.wajah.frame_h || 300
+                };
                 lastFaceDetectedTime = Date.now();
-            } else if (data.status === 'tidak_ada_wajah') {
-                activeFaceBox = null;
             }
+
+            if (isCoolingDown) return;
 
             const st = data.status;
 
@@ -1216,7 +1225,6 @@
         function tampilkanBelumTerdaftar(pesanCustom = 'Silahkan hubungi administrator') {
             if (cooldownTimer) clearTimeout(cooldownTimer);
             isCoolingDown = true;
-            activeFaceBox = null;
 
             playChime(false);
 
@@ -1259,7 +1267,6 @@
         function tampilkanDetailSukses(siswa, statusKode, pesanCustom) {
             if (cooldownTimer) clearTimeout(cooldownTimer);
             isCoolingDown = true;
-            activeFaceBox = null;
 
             if (notifNama) notifNama.textContent = siswa.nama || 'Siswa';
 
@@ -1363,9 +1370,9 @@
 
             boxCtx.clearRect(0, 0, boxCanvas.width, boxCanvas.height);
 
-            // Jika sedang jeda sukses atau wajah tidak terdeteksi lebih dari 450ms, kosongkan
+            // Hilangkan kotak jika tidak ada wajah terdeteksi dalam 1.2 detik terakhir
             const now = Date.now();
-            if (isCoolingDown || !activeFaceBox || (now - lastFaceDetectedTime > 450)) {
+            if (!activeFaceBox || (now - lastFaceDetectedTime > 1200)) {
                 smoothedBox = null;
                 requestAnimationFrame(renderFaceBoundingBox);
                 return;
@@ -1386,7 +1393,7 @@
             const offsetX = (displayW - renderedW) / 2;
             const offsetY = (displayH - renderedH) / 2;
 
-            // Koordinat relatif dari frame pemrosesan Python
+            // Koordinat relatif dari frame pemrosesan
             const frameW = activeFaceBox.frame_w || videoW;
             const frameH = activeFaceBox.frame_h || videoH;
             const relX = activeFaceBox.x / frameW;
@@ -1403,7 +1410,7 @@
             if (!smoothedBox) {
                 smoothedBox = { x: targetX, y: targetY, w: targetW, h: targetH };
             } else {
-                const lerpFactor = 0.40;
+                const lerpFactor = 0.45;
                 smoothedBox.x += (targetX - smoothedBox.x) * lerpFactor;
                 smoothedBox.y += (targetY - smoothedBox.y) * lerpFactor;
                 smoothedBox.w += (targetW - smoothedBox.w) * lerpFactor;
@@ -1460,32 +1467,100 @@
             ctx.restore();
         }
 
-        async function mulaiDeteksiWajahLokal() {
-            if (!localFaceDetector || !videoEl) return;
+        let localTrackerCanvas = null;
+        let localTrackerCtx = null;
+        let isLocalTrackingRunning = false;
 
-            const loop = async () => {
-                if (!isCoolingDown && videoEl.readyState >= 2) {
-                    try {
-                        const faces = await localFaceDetector.detect(videoEl);
-                        if (faces && faces.length > 0) {
-                            const b = faces[0].boundingBox;
-                            activeFaceBox = {
-                                x: b.x,
-                                y: b.y,
-                                w: b.width,
-                                h: b.height,
-                                frame_w: videoEl.videoWidth,
-                                frame_h: videoEl.videoHeight
-                            };
-                            lastFaceDetectedTime = Date.now();
-                        }
-                    } catch (e) {
-                        // Abaikan error deteksi lokal
+        function mulaiDeteksiWajahClient() {
+            if (isLocalTrackingRunning) return;
+            isLocalTrackingRunning = true;
+
+            localTrackerCanvas = document.createElement('canvas');
+            localTrackerCtx = localTrackerCanvas.getContext('2d', { willReadFrequently: true });
+
+            const tracker = (typeof tracking !== 'undefined' && tracking.ObjectTracker)
+                ? new tracking.ObjectTracker('face')
+                : null;
+
+            if (tracker) {
+                tracker.setInitialScale(4);
+                tracker.setStepSize(2);
+                tracker.setEdgesDensity(0.1);
+            }
+
+            const deteksiLoop = async () => {
+                if (videoEl && videoEl.readyState >= 2) {
+                    // 1. Coba browser native Shape Detection API jika didukung
+                    if (localFaceDetector) {
+                        try {
+                            const faces = await localFaceDetector.detect(videoEl);
+                            if (faces && faces.length > 0) {
+                                const b = faces[0].boundingBox;
+                                activeFaceBox = {
+                                    x: b.x,
+                                    y: b.y,
+                                    w: b.width,
+                                    h: b.height,
+                                    frame_w: videoEl.videoWidth || 640,
+                                    frame_h: videoEl.videoHeight || 480
+                                };
+                                lastFaceDetectedTime = Date.now();
+                            }
+                        } catch (e) {}
+                    } 
+                    // 2. Gunakan Haar Cascade OpenCV (tracking.js) lokal langsung di browser
+                    else if (tracker && typeof tracking !== 'undefined' && tracking.ViolaJones) {
+                        try {
+                            const vw = videoEl.videoWidth || 320;
+                            const vh = videoEl.videoHeight || 240;
+                            const sw = 320;
+                            const sh = Math.max(160, Math.round((vh / vw) * sw));
+
+                            if (localTrackerCanvas.width !== sw || localTrackerCanvas.height !== sh) {
+                                localTrackerCanvas.width = sw;
+                                localTrackerCanvas.height = sh;
+                            }
+
+                            localTrackerCtx.drawImage(videoEl, 0, 0, sw, sh);
+                            const imgData = localTrackerCtx.getImageData(0, 0, sw, sh);
+
+                            const detected = tracking.ViolaJones.detect(
+                                imgData.data,
+                                sw,
+                                sh,
+                                tracker.getInitialScale(),
+                                tracker.getScaleFactor(),
+                                tracker.getStepSize(),
+                                tracker.getEdgesDensity(),
+                                tracking.ViolaJones.classifiers.face
+                            );
+
+                            if (detected && detected.length > 0) {
+                                let best = detected[0];
+                                for (let i = 1; i < detected.length; i++) {
+                                    if ((detected[i].width * detected[i].height) > (best.width * best.height)) {
+                                        best = detected[i];
+                                    }
+                                }
+
+                                const scaleBack = vw / sw;
+                                activeFaceBox = {
+                                    x: best.x * scaleBack,
+                                    y: best.y * scaleBack,
+                                    w: best.width * scaleBack,
+                                    h: best.height * scaleBack,
+                                    frame_w: vw,
+                                    frame_h: vh
+                                };
+                                lastFaceDetectedTime = Date.now();
+                            }
+                        } catch (e) {}
                     }
                 }
-                setTimeout(loop, 60);
+                setTimeout(deteksiLoop, 80);
             };
-            loop();
+
+            deteksiLoop();
         }
 
         // 8. Deteksi Orientasi Mobile & Rekomendasi Mode Lanskap
@@ -1521,6 +1596,8 @@
         document.addEventListener('DOMContentLoaded', () => {
             mulaiKamera();
             periksaOrientasi();
+            requestAnimationFrame(renderFaceBoundingBox);
+        });
         });
     </script>
 </body>
