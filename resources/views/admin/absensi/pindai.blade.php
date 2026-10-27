@@ -148,17 +148,6 @@
             background: #000;
         }
 
-        /* Canvas Overlay Bounding Box Wajah (Khas Python OpenCV - Border Putih) */
-        .face-box-canvas {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            z-index: 30;
-        }
-
         /* Notifikasi Status Absensi di Dalam Frame Kamera */
         .notification-overlay {
             position: absolute;
@@ -861,8 +850,6 @@
                    class="video-feed"
                    style="transform: scaleX(-1);">
             </video>
-            <!-- Canvas Overlay Bounding Box Wajah (Khas Python OpenCV - Border Putih) -->
-            <canvas id="face-box-canvas" class="face-box-canvas" style="transform: scaleX(-1);"></canvas>
             <canvas id="capture-canvas" class="d-none"></canvas>
 
             <!-- Tampilan Saat Kamera Tidak Aktif / Akses Ditolak -->
@@ -931,8 +918,6 @@
 
         // 2. Elemen DOM
         const videoEl = document.getElementById('webcam-video');
-        const boxCanvas = document.getElementById('face-box-canvas');
-        const boxCtx = boxCanvas ? boxCanvas.getContext('2d') : null;
         const canvasEl = document.getElementById('capture-canvas');
         const offlineBox = document.getElementById('camera-offline-box');
         const offlineTitle = document.getElementById('camera-offline-title');
@@ -962,20 +947,6 @@
         let loopIntervalId = null;
         let lastScannedNisn = '';
         let lastScannedTime = 0;
-
-        // Data & Status Bounding Box Wajah (Khas Python OpenCV)
-        let activeFaceBox = null;
-        let lastFaceDetectedTime = 0;
-        let isBoxRenderLoopStarted = false;
-        let localFaceDetector = null;
-
-        if ('FaceDetector' in window) {
-            try {
-                localFaceDetector = new FaceDetector({ fastMode: true, maxDetectedFaces: 1 });
-            } catch (e) {
-                localFaceDetector = null;
-            }
-        }
 
         // 3. Audio Chime (Web Audio API Synthesizer - Ringan & Tanpa File Eksternal)
         function playChime(isSuccess = true) {
@@ -1040,17 +1011,11 @@
 
                 // Cermin video jika kamera depan, normal jika kamera belakang
                 videoEl.style.transform = (currentFacingMode === 'user') ? 'scaleX(-1)' : 'none';
-                if (boxCanvas) {
-                    boxCanvas.style.transform = (currentFacingMode === 'user') ? 'scaleX(-1)' : 'none';
-                }
 
                 videoEl.onloadedmetadata = () => {
-                    videoEl.play().catch(e => console.warn("Video play error:", e));
+                    videoEl.play();
                     perbaruiTombolKamera();
                     mulaiSiklusPemindaian();
-                    if (localFaceDetector) {
-                        mulaiDeteksiWajahLokal();
-                    }
                 };
             } catch (err) {
                 console.error("Gagal membuka kamera:", err);
@@ -1066,10 +1031,6 @@
 
         function tampilkanErrorKamera(judul, desc) {
             videoEl.classList.add('d-none');
-            if (boxCanvas) {
-                boxCanvas.classList.add('d-none');
-                activeFaceBox = null;
-            }
             offlineBox.classList.remove('d-none');
             if (offlineTitle) offlineTitle.textContent = judul;
             if (offlineDesc) offlineDesc.textContent = desc;
@@ -1077,9 +1038,6 @@
 
         function toggleKamera() {
             currentFacingMode = (currentFacingMode === 'user') ? 'environment' : 'user';
-            if (boxCanvas) {
-                boxCanvas.style.transform = (currentFacingMode === 'user') ? 'scaleX(-1)' : 'none';
-            }
             mulaiKamera();
         }
 
@@ -1163,19 +1121,6 @@
 
         // 6. Tangani Respon Backend
         function tanganiResponPresensi(data) {
-            // Perbarui data koordinat wajah dari backend Python
-            if (data.wajah && data.wajah.w > 0) {
-                activeFaceBox = {
-                    x: data.wajah.x,
-                    y: data.wajah.y,
-                    w: data.wajah.w,
-                    h: data.wajah.h,
-                    frame_w: data.wajah.frame_w || 400,
-                    frame_h: data.wajah.frame_h || 300
-                };
-                lastFaceDetectedTime = Date.now();
-            }
-
             if (isCoolingDown) return;
 
             const st = data.status;
@@ -1342,123 +1287,6 @@
             }, 3500);
         }
 
-        // 7. Render Visual Bounding Box Wajah (Khas Python OpenCV - Border Putih)
-        let smoothedBox = null;
-
-        function renderFaceBoundingBox() {
-            if (!boxCanvas || !boxCtx || !videoEl) {
-                requestAnimationFrame(renderFaceBoundingBox);
-                return;
-            }
-
-            const container = videoEl.parentElement;
-            const displayW = container ? container.clientWidth : videoEl.clientWidth;
-            const displayH = container ? container.clientHeight : videoEl.clientHeight;
-
-            if (displayW && displayH && (boxCanvas.width !== displayW || boxCanvas.height !== displayH)) {
-                boxCanvas.width = displayW;
-                boxCanvas.height = displayH;
-            }
-
-            boxCtx.clearRect(0, 0, boxCanvas.width, boxCanvas.height);
-
-            // Hilangkan kotak jika tidak ada wajah terdeteksi dalam 1.2 detik terakhir
-            const now = Date.now();
-            if (!activeFaceBox || (now - lastFaceDetectedTime > 1200)) {
-                smoothedBox = null;
-                requestAnimationFrame(renderFaceBoundingBox);
-                return;
-            }
-
-            const videoW = videoEl.videoWidth || activeFaceBox.frame_w || 400;
-            const videoH = videoEl.videoHeight || activeFaceBox.frame_h || 300;
-
-            if (!videoW || !videoH || !displayW || !displayH) {
-                requestAnimationFrame(renderFaceBoundingBox);
-                return;
-            }
-
-            // Hitung skala & offset penyesuaian CSS object-fit: cover
-            const scale = Math.max(displayW / videoW, displayH / videoH);
-            const renderedW = videoW * scale;
-            const renderedH = videoH * scale;
-            const offsetX = (displayW - renderedW) / 2;
-            const offsetY = (displayH - renderedH) / 2;
-
-            // Koordinat relatif dari frame pemrosesan
-            const frameW = activeFaceBox.frame_w || videoW;
-            const frameH = activeFaceBox.frame_h || videoH;
-            const relX = activeFaceBox.x / frameW;
-            const relY = activeFaceBox.y / frameH;
-            const relW = activeFaceBox.w / frameW;
-            const relH = activeFaceBox.h / frameH;
-
-            const targetX = offsetX + (relX * renderedW);
-            const targetY = offsetY + (relY * renderedH);
-            const targetW = relW * renderedW;
-            const targetH = relH * renderedH;
-
-            // Smooth Interpolation (LERP) agar pergerakan kotak wajah sangat halus dan stabil
-            if (!smoothedBox) {
-                smoothedBox = { x: targetX, y: targetY, w: targetW, h: targetH };
-            } else {
-                const lerpFactor = 0.45;
-                smoothedBox.x += (targetX - smoothedBox.x) * lerpFactor;
-                smoothedBox.y += (targetY - smoothedBox.y) * lerpFactor;
-                smoothedBox.w += (targetW - smoothedBox.w) * lerpFactor;
-                smoothedBox.h += (targetH - smoothedBox.h) * lerpFactor;
-            }
-
-            gambarKotakWajahOpenCv(boxCtx, smoothedBox.x, smoothedBox.y, smoothedBox.w, smoothedBox.h);
-
-            requestAnimationFrame(renderFaceBoundingBox);
-        }
-
-        function gambarKotakWajahOpenCv(ctx, x, y, w, h) {
-            if (w <= 0 || h <= 0) return;
-
-            ctx.save();
-
-            // Efek bayangan kontras tipis agar garis putih terlihat tajam dan jelas di berbagai kondisi cahaya
-            ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
-            ctx.shadowBlur = 4;
-
-            // Kotak persegi panjang putih persis seperti cv2.rectangle() khas Python OpenCV
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 2.8;
-            ctx.strokeRect(x, y, w, h);
-
-            ctx.restore();
-        }
-
-        async function mulaiDeteksiWajahLokal() {
-            if (!localFaceDetector || !videoEl) return;
-
-            const loop = async () => {
-                if (videoEl.readyState >= 2) {
-                    try {
-                        const faces = await localFaceDetector.detect(videoEl);
-                        if (faces && faces.length > 0) {
-                            const b = faces[0].boundingBox;
-                            activeFaceBox = {
-                                x: b.x,
-                                y: b.y,
-                                w: b.width,
-                                h: b.height,
-                                frame_w: videoEl.videoWidth || 640,
-                                frame_h: videoEl.videoHeight || 480
-                            };
-                            lastFaceDetectedTime = Date.now();
-                        }
-                    } catch (e) {
-                        // Abaikan error deteksi lokal
-                    }
-                }
-                setTimeout(loop, 70);
-            };
-            loop();
-        }
-
         // 8. Deteksi Orientasi Mobile & Rekomendasi Mode Lanskap
         function periksaOrientasi() {
             const promptEl = document.getElementById('rotate-prompt');
@@ -1492,7 +1320,6 @@
         document.addEventListener('DOMContentLoaded', () => {
             mulaiKamera();
             periksaOrientasi();
-            requestAnimationFrame(renderFaceBoundingBox);
         });
     </script>
 </body>

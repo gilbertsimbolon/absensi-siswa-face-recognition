@@ -422,10 +422,10 @@ class LayananWajah:
         Mencatat absensi ke Laravel (opsional),
         dan Mengembalikan gambar beranotasi OpenCV.
         """
-        if not self.is_ready:
+        if not self.is_ready or not self.embeddings_db:
             return {
                 "status": "error",
-                "pesan": "Layanan pemindai wajah sedang memuat model."
+                "pesan": "Database wajah belum siap atau sedang dimuat."
             }
 
         try:
