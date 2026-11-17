@@ -233,12 +233,19 @@ if __name__ == '__main__':
     print("  Server DeepFace FaceNet Presensi Wajah SMAN 2 Tondano")
     print(f"  Berjalan di http://{konfigurasi.HOST}:{konfigurasi.PORT}")
     print("====================================================")
-    try:
-        layanan.inisialisasi()
-    except Exception as e_init:
-        print(f"[!] Warning saat inisialisasi model: {e_init}")
-        import traceback
-        traceback.print_exc()
+    
+    # Jalankan inisialisasi model dan data di background thread
+    # agar port 5000 langsung terbuka seketika (< 0.1 detik) dan tidak memblokir restart/systemd
+    def background_inisialisasi():
+        try:
+            layanan.inisialisasi()
+        except Exception as e_init:
+            print(f"[!] Warning saat inisialisasi model: {e_init}")
+            import traceback
+            traceback.print_exc()
+
+    init_thread = threading.Thread(target=background_inisialisasi, daemon=True)
+    init_thread.start()
 
     try:
         app.run(host=konfigurasi.HOST, port=konfigurasi.PORT, debug=False, threaded=True)

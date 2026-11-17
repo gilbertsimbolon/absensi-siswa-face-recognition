@@ -406,37 +406,51 @@ class LayananWajah:
     def muat_data_siswa(self):
         """Memuat daftar siswa dan vektor embedding wajah langsung dari database Laravel."""
         loaded = False
-        url = f"{self.laravel_api_url.rstrip('/')}/api/presensi/daftar-siswa"
-        try:
-            res = requests.get(url, timeout=5)
-            if res.status_code == 200:
-                self.data_siswa = res.json()
-                print(f"[+] Berhasil memuat data {len(self.data_siswa)} siswa dari {url}.")
+        candidate_urls = [
+            f"{self.laravel_api_url.rstrip('/')}/api/presensi/daftar-siswa",
+            "http://127.0.0.1/api/presensi/daftar-siswa",
+            "http://localhost/api/presensi/daftar-siswa",
+        ]
+        # Hilangkan duplikat
+        seen = set()
+        unique_urls = []
+        for u in candidate_urls:
+            if u not in seen:
+                seen.add(u)
+                unique_urls.append(u)
 
-                # Ekstrak vektor embedding wajah langsung dari database Laravel (Single Source of Truth)
-                db_embeddings = []
-                for nisn, info in self.data_siswa.items():
-                    raw_embs = info.get("embeddings", [])
-                    for idx, emb_raw in enumerate(raw_embs):
-                        if emb_raw and len(emb_raw) == 128:
-                            emb_vec = np.array(emb_raw, dtype=np.float32)
-                            norm = np.linalg.norm(emb_vec)
-                            if norm > 0:
-                                emb_vec = emb_vec / norm
-                            db_embeddings.append({
-                                "label": str(nisn),
-                                "embedding": emb_vec,
-                                "path": f"db://faces/{nisn}/{idx}"
-                            })
+        for url in unique_urls:
+            try:
+                res = requests.get(url, timeout=3)
+                if res.status_code == 200:
+                    self.data_siswa = res.json()
+                    print(f"[+] Berhasil memuat data {len(self.data_siswa)} siswa dari {url}.")
 
-                if db_embeddings:
-                    self.embeddings_db = db_embeddings
-                    print(f"[+] Berhasil memuat {len(self.embeddings_db)} vektor embedding wajah langsung dari database MySQL.")
-                    self.perbarui_matrix_embeddings()
-                    self.is_ready = True
-                loaded = True
-        except Exception as e:
-            print(f"[!] Gagal terhubung ke Laravel ({url}): {e}")
+                    # Ekstrak vektor embedding wajah langsung dari database Laravel (Single Source of Truth)
+                    db_embeddings = []
+                    for nisn, info in self.data_siswa.items():
+                        raw_embs = info.get("embeddings", [])
+                        for idx, emb_raw in enumerate(raw_embs):
+                            if emb_raw and len(emb_raw) == 128:
+                                emb_vec = np.array(emb_raw, dtype=np.float32)
+                                norm = np.linalg.norm(emb_vec)
+                                if norm > 0:
+                                    emb_vec = emb_vec / norm
+                                db_embeddings.append({
+                                    "label": str(nisn),
+                                    "embedding": emb_vec,
+                                    "path": f"db://faces/{nisn}/{idx}"
+                                })
+
+                    if db_embeddings:
+                        self.embeddings_db = db_embeddings
+                        print(f"[+] Berhasil memuat {len(self.embeddings_db)} vektor embedding wajah langsung dari database MySQL.")
+                        self.perbarui_matrix_embeddings()
+                        self.is_ready = True
+                    loaded = True
+                    break
+            except Exception as e:
+                pass
 
         if not loaded:
             print("[*] Belum dapat terhubung ke Laravel untuk memuat daftar siswa.")
@@ -608,8 +622,12 @@ class LayananWajah:
         """
         if not self.is_ready or not self.embeddings_db:
             return {
-                "status": "error",
-                "pesan": "Database wajah belum siap atau sedang dimuat."
+                "status": "memindai",
+                "pesan": "Server AI sedang menyiapkan model...",
+                "hasil": {
+                    "status": "memindai",
+                    "pesan": "Server AI sedang menyiapkan model..."
+                }
             }
 
         try:

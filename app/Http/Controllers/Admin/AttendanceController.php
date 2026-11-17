@@ -823,11 +823,7 @@ class AttendanceController extends Controller
             try {
                 $pythonUrl = config('services.deepface.url', 'http://127.0.0.1:5000/proses-frame');
 
-                if (! PythonServiceManager::isRunning()) {
-                    PythonServiceManager::startService();
-                }
-
-                $response = Http::timeout(8)->post($pythonUrl, [
+                $response = Http::connectTimeout(1)->timeout(4)->post($pythonUrl, [
                     'gambar' => $gambarBase64,
                 ]);
 
@@ -871,15 +867,15 @@ class AttendanceController extends Controller
                     }
                 } else {
                     return response()->json([
-                        'status' => 'error_server',
-                        'pesan' => 'Layanan pemindai wajah DeepFace sedang bermasalah.',
-                    ], 502);
+                        'status' => 'memindai',
+                        'pesan' => 'Menghubungkan ke layanan AI di server...',
+                    ], 200);
                 }
             } catch (\Exception $e) {
                 return response()->json([
-                    'status' => 'error_server',
-                    'pesan' => 'Tidak dapat terhubung ke server DeepFace: '.$e->getMessage(),
-                ], 503);
+                    'status' => 'memindai',
+                    'pesan' => 'Menghubungkan ke layanan AI di server...',
+                ], 200);
             }
         }
 
