@@ -139,16 +139,17 @@
             }
         }
 
-        /* Video Feed MJPEG */
+        /* Video Feed MJPEG & Kamera HTML5 */
         .video-feed {
             width: 100%;
             height: 100%;
             object-fit: cover;
             display: block;
             background: #000;
+            transition: transform 0.35s cubic-bezier(0.2, 0.9, 0.3, 1), transform-origin 0.35s cubic-bezier(0.2, 0.9, 0.3, 1);
         }
 
-        /* Overlay Canvas Bounding Box & HUD AI */
+        /* Overlay Canvas Bounding Box & HUD AI (Auto-Zoom Dinamis) */
         .overlay-canvas {
             position: absolute;
             top: 0;
@@ -157,6 +158,7 @@
             height: 100%;
             pointer-events: none;
             z-index: 20;
+            transition: transform 0.35s cubic-bezier(0.2, 0.9, 0.3, 1), transform-origin 0.35s cubic-bezier(0.2, 0.9, 0.3, 1);
         }
 
         /* Notifikasi Status Absensi di Dalam Frame Kamera */
@@ -1062,7 +1064,14 @@
             }
         }
 
-        // 5. Gambar Bounding Box AI (Kotak Wajah Futuristik + Zoom & Status)
+        // 5. Gambar Bounding Box AI & Dynamic Auto-Zoom ke Wajah Siswa
+        function resetAutoZoom() {
+            if (videoEl) {
+                videoEl.style.transformOrigin = 'center center';
+                videoEl.style.transform = (currentFacingMode === 'user') ? 'scaleX(-1) scale(1.0)' : 'scale(1.0)';
+            }
+        }
+
         function gambarKotakWajah(wajah) {
             if (!overlayCanvas || !overlayCtx || !videoEl) return;
 
@@ -1074,7 +1083,10 @@
 
             overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
 
-            if (!wajah || !wajah.w || !wajah.h) return;
+            if (!wajah || !wajah.w || !wajah.h) {
+                resetAutoZoom();
+                return;
+            }
 
             const frameW = wajah.frame_w || 400;
             const frameH = wajah.frame_h || 300;
@@ -1090,6 +1102,24 @@
             if (currentFacingMode === 'user') {
                 bx = rect.width - (bx + bw);
             }
+
+            // Auto-Zoom Dinamis: Saat titik wajah terdeteksi, kamera langsung fokus & zoom in ke area wajah
+            const faceCenterX = bx + bw / 2;
+            const faceCenterY = by + bh / 2;
+            const originXPct = Math.max(15, Math.min(85, (faceCenterX / rect.width) * 100));
+            const originYPct = Math.max(15, Math.min(85, (faceCenterY / rect.height) * 100));
+
+            let zoomScale = 1.0;
+            const faceWidthRatio = bw / rect.width;
+            if (faceWidthRatio < 0.25) {
+                zoomScale = 1.35; // Zoom 35% lebih dekat jika siswa agak jauh
+            } else if (faceWidthRatio < 0.42) {
+                zoomScale = 1.20; // Zoom 20% jika jarak sedang
+            }
+
+            const originStyle = `${originXPct}% ${originYPct}%`;
+            videoEl.style.transformOrigin = originStyle;
+            videoEl.style.transform = (currentFacingMode === 'user') ? `scaleX(-1) scale(${zoomScale})` : `scale(${zoomScale})`;
 
             const status = wajah.status || 'memindai';
             let color = '#06b6d4'; // cyan memindai
@@ -1182,6 +1212,7 @@
                 if (overlayCtx && overlayCanvas) {
                     overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
                 }
+                resetAutoZoom();
             }, 600);
         }
 

@@ -276,8 +276,17 @@ class LayananWajah:
                 x2 = min(w_orig, fx + fw + pad_side)
                 face_crop = frame[y1:y2, x1:x2]
 
-                target_img = face_crop if (face_crop is not None and face_crop.size > 0 and 
-                                           face_crop.shape[0] > 20 and face_crop.shape[1] > 20) else frame
+                target_img = frame
+                if face_crop is not None and face_crop.size > 0 and face_crop.shape[0] > 20 and face_crop.shape[1] > 20:
+                    # 1. Normalisasi pencahayaan adaptif CLAHE pada area crop wajah agar fitur mata & hidung tajam
+                    enhanced_crop = FaceDetector.normalisasi_pencahayaan_adaptif(face_crop)
+
+                    # 2. Zoom & interpolasi kubik resolusi tinggi jika wajah berukuran kecil/jauh dari kamera
+                    hc, wc = enhanced_crop.shape[:2]
+                    if wc < 160 or hc < 160:
+                        enhanced_crop = cv2.resize(enhanced_crop, (160, 160), interpolation=cv2.INTER_CUBIC)
+
+                    target_img = enhanced_crop
 
                 # Ekstraksi fitur embedding FaceNet dengan perataan wajah instan (~20ms)
                 query_emb = self.embedder.ekstrak_embedding(
