@@ -33,8 +33,8 @@ if not os.path.exists(YUNET_MODEL_PATH):
         YUNET_MODEL_PATH = fallback_deepface
 
 # Ambang Batas Jarak Pencocokan (Threshold)
-# Standar ketat FaceNet anti false-positive (wajah orang lain / belum terdaftar 100% ditolak): 0.32
-THRESHOLD = float(os.getenv('FACE_THRESHOLD', 0.32))
+# Standar ketat FaceNet anti false-positive (wajah orang lain / belum terdaftar 100% ditolak): 0.28
+THRESHOLD = float(os.getenv('FACE_THRESHOLD', 0.28))
 
 # Path Penyimpanan Foto Wajah Laravel Storage (Single Source of Truth via php artisan storage:link)
 # Seluruh foto disimpan murni di Laravel storage/app/public/faces, tanpa duplikasi di python

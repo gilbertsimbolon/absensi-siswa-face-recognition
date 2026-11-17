@@ -138,6 +138,57 @@ class ReextractFacesCommand extends Command
             // Ignore
         }
 
+        // Diagnostik keunikan vektor di antara seluruh siswa terdaftar
+        $this->info('Memeriksa keunikan vektor di antara seluruh siswa terdaftar...');
+        $faces = StudentFace::with('student')->whereNotNull('embedding')->get();
+        $duplicatesFound = 0;
+
+        for ($i = 0; $i < $faces->count(); $i++) {
+            for ($j = $i + 1; $j < $faces->count(); $j++) {
+                $f1 = $faces[$i];
+                $f2 = $faces[$j];
+
+                if ($f1->student_id === $f2->student_id) {
+                    continue;
+                }
+
+                $v1 = $f1->embedding;
+                $v2 = $f2->embedding;
+
+                if (! is_array($v1) || ! is_array($v2) || count($v1) !== count($v2)) {
+                    continue;
+                }
+
+                $dot = 0.0;
+                $norm1 = 0.0;
+                $norm2 = 0.0;
+                for ($k = 0; $k < count($v1); $k++) {
+                    $dot += $v1[$k] * $v2[$k];
+                    $norm1 += $v1[$k] ** 2;
+                    $norm2 += $v2[$k] ** 2;
+                }
+
+                $norm1 = sqrt($norm1) ?: 1.0;
+                $norm2 = sqrt($norm2) ?: 1.0;
+                $sim = $dot / ($norm1 * $norm2);
+                $dist = 1.0 - $sim;
+
+                if ($dist < 0.28) {
+                    $s1Name = $f1->student?->name ?? 'Siswa';
+                    $s1Nisn = $f1->student?->nisn ?? '-';
+                    $s2Name = $f2->student?->name ?? 'Siswa';
+                    $s2Nisn = $f2->student?->nisn ?? '-';
+
+                    $this->warn("   [!] PERHATIAN (DUPLIKAT/KEMBAR): {$s1Name} ({$s1Nisn}) dan {$s2Name} ({$s2Nisn}) sangat mirip (Jarak: ".round($dist, 4).', Kemiripan: '.round($sim * 100, 1).'%). Pastikan berkas foto kedua siswa ini tidak sama.');
+                    $duplicatesFound++;
+                }
+            }
+        }
+
+        if ($duplicatesFound === 0) {
+            $this->info('[+] Seluruh vektor siswa 100% unik dan tidak ada bentrok/kembar!');
+        }
+
         $this->info("=== SELESAI: {$successCount} siswa berhasil diekstrak ulang ===");
 
         return self::SUCCESS;

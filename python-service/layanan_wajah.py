@@ -18,17 +18,18 @@ from PIL import Image
 from deepface import DeepFace
 import konfigurasi
 
-def hitung_persentase_akurasi(cosine_dist, threshold=0.32):
+def hitung_persentase_akurasi(cosine_dist, threshold=0.28):
     """
     Mengonversi jarak kosinus FaceNet (0.0 - 1.0+) menjadi persentase akurasi yang proporsional.
-    - Wajah cocok (jarak <= threshold 0.32): menghasilkan skor 85.0% - 99.9%
+    - Wajah cocok (jarak <= threshold 0.28): menghasilkan skor 85.0% - 99.9%
       sehingga siswa terdaftar langsung lolos verifikasi standar sekolah (80% - 85%) dalam < 1-2 detik.
-    - Wajah bukan siswa / berbeda (jarak > threshold 0.32): skor langsung drop tajam ke bawah 60%.
+    - Wajah bukan siswa / berbeda (jarak > threshold 0.28): skor langsung drop tajam ke bawah 60.0%
+      sehingga tidak akan pernah lolos verifikasi presensi.
     """
     if cosine_dist <= 0:
         return 100.0
 
-    th = float(threshold) if threshold and float(threshold) > 0 else 0.32
+    th = float(threshold) if threshold and float(threshold) > 0 else 0.28
     d = float(cosine_dist)
 
     if d <= th:
@@ -36,10 +37,10 @@ def hitung_persentase_akurasi(cosine_dist, threshold=0.32):
         skor = 100.0 - (d / th) * 15.0
         return round(max(85.0, min(99.99, skor)), 2)
     else:
-        # Di atas threshold (bukan siswa / wajah berbeda): drop tajam dari 84.9% ke bawah
+        # Di atas threshold (bukan siswa terdaftar / wajah berbeda): drop langsung di bawah 60%
         over = d - th
-        skor = 84.9 - (over / 0.15) * 50.0
-        return round(max(0.0, min(84.99, skor)), 2)
+        skor = 60.0 - (over / 0.10) * 40.0
+        return round(max(0.0, min(60.0, skor)), 2)
 
 class LayananWajah:
     def __init__(self):
@@ -475,13 +476,13 @@ class LayananWajah:
 
                 target_img = face_crop if (face_crop is not None and face_crop.size > 0 and face_crop.shape[0] > 20 and face_crop.shape[1] > 20) else frame
 
-                # Ambil embedding wajah teraligni secara konsisten dengan backend OpenCV
+                # Ambil embedding wajah teraligni secara konsisten dengan backend skip (karena sudah dicrop dengan padding optimal oleh YuNet)
                 try:
                     with self.model_lock:
                         representations = DeepFace.represent(
                             img_path=target_img,
                             model_name=self.model_name,
-                            detector_backend="opencv",
+                            detector_backend="skip",
                             enforce_detection=False
                         )
                 except Exception:
@@ -793,18 +794,35 @@ class LayananWajah:
         new_embeddings = []
         for file_name in foto_files:
             img_path = os.path.join(folder_siswa, file_name)
+            img = cv2.imread(img_path)
+            if img is None or img.size == 0:
+                continue
 
-            # Terapkan teknik auto-crop & zoom wajah langsung pada berkas foto di storage publik
-            berhasil_crop = self.potong_dan_zoom_wajah(img_path)
+            h_img, w_img = img.shape[:2]
+            faces = self.deteksi_wajah_cnn(img, min_score=0.40)
+
+            target_face = img
+            if faces:
+                faces = sorted(faces, key=lambda f: f[2] * f[3], reverse=True)
+                fx, fy, fw, fh = faces[0][:4]
+                pad_top = int(fh * 0.35)
+                pad_bottom = int(fh * 0.40)
+                pad_side = int(fw * 0.30)
+                y1 = max(0, fy - pad_top)
+                y2 = min(h_img, fy + fh + pad_bottom)
+                x1 = max(0, fx - pad_side)
+                x2 = min(w_img, fx + fw + pad_side)
+                crop = img[y1:y2, x1:x2]
+                if crop is not None and crop.size > 0:
+                    target_face = crop
 
             representations = []
             try:
-                # Selalu gunakan backend OpenCV agar perataan wajah (alignment) identik 100% antara foto dataset dan kamera
                 with self.model_lock:
                     representations = DeepFace.represent(
-                        img_path=img_path,
+                        img_path=target_face,
                         model_name=self.model_name,
-                        detector_backend="opencv",
+                        detector_backend="skip",
                         enforce_detection=False
                     )
             except Exception:
@@ -813,7 +831,7 @@ class LayananWajah:
                         representations = DeepFace.represent(
                             img_path=img_path,
                             model_name=self.model_name,
-                            detector_backend="skip",
+                            detector_backend="opencv",
                             enforce_detection=False
                         )
                 except Exception as e:
