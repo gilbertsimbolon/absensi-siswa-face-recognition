@@ -148,6 +148,17 @@
             background: #000;
         }
 
+        /* Overlay Canvas Bounding Box & HUD AI */
+        .overlay-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 20;
+        }
+
         /* Notifikasi Status Absensi di Dalam Frame Kamera */
         .notification-overlay {
             position: absolute;
@@ -850,6 +861,7 @@
                    class="video-feed"
                    style="transform: scaleX(-1);">
             </video>
+            <canvas id="overlay-canvas" class="overlay-canvas"></canvas>
             <canvas id="capture-canvas" class="d-none"></canvas>
 
             <!-- Tampilan Saat Kamera Tidak Aktif / Akses Ditolak -->
@@ -918,6 +930,9 @@
 
         // 2. Elemen DOM
         const videoEl = document.getElementById('webcam-video');
+        const overlayCanvas = document.getElementById('overlay-canvas');
+        const overlayCtx = overlayCanvas ? overlayCanvas.getContext('2d') : null;
+        let clearBoxTimer = null;
         const canvasEl = document.getElementById('capture-canvas');
         const offlineBox = document.getElementById('camera-offline-box');
         const offlineTitle = document.getElementById('camera-offline-title');
@@ -1047,13 +1062,136 @@
             }
         }
 
-        // 5. Siklus Penangkapan Citra & Pengiriman ke Backend Python Secepat Kilat
-        function mulaiSiklusPemindaian() {
-            if (loopIntervalId) clearTimeout(loopIntervalId);
-            jadwalkanFrameBerikutnya(80);
+        // 5. Gambar Bounding Box AI (Kotak Wajah Futuristik + Zoom & Status)
+        function gambarKotakWajah(wajah) {
+            if (!overlayCanvas || !overlayCtx || !videoEl) return;
+
+            const rect = videoEl.getBoundingClientRect();
+            if (overlayCanvas.width !== rect.width || overlayCanvas.height !== rect.height) {
+                overlayCanvas.width = rect.width;
+                overlayCanvas.height = rect.height;
+            }
+
+            overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+
+            if (!wajah || !wajah.w || !wajah.h) return;
+
+            const frameW = wajah.frame_w || 400;
+            const frameH = wajah.frame_h || 300;
+            const scaleX = rect.width / frameW;
+            const scaleY = rect.height / frameH;
+
+            let bx = wajah.x * scaleX;
+            let by = wajah.y * scaleY;
+            let bw = wajah.w * scaleX;
+            let bh = wajah.h * scaleY;
+
+            // Jika kamera depan, cerminkan koordinat X agar sinkron dengan cermin video
+            if (currentFacingMode === 'user') {
+                bx = rect.width - (bx + bw);
+            }
+
+            const status = wajah.status || 'memindai';
+            let color = '#06b6d4'; // cyan memindai
+            let badgeBg = 'rgba(6, 182, 212, 0.90)';
+            if (status === 'sukses') {
+                color = '#22c55e'; // emerald green
+                badgeBg = 'rgba(34, 197, 94, 0.92)';
+            } else if (status === 'sudah_absen') {
+                color = '#0284c7'; // sky blue
+                badgeBg = 'rgba(2, 132, 199, 0.92)';
+            } else if (status === 'tidak_dikenali') {
+                color = '#ef4444'; // red
+                badgeBg = 'rgba(239, 68, 68, 0.92)';
+            } else if (status === 'gagal_akurasi') {
+                color = '#f59e0b'; // amber
+                badgeBg = 'rgba(245, 158, 11, 0.92)';
+            }
+
+            // 1. Gambar Bounding Box dengan Sudut Autofokus Futuristik (Corner Brackets)
+            overlayCtx.save();
+            overlayCtx.strokeStyle = color;
+            overlayCtx.lineWidth = 3;
+            overlayCtx.shadowColor = color;
+            overlayCtx.shadowBlur = 10;
+
+            const cornerLen = Math.min(bw, bh) * 0.28;
+
+            // Kiri Atas
+            overlayCtx.beginPath();
+            overlayCtx.moveTo(bx, by + cornerLen);
+            overlayCtx.lineTo(bx, by);
+            overlayCtx.lineTo(bx + cornerLen, by);
+            overlayCtx.stroke();
+
+            // Kanan Atas
+            overlayCtx.beginPath();
+            overlayCtx.moveTo(bx + bw - cornerLen, by);
+            overlayCtx.lineTo(bx + bw, by);
+            overlayCtx.lineTo(bx + bw, by + cornerLen);
+            overlayCtx.stroke();
+
+            // Kanan Bawah
+            overlayCtx.beginPath();
+            overlayCtx.moveTo(bx + bw, by + bh - cornerLen);
+            overlayCtx.lineTo(bx + bw, by + bh);
+            overlayCtx.lineTo(bx + bw - cornerLen, by + bh);
+            overlayCtx.stroke();
+
+            // Kiri Bawah
+            overlayCtx.beginPath();
+            overlayCtx.moveTo(bx + cornerLen, by + bh);
+            overlayCtx.lineTo(bx, by + bh);
+            overlayCtx.lineTo(bx, by + bh - cornerLen);
+            overlayCtx.stroke();
+
+            // Kotak tipis di sekeliling wajah
+            overlayCtx.strokeStyle = color;
+            overlayCtx.lineWidth = 1;
+            overlayCtx.strokeRect(bx, by, bw, bh);
+
+            // 2. Label Nama Siswa & Status di Atas Kotak Wajah
+            const durasiTeks = wajah.waktu_proses ? ` • ⚡ ${wajah.waktu_proses}` : '';
+            const labelText = wajah.nama ? `${wajah.nama}${wajah.skor ? ' (' + wajah.skor + ')' : ''}${durasiTeks}` : `MEMINDAI...${durasiTeks}`;
+            overlayCtx.font = 'bold 12px "Plus Jakarta Sans", sans-serif';
+            const textWidth = overlayCtx.measureText(labelText).width;
+            const badgeW = textWidth + 18;
+            const badgeH = 24;
+            const badgeX = Math.max(8, Math.min(rect.width - badgeW - 8, bx + (bw - badgeW) / 2));
+            const badgeY = Math.max(badgeH + 4, by - 8);
+
+            // Background Badge Pill
+            overlayCtx.fillStyle = badgeBg;
+            overlayCtx.beginPath();
+            if (overlayCtx.roundRect) {
+                overlayCtx.roundRect(badgeX, badgeY - badgeH, badgeW, badgeH, 6);
+            } else {
+                overlayCtx.rect(badgeX, badgeY - badgeH, badgeW, badgeH);
+            }
+            overlayCtx.fill();
+
+            // Teks Label
+            overlayCtx.fillStyle = '#ffffff';
+            overlayCtx.shadowBlur = 0;
+            overlayCtx.fillText(labelText, badgeX + 9, badgeY - 7);
+
+            overlayCtx.restore();
+
+            if (clearBoxTimer) clearTimeout(clearBoxTimer);
+            clearBoxTimer = setTimeout(() => {
+                if (overlayCtx && overlayCanvas) {
+                    overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+                }
+            }, 600);
         }
 
-        function jadwalkanFrameBerikutnya(delayMs = 150) {
+        // 6. Siklus Penangkapan Citra & Pengiriman ke Backend Python Secepat Kilat
+        function mulaiSiklusPemindaian() {
+            if (loopIntervalId) clearTimeout(loopIntervalId);
+            jadwalkanFrameBerikutnya(60);
+        }
+
+        function jadwalkanFrameBerikutnya(delayMs = 60) {
             if (isCoolingDown) return;
             if (loopIntervalId) clearTimeout(loopIntervalId);
             loopIntervalId = setTimeout(tangkapDanProsesFrame, delayMs);
@@ -1062,14 +1200,14 @@
         async function tangkapDanProsesFrame() {
             // Jangan memproses jika sedang ada request aktif, sedang jeda sukses, atau video belum siap
             if (isProcessingFrame || isCoolingDown || !videoEl || videoEl.readyState < 2) {
-                if (!isCoolingDown) jadwalkanFrameBerikutnya(200);
+                if (!isCoolingDown) jadwalkanFrameBerikutnya(100);
                 return;
             }
 
             const videoW = videoEl.videoWidth;
             const videoH = videoEl.videoHeight;
             if (!videoW || !videoH) {
-                jadwalkanFrameBerikutnya(200);
+                jadwalkanFrameBerikutnya(100);
                 return;
             }
 
@@ -1103,6 +1241,11 @@
 
                 if (response.ok) {
                     const data = await response.json();
+                    if (data.wajah) {
+                        gambarKotakWajah(data.wajah);
+                    } else if (data.status === 'tidak_ada_wajah') {
+                        gambarKotakWajah(null);
+                    }
                     tanganiResponPresensi(data);
                 } else {
                     if (response.status === 502 || response.status === 503) {
@@ -1114,7 +1257,7 @@
             } finally {
                 isProcessingFrame = false;
                 if (!isCoolingDown) {
-                    jadwalkanFrameBerikutnya(150); // Scan berlanjut setiap 150ms untuk respons instan
+                    jadwalkanFrameBerikutnya(60); // Kecepatan tinggi (60ms) agar deteksi secepat kilat
                 }
             }
         }
@@ -1271,11 +1414,12 @@
                 notifDetail.textContent = `${siswa.kelas || '-'} • NISN: ${siswa.nisn || '-'}`;
             }
 
-            // Waktu di bawah/samping badge: Hanya jam tanpa teks sudah absen
+            // Waktu di bawah/samping badge: Jam & durasi deteksi instan
             if (notifJam) {
                 const jamStr = siswa.jam ? siswa.jam.substring(0, 5) : '';
                 const waktuTeks = (jamStr || new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })) + ' WITA';
-                notifJam.textContent = waktuTeks;
+                const durasiTeks = siswa.durasi ? ` • ⚡ ${siswa.durasi}` : '';
+                notifJam.textContent = `${waktuTeks}${durasiTeks}`;
             }
 
             if (notifLive) notifLive.classList.add('d-none');

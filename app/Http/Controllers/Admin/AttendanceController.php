@@ -832,6 +832,8 @@ class AttendanceController extends Controller
                     $frameAnnotated = $aiData['frame_annotated'] ?? null;
                     $hasil = $aiData['hasil'] ?? [];
                     $wajah = $aiData['wajah'] ?? null;
+                    $waktuProses = $aiData['waktu_proses'] ?? null;
+                    $durasiDetik = $aiData['durasi_detik'] ?? null;
 
                     if (($aiData['status'] ?? '') === 'sukses' && ! empty($hasil['nisn'] ?? $aiData['nisn'] ?? null)) {
                         $nisn = $hasil['nisn'] ?? $aiData['nisn'];
@@ -841,6 +843,8 @@ class AttendanceController extends Controller
                             'status' => 'tidak_ada_wajah',
                             'pesan' => 'Wajah tidak terdeteksi pada kamera.',
                             'wajah' => null,
+                            'waktu_proses' => $waktuProses,
+                            'durasi_detik' => $durasiDetik,
                             'frame_annotated' => $frameAnnotated,
                         ], 200);
                     } elseif (($hasil['status'] ?? '') === 'memindai' || ($aiData['status'] ?? '') === 'memindai') {
@@ -848,6 +852,8 @@ class AttendanceController extends Controller
                             'status' => 'memindai',
                             'pesan' => 'Arahkan wajah ke kamera.',
                             'wajah' => $wajah,
+                            'waktu_proses' => $waktuProses,
+                            'durasi_detik' => $durasiDetik,
                             'frame_annotated' => $frameAnnotated,
                         ], 200);
                     } elseif (($hasil['status'] ?? '') === 'gagal_akurasi' || ($aiData['status'] ?? '') === 'gagal_akurasi') {
@@ -855,6 +861,8 @@ class AttendanceController extends Controller
                             'status' => 'gagal_akurasi',
                             'pesan' => $hasil['pesan'] ?? 'Akurasi wajah di bawah batas minimum.',
                             'wajah' => $wajah,
+                            'waktu_proses' => $waktuProses,
+                            'durasi_detik' => $durasiDetik,
                             'frame_annotated' => $frameAnnotated,
                         ], 200);
                     } else {
@@ -862,6 +870,8 @@ class AttendanceController extends Controller
                             'status' => 'tidak_dikenali',
                             'pesan' => $hasil['pesan'] ?? $aiData['pesan'] ?? 'Data belum terdaftar. Silahkan hubungi administrator.',
                             'wajah' => $wajah,
+                            'waktu_proses' => $waktuProses,
+                            'durasi_detik' => $durasiDetik,
                             'frame_annotated' => $frameAnnotated,
                         ], 200);
                     }
@@ -1042,6 +1052,8 @@ class AttendanceController extends Controller
             'tipe' => 'masuk',
             'pesan' => "Presensi masuk berhasil dicatat! Status: {$statusDisplay}.",
             'wajah' => $wajah,
+            'waktu_proses' => $waktuProses ?? null,
+            'durasi_detik' => $durasiDetik ?? null,
             'frame_annotated' => $frameAnnotated,
             'siswa' => [
                 'id' => $student->id,
@@ -1051,6 +1063,7 @@ class AttendanceController extends Controller
                 'status' => $statusDisplay,
                 'status_kode' => $attendance->status,
                 'jam' => $now->format('H:i:s'),
+                'durasi' => $waktuProses ?? null,
                 'foto' => $student->faces->first()?->file_path ? asset('storage/'.$student->faces->first()->file_path) : null,
             ],
         ]);

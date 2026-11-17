@@ -48,7 +48,7 @@ class LayananWajah:
         self.detector = FaceDetector(yunet_model_path=konfigurasi.YUNET_MODEL_PATH)
         self.embedder = FaceEmbedder(model_name=self.model_name)
         self.matcher = FaceMatcher(threshold=self.threshold, min_persen_cocok=70.0)
-        self.tracker = FaceTracker(max_window_size=5, required_votes=3, timeout_seconds=1.2)
+        self.tracker = FaceTracker(max_window_size=5, required_votes=3, timeout_seconds=2.5)
         self.student_repo = StudentRepository(
             storage_path=self.storage_path,
             laravel_api_url=self.laravel_api_url,
@@ -229,6 +229,8 @@ class LayananWajah:
             }
 
         try:
+            t_mulai = time.time()
+
             if "," in gambar_base64:
                 gambar_base64 = gambar_base64.split(",")[1]
 
@@ -432,6 +434,9 @@ class LayananWajah:
                         nama_box = "BELUM TERDAFTAR"
                         skor_box = ""
 
+                durasi_detik = round(time.time() - t_mulai, 3)
+                durasi_ms = round((time.time() - t_mulai) * 1000, 1)
+
                 wajah_data = {
                     "x": int(fa["x"]),
                     "y": int(fa["y"]),
@@ -441,8 +446,19 @@ class LayananWajah:
                     "frame_h": int(h_orig),
                     "nama": nama_box,
                     "skor": skor_box,
-                    "status": status_box
+                    "status": status_box,
+                    "durasi_detik": durasi_detik,
+                    "durasi_ms": durasi_ms,
+                    "waktu_proses": f"{durasi_detik:.2f}s"
                 }
+
+            durasi_total_detik = round(time.time() - t_mulai, 3)
+            durasi_total_ms = round((time.time() - t_mulai) * 1000, 1)
+
+            if hasil_pencocokan:
+                hasil_pencocokan["durasi_detik"] = durasi_total_detik
+                hasil_pencocokan["durasi_ms"] = durasi_total_ms
+                hasil_pencocokan["waktu_proses"] = f"{durasi_total_detik:.2f}s"
 
             return {
                 "status": hasil_pencocokan.get("status", "ok") if hasil_pencocokan else "ok",
@@ -450,7 +466,10 @@ class LayananWajah:
                 "frame_annotated": None,
                 "hasil": hasil_pencocokan,
                 "wajah": wajah_data,
-                "total_wajah_frame": len(detected_faces)
+                "total_wajah_frame": len(detected_faces),
+                "durasi_detik": durasi_total_detik,
+                "durasi_ms": durasi_total_ms,
+                "waktu_proses": f"{durasi_total_detik:.2f}s"
             }
 
         except Exception as e:

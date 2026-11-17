@@ -106,17 +106,37 @@ class StudentRepository:
                 return False
 
             h_img, w_img = img.shape[:2]
-            if self.detector is None:
-                return False
+            faces = []
 
-            faces = self.detector.deteksi_wajah(img, min_score=0.45)
+            # 1. Deteksi wajah dengan model CNN YuNet
+            if self.detector is not None:
+                faces = self.detector.deteksi_wajah(img, min_score=0.35)
+                if not faces:
+                    # Coba dengan normalisasi pencahayaan adaptif CLAHE
+                    from .face_detector import FaceDetector
+                    img_enhanced = FaceDetector.normalisasi_pencahayaan_adaptif(img)
+                    faces = self.detector.deteksi_wajah(img_enhanced, min_score=0.25)
+
+            # 2. Fallback OpenCV Haar Cascade jika YuNet tidak mendeteksi wajah
+            if not faces:
+                try:
+                    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+                    cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
+                    cc = cv2.CascadeClassifier(cascade_path)
+                    rects = cc.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=3, minSize=(30, 30))
+                    if len(rects) > 0:
+                        faces = rects
+                except Exception:
+                    pass
+
             if not faces:
                 return False
 
             faces = sorted(faces, key=lambda f: f[2] * f[3], reverse=True)
-            x, y, w, h = faces[0][:4]
+            x, y, w, h = [int(v) for v in faces[0][:4]]
 
-            if (w * h) / (w_img * h_img) > 0.70:
+            # Jika wajah sudah memenuhi > 75% dari gambar, tidak perlu dipotong lagi
+            if (w * h) / (w_img * h_img) > 0.75:
                 return True
 
             pad_top = int(h * 0.40)
@@ -156,6 +176,10 @@ class StudentRepository:
         new_embeddings = []
         for file_name in foto_files:
             img_path = os.path.join(folder_siswa, file_name)
+
+            # 1. Jalankan auto-crop zoom portrait pada berkas fisik foto
+            self.potong_dan_zoom_wajah(img_path)
+
             img = cv2.imread(img_path)
             if img is None or img.size == 0:
                 continue
@@ -163,11 +187,12 @@ class StudentRepository:
             h_img, w_img = img.shape[:2]
             target_face = img
 
+            # Deteksi wajah pada pasfoto untuk cropping tight fitur FaceNet
             if self.detector is not None:
-                faces = self.detector.deteksi_wajah(img, min_score=0.40)
+                faces = self.detector.deteksi_wajah(img, min_score=0.30)
                 if faces:
                     faces = sorted(faces, key=lambda f: f[2] * f[3], reverse=True)
-                    fx, fy, fw, fh = faces[0][:4]
+                    fx, fy, fw, fh = [int(v) for v in faces[0][:4]]
                     pad_top = int(fh * 0.35)
                     pad_bottom = int(fh * 0.40)
                     pad_side = int(fw * 0.30)
@@ -179,14 +204,37 @@ class StudentRepository:
                     if crop is not None and crop.size > 0:
                         target_face = crop
 
+            emb = None
             if self.embedder is not None:
                 emb = self.embedder.ekstrak_embedding(target_face, frame_lengkap=img, detector_backend="skip")
-                if emb is not None:
-                    new_embeddings.append({
-                        "label": nisn,
-                        "embedding": emb,
-                        "path": img_path
-                    })
+
+            # Fallback ekstraksi darurat jika backend skip belum menghasilkan vektor
+            if emb is None:
+                try:
+                    from deepface import DeepFace
+                    model_name = self.embedder.model_name if self.embedder else "Facenet"
+                    lock = self.embedder.model_lock if self.embedder else None
+                    reps = []
+                    if lock:
+                        with lock:
+                            reps = DeepFace.represent(img, model_name=model_name, detector_backend="skip", enforce_detection=False)
+                    else:
+                        reps = DeepFace.represent(img, model_name=model_name, detector_backend="skip", enforce_detection=False)
+                    if reps and len(reps) > 0:
+                        raw = np.array(reps[0]["embedding"], dtype=np.float32).flatten()
+                        if raw.shape == (128,):
+                            norm = np.linalg.norm(raw)
+                            if norm > 1e-6:
+                                emb = raw / norm
+                except Exception as e_reps:
+                    print(f"[!] Fallback ekstraksi darurat foto {img_path}: {e_reps}")
+
+            if emb is not None:
+                new_embeddings.append({
+                    "label": nisn,
+                    "embedding": emb,
+                    "path": img_path
+                })
 
         if not new_embeddings:
             return {"status": "error", "pesan": f"Wajah tidak terdeteksi pada berkas foto NISN {nisn}."}

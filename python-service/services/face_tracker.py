@@ -133,14 +133,16 @@ class FaceTracker:
                     identitas_tervalidasi = True
             else:
                 # Skenario B: Belum ada identitas terkonfirmasi (wajah baru sedang diverifikasi)
-                # Syarat validasi:
-                # 1. best_votes >= required_votes (misal 3 suara), ATAU
-                # 2. 2 frame berturut-turut kandidat sama dengan jarak sangat dekat (jarak <= 0.26)
-                is_confident_two_frames = (
-                    best_votes >= 2 and window_len >= 2 and 
-                    candidate_latest_entry.get(best_nisn, {}).get("jarak", 1.0) <= 0.26
-                )
-                if best_nisn is not None and (best_votes >= self.required_votes or is_confident_two_frames):
+                # Validasi secepat kilat:
+                # 1. Jarak sangat dekat (<= 0.24): langsung tervalidasi di frame pertama (instan < 50ms)
+                # 2. Jarak meyakinkan (<= 0.28): tervalidasi dalam 2 frame berturut-turut (~100ms)
+                # 3. Jarak standar (<= 0.32): tervalidasi dengan mayoritas suara (>= 3 suara)
+                latest_dist = candidate_latest_entry.get(best_nisn, {}).get("jarak", 1.0) if best_nisn else 1.0
+                is_instant_confident = (best_votes >= 1 and latest_dist <= 0.24)
+                is_fast_two_frames = (best_votes >= 2 and latest_dist <= 0.28)
+                is_standard_majority = (best_votes >= self.required_votes)
+
+                if best_nisn is not None and (is_instant_confident or is_fast_two_frames or is_standard_majority):
                     self.confirmed_identity = best_nisn
                     terpilih_entry = candidate_latest_entry[best_nisn]
                     identitas_tervalidasi = True
