@@ -36,8 +36,8 @@ return [
     ],
 
     'deepface' => [
-        'url' => env('DEEPFACE_SERVICE_URL', (env('APP_URL') ? preg_replace('/:\d+$/', '', rtrim(env('APP_URL'), '/')).':5000/proses-frame' : 'http://127.0.0.1:5000/proses-frame')),
-        'base_url' => env('PYTHON_SERVICE_BASE_URL', (env('APP_URL') ? preg_replace('/:\d+$/', '', rtrim(env('APP_URL'), '/')).':5000' : 'http://127.0.0.1:5000')),
+        'url' => env('DEEPFACE_SERVICE_URL', 'http://127.0.0.1:5000/proses-frame'),
+        'base_url' => env('PYTHON_SERVICE_BASE_URL', 'http://127.0.0.1:5000'),
         'scanner_url' => env('SCANNER_URL', '/scanner/'),
         'python_binary' => env('PYTHON_BINARY', 'python'),
     ],

@@ -54,7 +54,26 @@ class ReextractFacesCommand extends Command
         $this->info("Memproses {$students->count()} data siswa...");
 
         $successCount = 0;
-        $pythonBaseUrl = config('services.deepface.base_url', 'http://bolonsite.my.id:5000');
+
+        $candidateUrls = array_filter(array_unique([
+            'http://127.0.0.1:5000',
+            'http://localhost:5000',
+            config('services.deepface.base_url', 'http://127.0.0.1:5000'),
+        ]));
+
+        $pythonBaseUrl = 'http://127.0.0.1:5000';
+        foreach ($candidateUrls as $url) {
+            try {
+                $check = Http::timeout(2)->get("{$url}/status");
+                if ($check->successful()) {
+                    $pythonBaseUrl = rtrim($url, '/');
+                    $this->info("[+] Terhubung ke Microservice Python di: {$pythonBaseUrl}");
+                    break;
+                }
+            } catch (\Throwable $e) {
+                // Coba kandidat berikutnya
+            }
+        }
 
         foreach ($students as $student) {
             $nisn = (string) $student->nisn;

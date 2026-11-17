@@ -116,10 +116,14 @@ class PythonServiceManager
 
                 if (file_exists('/etc/systemd/system/absensi-ai.service')) {
                     @exec('sudo systemctl start absensi-ai > /dev/null 2>&1 &');
-                } elseif (file_exists($venvPython)) {
-                    @exec('cd '.base_path('python-service')." && {$venvPython} {$scriptPath} > /dev/null 2>&1 &");
-                } else {
-                    @exec('cd '.base_path('python-service')." && python3 {$scriptPath} > /dev/null 2>&1 &");
+                }
+
+                if (! self::isRunning()) {
+                    if (file_exists($venvPython)) {
+                        @exec('cd '.base_path('python-service')." && nohup {$venvPython} {$scriptPath} > /dev/null 2>&1 &");
+                    } else {
+                        @exec('cd '.base_path('python-service')." && nohup python3 {$scriptPath} > /dev/null 2>&1 &");
+                    }
                 }
             }
 
