@@ -48,7 +48,7 @@ class LayananWajah:
         self.threshold = konfigurasi.THRESHOLD
         self.storage_path = konfigurasi.STORAGE_FACES_PATH
         self.dataset_path = self.storage_path
-        raw_laravel_url = getattr(konfigurasi, 'LARAVEL_BASE_URL', None) or os.getenv('LARAVEL_BASE_URL') or os.getenv('APP_URL', 'http://127.0.0.1:8000')
+        raw_laravel_url = os.getenv('APP_URL') or getattr(konfigurasi, 'LARAVEL_BASE_URL', None) or os.getenv('LARAVEL_BASE_URL') or 'http://localhost:8000'
         self.laravel_api_url = str(raw_laravel_url).rstrip('/')
         
         self.embeddings_db = []
@@ -236,8 +236,9 @@ class LayananWajah:
 
     def muat_data_siswa(self):
         """Memuat daftar siswa dan vektor embedding wajah langsung dari database Laravel."""
-        candidate_bases = [self.laravel_api_url]
-        for base in ["http://127.0.0.1", "http://127.0.0.1:8000", "http://localhost", "http://localhost:8000"]:
+        app_url = (os.getenv('APP_URL') or self.laravel_api_url).rstrip('/')
+        candidate_bases = [app_url, self.laravel_api_url]
+        for base in ["http://localhost", "http://localhost:8000", "http://127.0.0.1", "http://127.0.0.1:8000"]:
             if base not in candidate_bases:
                 candidate_bases.append(base)
 
@@ -245,7 +246,7 @@ class LayananWajah:
         for base_url in candidate_bases:
             try:
                 url = f"{base_url.rstrip('/')}/api/presensi/daftar-siswa"
-                res = requests.get(url, timeout=3)
+                res = requests.get(url, timeout=5)
                 if res.status_code == 200:
                     self.data_siswa = res.json()
                     self.laravel_api_url = base_url.rstrip('/')
@@ -540,9 +541,33 @@ class LayananWajah:
                     else:
                         if self.embeddings_matrix is not None and len(self.embeddings_matrix) > 0:
                             cosine_distances = 1.0 - np.dot(self.embeddings_matrix, query_emb)
-                            best_idx = int(np.argmin(cosine_distances))
-                            min_dist = float(cosine_distances[best_idx])
-                            nisn = self.labels_list[best_idx]
+
+# Urutkan 3 kandidat dengan jarak cosine terkecil
+top_indices = np.argsort(cosine_distances)[:3]
+
+best_idx = int(top_indices[0])
+min_dist = float(cosine_distances[best_idx])
+nisn = self.labels_list[best_idx]
+
+# Catat kandidat untuk diagnostik
+diagnostic_candidates = []
+
+for idx in top_indices:
+    idx = int(idx)
+    candidate_nisn = self.labels_list[idx]
+    candidate_name = self.data_siswa.get(candidate_nisn, {}).get(
+        "nama", f"Siswa {candidate_nisn}"
+    )
+
+    diagnostic_candidates.append(
+        f"{candidate_name}: {float(cosine_distances[idx]):.4f}"
+    )
+
+print(
+    "[DIAGNOSTIK WAJAH] "
+    + " | ".join(diagnostic_candidates),
+    flush=True
+)
                         else:
                             db_embeddings = np.array([item["embedding"] for item in self.embeddings_db])
                             dot_products = np.dot(db_embeddings, query_emb)

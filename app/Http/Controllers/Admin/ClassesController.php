@@ -689,9 +689,10 @@ class ClassesController extends Controller
             'min_face_accuracy' => round((float) $validated['min_face_accuracy'], 2),
         ]);
 
-        // Beritahu layanan Python jika aktif di localhost
+        // Beritahu layanan Python jika aktif
         try {
-            Http::timeout(2)->post('http://127.0.0.1:5000/update-konfigurasi', [
+            $pythonUrl = config('services.deepface.base_url', 'http://127.0.0.1:5000').'/update-konfigurasi';
+            Http::timeout(2)->post($pythonUrl, [
                 'min_face_accuracy' => $setting->min_face_accuracy,
             ]);
         } catch (\Exception $e) {

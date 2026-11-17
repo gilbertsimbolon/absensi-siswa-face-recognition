@@ -11,11 +11,14 @@ if os.path.exists(root_env):
 else:
     load_dotenv(os.path.join(BASE_DIR, '.env'))
 
-# Konfigurasi Server (Terkunci ke localhost loopback internal demi keamanan)
+# Konfigurasi Server (Menerima koneksi loopback lokal maupun via domain/IP VPS)
 PORT = int(os.getenv('SERVICE_PORT', 5000))
-HOST = os.getenv('SERVICE_HOST', '127.0.0.1')
-LARAVEL_BASE_URL = os.getenv('LARAVEL_BASE_URL') or os.getenv('APP_URL', 'http://127.0.0.1:8000')
-LARAVEL_API_URL = os.getenv('LARAVEL_API_URL', f"{LARAVEL_BASE_URL.rstrip('/')}/admin/absensi/proses-pindai")
+HOST = os.getenv('SERVICE_HOST', '0.0.0.0')
+
+# Ambil base URL Laravel dinamis dari APP_URL di .env utama (prioritas tertinggi)
+APP_URL = (os.getenv('APP_URL') or os.getenv('LARAVEL_BASE_URL') or 'http://localhost:8000').rstrip('/')
+LARAVEL_BASE_URL = APP_URL
+LARAVEL_API_URL = os.getenv('LARAVEL_API_URL', f"{LARAVEL_BASE_URL}/admin/absensi/proses-pindai")
 APP_KEY = os.getenv('APP_KEY', '')
 
 # Model DeepFace & CNN Face Detector

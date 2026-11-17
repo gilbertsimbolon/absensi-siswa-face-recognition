@@ -31,7 +31,8 @@ class SyncFaceEmbeddings extends Command
         // 2. Jika kosong, coba ambil dari microservice Python
         if (empty($embeddingsData)) {
             try {
-                $response = Http::timeout(10)->get('http://127.0.0.1:5000/scanner/semua-embedding');
+                $pythonBaseUrl = config('services.deepface.base_url', 'http://127.0.0.1:5000');
+                $response = Http::timeout(10)->get("{$pythonBaseUrl}/scanner/semua-embedding");
                 if ($response->successful()) {
                     $embeddingsData = $response->json('data') ?: [];
                 }

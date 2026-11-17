@@ -54,7 +54,7 @@ class ReextractFacesCommand extends Command
         $this->info("Memproses {$students->count()} data siswa...");
 
         $successCount = 0;
-        $pythonBaseUrl = config('services.deepface.base_url', 'http://127.0.0.1:5000');
+        $pythonBaseUrl = config('services.deepface.base_url', 'http://bolonsite.my.id:5000');
 
         foreach ($students as $student) {
             $nisn = (string) $student->nisn;
