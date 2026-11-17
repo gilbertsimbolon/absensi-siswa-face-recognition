@@ -1141,6 +1141,8 @@
                 tampilkanDetailSukses(siswa, st, data.pesan);
             } else if (st === 'tidak_ada_wajah') {
                 perbaruiNotifLive('state-standby', '<i class="bx bx-scan"></i>', 'Arahkan Wajah ke Kamera', 'Posisikan wajah Anda di dalam frame untuk presensi otomatis');
+            } else if (st === 'memindai') {
+                perbaruiNotifLive('state-standby', '<i class="bx bx-loader-alt bx-spin"></i>', 'Memvalidasi Wajah...', data.pesan || 'Mencocokkan kestabilan wajah...');
             } else if (st === 'tidak_dikenali' || st === 'tidak_ditemukan') {
                 tampilkanBelumTerdaftar(data.pesan || 'Data belum terdaftar. Silahkan hubungi administrator.');
             } else if (st === 'gagal_akurasi') {
