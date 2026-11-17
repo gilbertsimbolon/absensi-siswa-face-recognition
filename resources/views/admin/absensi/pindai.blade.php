@@ -1139,10 +1139,8 @@
 
                 playChime(true);
                 tampilkanDetailSukses(siswa, st, data.pesan);
-            } else if (st === 'tidak_ada_wajah') {
+            } else if (st === 'tidak_ada_wajah' || st === 'memindai') {
                 perbaruiNotifLive('state-standby', '<i class="bx bx-scan"></i>', 'Arahkan Wajah ke Kamera', 'Posisikan wajah Anda di dalam frame untuk presensi otomatis');
-            } else if (st === 'memindai') {
-                perbaruiNotifLive('state-standby', '<i class="bx bx-loader-alt bx-spin"></i>', 'Memvalidasi Wajah...', data.pesan || 'Mencocokkan kestabilan wajah...');
             } else if (st === 'tidak_dikenali' || st === 'tidak_ditemukan') {
                 tampilkanBelumTerdaftar(data.pesan || 'Data belum terdaftar. Silahkan hubungi administrator.');
             } else if (st === 'gagal_akurasi') {
@@ -1152,6 +1150,10 @@
 
         function perbaruiNotifLive(stateClass, iconHtml, title, desc) {
             if (!notifLive || isCoolingDown) return;
+            // Hindari re-render DOM berulang yang membuat animasi flicker jika isi konten sama
+            if (liveTitle && liveTitle.textContent === title && notifLive.className === 'notif-live ' + stateClass) {
+                return;
+            }
             notifLive.className = 'notif-live ' + stateClass;
             if (liveIconBox) liveIconBox.innerHTML = iconHtml;
             if (liveTitle) liveTitle.textContent = title;

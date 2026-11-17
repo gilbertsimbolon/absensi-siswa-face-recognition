@@ -846,7 +846,7 @@ class AttendanceController extends Controller
                     } elseif (($hasil['status'] ?? '') === 'memindai' || ($aiData['status'] ?? '') === 'memindai') {
                         return response()->json([
                             'status' => 'memindai',
-                            'pesan' => $hasil['pesan'] ?? 'Memvalidasi kestabilan wajah...',
+                            'pesan' => 'Arahkan wajah ke kamera.',
                             'wajah' => $wajah,
                             'frame_annotated' => $frameAnnotated,
                         ], 200);

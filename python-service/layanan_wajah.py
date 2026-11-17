@@ -367,10 +367,9 @@ class LayananWajah:
                             # Masih dalam tahap stabilisasi: Status memindai
                             suara = meta["suara"]
                             target_suara = meta["target_suara"]
-                            target_info = f"({suara}/{target_suara})" if suara > 0 else "..."
                             hasil_pencocokan = {
                                 "status": "memindai",
-                                "pesan": f"Memvalidasi kestabilan wajah {target_info}...",
+                                "pesan": "Arahkan wajah ke kamera.",
                                 "nisn": None,
                                 "nama": None,
                                 "suara": suara,
