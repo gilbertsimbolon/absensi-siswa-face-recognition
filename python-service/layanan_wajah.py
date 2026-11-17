@@ -18,17 +18,17 @@ from PIL import Image
 from deepface import DeepFace
 import konfigurasi
 
-def hitung_persentase_akurasi(cosine_dist, threshold=0.35):
+def hitung_persentase_akurasi(cosine_dist, threshold=0.32):
     """
     Mengonversi jarak kosinus FaceNet (0.0 - 1.0+) menjadi persentase akurasi yang proporsional.
-    - Wajah cocok (jarak <= threshold 0.35): menghasilkan skor 85.0% - 99.9%
+    - Wajah cocok (jarak <= threshold 0.32): menghasilkan skor 85.0% - 99.9%
       sehingga siswa terdaftar langsung lolos verifikasi standar sekolah (80% - 85%) dalam < 1-2 detik.
-    - Wajah bukan siswa / berbeda (jarak > threshold 0.35): skor langsung drop tajam ke bawah 60%.
+    - Wajah bukan siswa / berbeda (jarak > threshold 0.32): skor langsung drop tajam ke bawah 60%.
     """
     if cosine_dist <= 0:
         return 100.0
 
-    th = float(threshold) if threshold and float(threshold) > 0 else 0.35
+    th = float(threshold) if threshold and float(threshold) > 0 else 0.32
     d = float(cosine_dist)
 
     if d <= th:
@@ -493,20 +493,20 @@ class LayananWajah:
 
                 target_img = face_crop if (face_crop is not None and face_crop.size > 0 and face_crop.shape[0] > 20 and face_crop.shape[1] > 20) else frame
 
-                # Ambil embedding wajah utama secepat kilat (skip detector karena sudah dicrop oleh YuNet)
+                # Ambil embedding wajah teraligni secara konsisten dengan backend OpenCV
                 try:
                     with self.model_lock:
                         representations = DeepFace.represent(
                             img_path=target_img,
                             model_name=self.model_name,
-                            detector_backend="skip",
+                            detector_backend="opencv",
                             enforce_detection=False
                         )
                 except Exception:
                     try:
                         with self.model_lock:
                             representations = DeepFace.represent(
-                                img_path=target_img,
+                                img_path=frame,
                                 model_name=self.model_name,
                                 detector_backend="opencv",
                                 enforce_detection=False
@@ -811,15 +811,26 @@ class LayananWajah:
             berhasil_crop = self.potong_dan_zoom_wajah(img_path)
 
             try:
-                # Jika sudah berhasil di-crop oleh YuNet OpenCV, lewati re-deteksi berat DeepFace agar inferensi instan (< 0.2s)
-                backend_deteksi = "skip" if berhasil_crop else self.detector_backend
+                # Selalu gunakan backend OpenCV agar perataan wajah (alignment) identik 100% antara foto dataset dan kamera
                 with self.model_lock:
                     representations = DeepFace.represent(
                         img_path=img_path,
                         model_name=self.model_name,
-                        detector_backend=backend_deteksi,
+                        detector_backend="opencv",
                         enforce_detection=False
                     )
+            except Exception:
+                try:
+                    with self.model_lock:
+                        representations = DeepFace.represent(
+                            img_path=img_path,
+                            model_name=self.model_name,
+                            detector_backend="skip",
+                            enforce_detection=False
+                        )
+                except Exception as e:
+                    print(f"[!] Gagal mengekstrak fitur foto {img_path}: {e}")
+                    representations = []
                 if representations and len(representations) > 0:
                     emb = np.array(representations[0]["embedding"], dtype=np.float32)
                     norm = np.linalg.norm(emb)

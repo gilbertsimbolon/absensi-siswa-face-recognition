@@ -20,7 +20,7 @@ APP_KEY = os.getenv('APP_KEY', '')
 
 # Model DeepFace & CNN Face Detector
 MODEL_NAME = os.getenv('DEEPFACE_MODEL', 'Facenet')
-DETECTOR_BACKEND = os.getenv('DETECTOR_BACKEND', 'yunet')
+DETECTOR_BACKEND = os.getenv('DETECTOR_BACKEND', 'opencv')
 DISTANCE_METRIC = os.getenv('DISTANCE_METRIC', 'cosine')
 
 # Model Deteksi Wajah Deep Learning CNN (YuNet ONNX)
@@ -31,8 +31,8 @@ if not os.path.exists(YUNET_MODEL_PATH):
         YUNET_MODEL_PATH = fallback_deepface
 
 # Ambang Batas Jarak Pencocokan (Threshold)
-# Standar optimal FaceNet anti false-positive (wajah orang lain pasti ditolak): 0.35
-THRESHOLD = float(os.getenv('FACE_THRESHOLD', 0.35))
+# Standar ketat FaceNet anti false-positive (wajah orang lain / belum terdaftar 100% ditolak): 0.32
+THRESHOLD = float(os.getenv('FACE_THRESHOLD', 0.32))
 
 # Path Penyimpanan Foto Wajah Laravel Storage (Single Source of Truth via php artisan storage:link)
 # Seluruh foto disimpan murni di Laravel storage/app/public/faces, tanpa duplikasi di python
