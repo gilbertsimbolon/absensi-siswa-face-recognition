@@ -48,8 +48,7 @@ class LayananWajah:
         self.threshold = konfigurasi.THRESHOLD
         self.storage_path = konfigurasi.STORAGE_FACES_PATH
         self.dataset_path = self.storage_path
-        raw_laravel_url = os.getenv('APP_URL') or getattr(konfigurasi, 'LARAVEL_BASE_URL', None) or os.getenv('LARAVEL_BASE_URL') or 'http://localhost:8000'
-        self.laravel_api_url = str(raw_laravel_url).rstrip('/')
+        self.laravel_api_url = konfigurasi.LARAVEL_BASE_URL
         
         self.embeddings_db = []
         self.embeddings_matrix = None
@@ -236,47 +235,38 @@ class LayananWajah:
 
     def muat_data_siswa(self):
         """Memuat daftar siswa dan vektor embedding wajah langsung dari database Laravel."""
-        app_url = (os.getenv('APP_URL') or self.laravel_api_url).rstrip('/')
-        candidate_bases = [app_url, self.laravel_api_url]
-        for base in ["http://localhost", "http://localhost:8000", "http://127.0.0.1", "http://127.0.0.1:8000"]:
-            if base not in candidate_bases:
-                candidate_bases.append(base)
-
         loaded = False
-        for base_url in candidate_bases:
-            try:
-                url = f"{base_url.rstrip('/')}/api/presensi/daftar-siswa"
-                res = requests.get(url, timeout=5)
-                if res.status_code == 200:
-                    self.data_siswa = res.json()
-                    self.laravel_api_url = base_url.rstrip('/')
-                    print(f"[+] Berhasil memuat data {len(self.data_siswa)} siswa dari {url}.")
+        url = f"{self.laravel_api_url.rstrip('/')}/api/presensi/daftar-siswa"
+        try:
+            res = requests.get(url, timeout=5)
+            if res.status_code == 200:
+                self.data_siswa = res.json()
+                print(f"[+] Berhasil memuat data {len(self.data_siswa)} siswa dari {url}.")
 
-                    # Ekstrak vektor embedding wajah langsung dari database Laravel (Single Source of Truth)
-                    db_embeddings = []
-                    for nisn, info in self.data_siswa.items():
-                        raw_embs = info.get("embeddings", [])
-                        for idx, emb_raw in enumerate(raw_embs):
-                            if emb_raw and len(emb_raw) == 128:
-                                emb_vec = np.array(emb_raw, dtype=np.float32)
-                                norm = np.linalg.norm(emb_vec)
-                                if norm > 0:
-                                    emb_vec = emb_vec / norm
-                                db_embeddings.append({
-                                    "label": str(nisn),
-                                    "embedding": emb_vec,
-                                    "path": f"db://faces/{nisn}/{idx}"
-                                })
+                # Ekstrak vektor embedding wajah langsung dari database Laravel (Single Source of Truth)
+                db_embeddings = []
+                for nisn, info in self.data_siswa.items():
+                    raw_embs = info.get("embeddings", [])
+                    for idx, emb_raw in enumerate(raw_embs):
+                        if emb_raw and len(emb_raw) == 128:
+                            emb_vec = np.array(emb_raw, dtype=np.float32)
+                            norm = np.linalg.norm(emb_vec)
+                            if norm > 0:
+                                emb_vec = emb_vec / norm
+                            db_embeddings.append({
+                                "label": str(nisn),
+                                "embedding": emb_vec,
+                                "path": f"db://faces/{nisn}/{idx}"
+                            })
 
-                    if db_embeddings:
-                        self.embeddings_db = db_embeddings
-                        print(f"[+] Berhasil memuat {len(self.embeddings_db)} vektor embedding wajah langsung dari database MySQL.")
-                        self.perbarui_matrix_embeddings()
-                        self.is_ready = True
-                    loaded = True
-                    break
-            except Exception:
-                continue
+                if db_embeddings:
+                    self.embeddings_db = db_embeddings
+                    print(f"[+] Berhasil memuat {len(self.embeddings_db)} vektor embedding wajah langsung dari database MySQL.")
+                    self.perbarui_matrix_embeddings()
+                    self.is_ready = True
+                loaded = True
+        except Exception as e:
+            print(f"[!] Gagal terhubung ke Laravel ({url}): {e}")
 
         if not loaded:
             print("[*] Belum dapat terhubung ke Laravel untuk memuat daftar siswa.")
@@ -541,33 +531,14 @@ class LayananWajah:
                     else:
                         if self.embeddings_matrix is not None and len(self.embeddings_matrix) > 0:
                             cosine_distances = 1.0 - np.dot(self.embeddings_matrix, query_emb)
+                            best_idx = int(np.argmin(cosine_distances))
+                            min_dist = float(cosine_distances[best_idx])
+                            nisn = self.labels_list[best_idx]
 
-# Urutkan 3 kandidat dengan jarak cosine terkecil
-top_indices = np.argsort(cosine_distances)[:3]
-
-best_idx = int(top_indices[0])
-min_dist = float(cosine_distances[best_idx])
-nisn = self.labels_list[best_idx]
-
-# Catat kandidat untuk diagnostik
-diagnostic_candidates = []
-
-for idx in top_indices:
-    idx = int(idx)
-    candidate_nisn = self.labels_list[idx]
-    candidate_name = self.data_siswa.get(candidate_nisn, {}).get(
-        "nama", f"Siswa {candidate_nisn}"
-    )
-
-    diagnostic_candidates.append(
-        f"{candidate_name}: {float(cosine_distances[idx]):.4f}"
-    )
-
-print(
-    "[DIAGNOSTIK WAJAH] "
-    + " | ".join(diagnostic_candidates),
-    flush=True
-)
+                            # Diagnostik jarak kosinus (indeks dan nilai jarak saja, tanpa nama/NISN siswa)
+                            top_indices = np.argsort(cosine_distances)[:3]
+                            diag_distances = [f"kandidat_{i+1}_dist={float(cosine_distances[idx]):.4f}" for i, idx in enumerate(top_indices)]
+                            print(f"[DIAGNOSTIK WAJAH] {', '.join(diag_distances)}", flush=True)
                         else:
                             db_embeddings = np.array([item["embedding"] for item in self.embeddings_db])
                             dot_products = np.dot(db_embeddings, query_emb)
