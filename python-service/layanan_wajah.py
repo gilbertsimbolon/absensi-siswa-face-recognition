@@ -1,5 +1,10 @@
 import os
 import sys
+import io
+import time
+import base64
+import numpy as np
+import cv2
 
 # Konfigurasi encoding UTF-8 untuk output terminal / log Windows
 if hasattr(sys.stdout, 'reconfigure'):
@@ -7,42 +12,28 @@ if hasattr(sys.stdout, 'reconfigure'):
 if hasattr(sys.stderr, 'reconfigure'):
     sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 
-import io
-import time
-import base64
-import threading
-import numpy as np
-import cv2
-import requests
-from PIL import Image
-from deepface import DeepFace
 import konfigurasi
-
-def hitung_persentase_akurasi(cosine_dist, threshold=0.32):
-    """
-    Mengonversi jarak kosinus FaceNet (0.0 - 1.0+) menjadi persentase akurasi yang proporsional.
-    - Wajah cocok (jarak <= threshold 0.32): menghasilkan skor 85.0% - 99.9%
-      sehingga siswa terdaftar langsung lolos verifikasi standar sekolah (80% - 85%) dalam < 1-2 detik.
-    - Wajah bukan siswa / berbeda (jarak > threshold 0.32): skor langsung drop tajam ke bawah 60.0%
-      sehingga tidak akan pernah lolos verifikasi presensi.
-    """
-    if cosine_dist <= 0:
-        return 100.0
-
-    th = float(threshold) if threshold and float(threshold) > 0 else 0.32
-    d = float(cosine_dist)
-
-    if d <= th:
-        # Interpolasi proporsional dari 100% pada jarak 0.0 ke 85.0% pada batas threshold
-        skor = 100.0 - (d / th) * 15.0
-        return round(max(85.0, min(99.99, skor)), 2)
-    else:
-        # Di atas threshold (bukan siswa terdaftar / wajah berbeda): drop langsung di bawah 60%
-        over = d - th
-        skor = 60.0 - (over / 0.10) * 40.0
-        return round(max(0.0, min(60.0, skor)), 2)
+from services.face_detector import FaceDetector
+from services.face_embedder import FaceEmbedder, hitung_persentase_akurasi
+from services.face_matcher import FaceMatcher
+from services.face_tracker import FaceTracker
+from services.student_repository import StudentRepository
+from services.attendance_client import AttendanceClient
+from services.visualizer import Visualizer
 
 class LayananWajah:
+    """
+    Fasade / Koordinator Utama Layanan Pengenalan Wajah Presensi Siswa.
+    Mengorkestrasi modul-modul independen:
+    - FaceDetector (Deteksi YuNet CNN & Pencahayaan Adaptif)
+    - FaceEmbedder (Ekstraksi 128-D FaceNet & Perataan Aligned OpenCV)
+    - FaceMatcher (Cosine Distance & Validasi Dua Kandidat)
+    - FaceTracker (Temporal Voting & Sliding Window Multi-Frame)
+    - StudentRepository (Pemuatan Data Siswa & Embeddings dari MySQL/Laravel)
+    - AttendanceClient (Pencatatan Presensi Otomatis & Cooldown)
+    - Visualizer (Rendering Bounding Box & HUD OpenCV)
+    """
+
     def __init__(self):
         self.model_name = konfigurasi.MODEL_NAME
         self.detector_backend = konfigurasi.DETECTOR_BACKEND
@@ -50,574 +41,184 @@ class LayananWajah:
         self.storage_path = konfigurasi.STORAGE_FACES_PATH
         self.dataset_path = self.storage_path
         self.laravel_api_url = konfigurasi.LARAVEL_BASE_URL
-        
-        self.embeddings_db = []
-        self.embeddings_matrix = None
-        self.labels_list = []
-        self.data_siswa = {}
-        self.is_ready = False
-        self.model_lock = threading.RLock()
-        self.detector_lock = threading.RLock()
-
-        # Inisialisasi Deep Learning Face Detector (YuNet CNN ONNX)
-        self.yunet_model_path = konfigurasi.YUNET_MODEL_PATH
-        self.yunet_detector = None
-        if hasattr(cv2, 'FaceDetectorYN') and os.path.exists(self.yunet_model_path):
-            try:
-                self.yunet_detector = cv2.FaceDetectorYN.create(
-                    model=self.yunet_model_path,
-                    config="",
-                    input_size=(640, 480),
-                    score_threshold=0.55,
-                    nms_threshold=0.30,
-                    top_k=5000
-                )
-                print(f"[+] Berhasil memuat Deep Learning Face Detector CNN (YuNet ONNX): {self.yunet_model_path}")
-            except Exception as e:
-                print(f"[!] Gagal inisialisasi FaceDetectorYN: {e}")
-
-        self.min_face_accuracy = 70.0
-        self.last_attendance_time = {}
         self.cooldown_seconds = 5
+        self.is_ready = False
 
-        # Stabilitas Antar-Frame (Sliding-Window Temporal Voting & Smoothing)
-        self.history_lock = threading.RLock()
-        self.voting_window = []   # Jendela geser riwayat frame: [{'nisn': ..., 'status': ..., 'timestamp': ...}]
-        self.max_window_size = 5  # Kapasitas maksimal 5 frame terakhir (~0.7 detik)
-        self.required_votes = 3   # Minimal 3 suara mayoritas (>= 60%) untuk validasi identitas
-        self.face_timeout_seconds = 1.2
-        self.last_seen_timestamp = 0.0
-        self.last_bounding_box = None
-        self.confirmed_identity = None
+        # Inisialisasi Modul-Modul Layanan
+        self.detector = FaceDetector(yunet_model_path=konfigurasi.YUNET_MODEL_PATH)
+        self.embedder = FaceEmbedder(model_name=self.model_name)
+        self.matcher = FaceMatcher(threshold=self.threshold, min_persen_cocok=70.0)
+        self.tracker = FaceTracker(max_window_size=5, required_votes=3, timeout_seconds=1.2)
+        self.student_repo = StudentRepository(
+            storage_path=self.storage_path,
+            laravel_api_url=self.laravel_api_url,
+            embedder=self.embedder,
+            detector=self.detector
+        )
+        self.attendance_client = AttendanceClient(
+            laravel_api_url=self.laravel_api_url,
+            cooldown_seconds=self.cooldown_seconds
+        )
+        self.visualizer = Visualizer(model_name=self.model_name)
 
-    def reset_riwayat_wajah(self):
-        """Mereset seluruh riwayat kestabilan antar-frame ketika wajah menghilang atau berganti."""
-        with self.history_lock:
-            self.voting_window.clear()
-            self.last_seen_timestamp = 0.0
-            self.last_bounding_box = None
-            self.confirmed_identity = None
+        # Alias Mutex untuk Kompatibilitas
+        self.model_lock = self.embedder.model_lock
+        self.detector_lock = self.detector.detector_lock
+        self.history_lock = self.tracker.history_lock
 
-    @staticmethod
-    def normalisasi_pencahayaan_adaptif(img):
-        """
-        Normalisasi pencahayaan adaptif menggunakan Contrast Limited Adaptive Histogram Equalization (CLAHE)
-        pada ruang warna LAB (kanal Luminance L).
-        Memastikan wajah siswa yang berada dalam kondisi backlight, silau, atau redup/berbayang
-        tetap memiliki kontras fitur wajah (mata, hidung, mulut) yang tajam dan mudah dikenali DeepFace.
-        """
-        if img is None or img.size == 0:
-            return img
-        try:
-            lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
-            l, a, b = cv2.split(lab)
-            clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-            cl = clahe.apply(l)
-            limg = cv2.merge((cl, a, b))
-            return cv2.cvtColor(limg, cv2.COLOR_LAB2BGR)
-        except Exception:
-            return img
+    # =========================================================================
+    # Properti Kompatibilitas dengan aplikasi.py dan modul lain
+    # =========================================================================
+    @property
+    def embeddings_db(self):
+        return self.student_repo.embeddings_db
 
-    def deteksi_wajah_cnn(self, img, min_score=0.40):
-        """
-        Mendeteksi wajah menggunakan model Deep Learning CNN (YuNet ONNX) secepat kilat (60+ FPS).
-        Menggunakan resolusi deteksi optimal agar responsif menangkap wajah siswa yang sedang berjalan/bergerak.
-        Thread-safe: Dilindungi mutex detector_lock agar tidak crash saat diakses multi-thread.
-        Mengembalikan list bounding box: [(x, y, w, h, score), ...]
-        """
-        if img is None or img.size == 0:
-            return []
+    @embeddings_db.setter
+    def embeddings_db(self, value):
+        self.student_repo.embeddings_db = value
 
-        with self.detector_lock:
-            h_img, w_img = img.shape[:2]
+    @property
+    def data_siswa(self):
+        return self.student_repo.data_siswa
 
-            # 1. Deteksi via YuNet CNN langsung pada frame BGR tanpa lag komputasi CLAHE full-frame
-            if self.yunet_detector is not None:
-                try:
-                    # Downscale 0.5x untuk kecepatan 3-5x lipat (< 3 ms) tanpa mengurangi akurasi
-                    scale = 0.5
-                    det_w = int(w_img * scale)
-                    det_h = int(h_img * scale)
-                    small_frame = cv2.resize(img, (det_w, det_h), interpolation=cv2.INTER_LINEAR)
+    @data_siswa.setter
+    def data_siswa(self, value):
+        self.student_repo.data_siswa = value
 
-                    self.yunet_detector.setInputSize((det_w, det_h))
-                    _, faces = self.yunet_detector.detect(small_frame)
-                    if faces is not None and len(faces) > 0:
-                        inv_scale = 1.0 / scale
-                        results = []
-                        for face in faces:
-                            fx = int(face[0] * inv_scale)
-                            fy = int(face[1] * inv_scale)
-                            fw = int(face[2] * inv_scale)
-                            fh = int(face[3] * inv_scale)
-                            score = float(face[14]) if len(face) > 14 else 1.0
-                            if score >= min_score and fw > 25 and fh > 25:
-                                results.append((
-                                    max(0, fx),
-                                    max(0, fy),
-                                    min(w_img - fx, fw),
-                                    min(h_img - fy, fh),
-                                    score
-                                ))
-                        if results:
-                            return results
-                except Exception:
-                    pass
+    @property
+    def embeddings_matrix(self):
+        return self.matcher.embeddings_matrix
 
-                # Fallback resolusi native jika tidak ada wajah di 0.5x
-                try:
-                    self.yunet_detector.setInputSize((w_img, h_img))
-                    _, faces = self.yunet_detector.detect(img)
-                    if faces is not None and len(faces) > 0:
-                        results = []
-                        for face in faces:
-                            fx, fy, fw, fh = int(face[0]), int(face[1]), int(face[2]), int(face[3])
-                            score = float(face[14]) if len(face) > 14 else 1.0
-                            if score >= min_score and fw > 25 and fh > 25:
-                                results.append((max(0, fx), max(0, fy), min(w_img - fx, fw), min(h_img - fy, fh), score))
-                        if results:
-                            return results
-                except Exception:
-                    pass
+    @embeddings_matrix.setter
+    def embeddings_matrix(self, value):
+        self.matcher.embeddings_matrix = value
 
-            return []
+    @property
+    def labels_list(self):
+        return self.matcher.labels_list
 
-    def perbarui_matrix_embeddings(self):
-        """
-        Membuat matrix numpy 2D untuk pencocokan vektor secepat kilat (BLAS/AVX)
-        dengan sinkronisasi ketat 1-to-1 antara embeddings_matrix dan labels_list,
-        serta normalisasi L2 yang konsisten untuk setiap embedding database.
-        """
-        if self.embeddings_db:
-            try:
-                aktif_db = self.embeddings_db
-                if self.data_siswa and len(self.data_siswa) > 0:
-                    aktif_db = [item for item in self.embeddings_db if str(item.get("label", "")).strip() in self.data_siswa]
+    @labels_list.setter
+    def labels_list(self, value):
+        self.matcher.labels_list = value
 
-                if not aktif_db:
-                    self.embeddings_matrix = None
-                    self.labels_list = []
-                    return
+    @property
+    def min_face_accuracy(self):
+        return self.matcher.min_persen_cocok
 
-                clean_embeddings = []
-                clean_labels = []
-                for item in aktif_db:
-                    raw_emb = item.get("embedding")
-                    lbl = str(item.get("label", "")).strip()
-                    if raw_emb is None or not lbl:
-                        continue
-                    emb = np.array(raw_emb, dtype=np.float32).flatten()
-                    if emb.shape != (128,):
-                        continue
-                    norm = np.linalg.norm(emb)
-                    if norm > 1e-6:
-                        emb = emb / norm
-                    else:
-                        continue
-                    clean_embeddings.append(emb)
-                    clean_labels.append(lbl)
+    @min_face_accuracy.setter
+    def min_face_accuracy(self, value):
+        self.matcher.min_persen_cocok = float(value)
 
-                if clean_embeddings:
-                    self.embeddings_matrix = np.array(clean_embeddings, dtype=np.float32)
-                    self.labels_list = clean_labels
-                    print(f"[+] Matriks pencocokan aktif: {len(self.labels_list)} embedding untuk {len(set(self.labels_list))} siswa terdaftar.")
-                else:
-                    self.embeddings_matrix = None
-                    self.labels_list = []
-            except Exception as e:
-                print(f"[!] Gagal menyusun matriks embedding: {e}")
-                self.embeddings_matrix = None
-                self.labels_list = []
-        else:
-            self.embeddings_matrix = None
-            self.labels_list = []
-
-    def cocokkan_dua_kandidat(self, query_emb):
-        """
-        Mencocokkan embedding query ke database dengan validasi dua kandidat terdekat:
-        - Mendukung jalur embeddings_matrix maupun fallback embeddings_db dengan aturan validasi identik.
-        - Memastikan query_emb dan database ter-normalisasi L2 secara konsisten.
-        - Mengurutkan dua kandidat NISN terdekat.
-        - Memvalidasi threshold kandidat pertama (dist1 <= self.threshold).
-        - Memvalidasi selisih jarak antara kandidat pertama dan kedua (margin >= MIN_MARGIN).
-        - Mengembalikan status 'valid', 'ambigu', 'tidak_dikenali', atau 'gagal_akurasi'.
-        """
-        # 1. Tentukan sumber matriks dan label aktif
-        if self.embeddings_matrix is not None and len(self.embeddings_matrix) > 0 and len(self.labels_list) == len(self.embeddings_matrix):
-            matrix = self.embeddings_matrix
-            labels = self.labels_list
-        elif self.embeddings_db and len(self.embeddings_db) > 0:
-            # Jalur Fallback embeddings_db dengan normalisasi dan sinkronisasi yang sama persis
-            clean_embs = []
-            clean_lbls = []
-            for item in self.embeddings_db:
-                raw_emb = item.get("embedding")
-                lbl = str(item.get("label", "")).strip()
-                if raw_emb is None or not lbl:
-                    continue
-                emb = np.array(raw_emb, dtype=np.float32).flatten()
-                if emb.shape != (128,):
-                    continue
-                norm = np.linalg.norm(emb)
-                if norm > 1e-6:
-                    emb = emb / norm
-                else:
-                    continue
-                clean_embs.append(emb)
-                clean_lbls.append(lbl)
-            if not clean_embs:
-                return {"status": "tidak_dikenali", "pesan": "Database wajah belum tersedia."}
-            matrix = np.array(clean_embs, dtype=np.float32)
-            labels = clean_lbls
-        else:
-            return {"status": "tidak_dikenali", "pesan": "Database wajah belum tersedia."}
-
-        # 2. Normalisasi konsisten embedding query (L2 norm)
-        q_emb = np.array(query_emb, dtype=np.float32).flatten()
-        if q_emb.shape != (128,):
-            return {"status": "tidak_dikenali", "pesan": "Dimensi embedding tidak valid."}
-        q_norm = np.linalg.norm(q_emb)
-        if q_norm < 1e-6:
-            return {"status": "tidak_dikenali", "pesan": "Fitur wajah tidak valid."}
-        q_emb = q_emb / q_norm
-
-        # 3. Hitung cosine distance (1.0 - dot product karena keduanya sudah L2-normalized)
-        cosine_distances = 1.0 - np.dot(matrix, q_emb)
-
-        sorted_indices = np.argsort(cosine_distances)
-        if len(sorted_indices) == 0:
-            return {"status": "tidak_dikenali", "pesan": "Tidak ada data pembanding."}
-
-        # Ambil Kandidat 1 terdekat
-        idx1 = int(sorted_indices[0])
-        dist1 = float(cosine_distances[idx1])
-        nisn1 = str(labels[idx1])
-
-        # Ambil Kandidat 2 terdekat dengan NISN berbeda (identitas berbeda)
-        idx2 = None
-        dist2 = 1.0
-        nisn2 = None
-        for idx in sorted_indices[1:]:
-            lbl = str(labels[idx])
-            if lbl != nisn1:
-                idx2 = int(idx)
-                dist2 = float(cosine_distances[idx2])
-                nisn2 = lbl
-                break
-
-        nama1 = self.data_siswa.get(nisn1, {}).get("nama", f"Siswa {nisn1}")
-        nama2 = self.data_siswa.get(nisn2, {}).get("nama", f"Siswa {nisn2}") if nisn2 else "None"
-        kelas1 = self.data_siswa.get(nisn1, {}).get("kelas", "-")
-
-        # Selisih jarak antara kandidat pertama dan kedua
-        selisih = (dist2 - dist1) if nisn2 is not None else 1.0
-
-        # Log diagnostik pencocokan wajah
-        diag_log = f"[DIAGNOSTIK WAJAH] kandidat_1({nisn1}:{nama1})_dist={dist1:.4f}, kandidat_2({nisn2}:{nama2})_dist={dist2:.4f}, margin={selisih:.4f}, th={self.threshold:.4f}"
-        print(diag_log, flush=True)
-
-        # 4. Validasi Jarak Terhadap Threshold
-        if dist1 > self.threshold:
-            return {
-                "status": "tidak_dikenali",
-                "pesan": "Data belum terdaftar. Silahkan hubungi administrator.",
-                "nisn": nisn1,
-                "jarak": round(dist1, 4),
-                "margin": round(selisih, 4)
-            }
-
-        # 5. Informasi Selisih Dua Kandidat untuk Analisis Kestabilan (bukan penolakan otomatis mutlak)
-        # Selisih dicatat sebagai bobot keyakinan untuk mendukung kestabilan voting multi-frame
-        ambigu = bool(nisn2 is not None and selisih < 0.035)
-        if ambigu:
-            print(f"[*] Informasi margin tipis: {nama1} ({dist1:.4f}) vs {nama2} ({dist2:.4f}), selisih={selisih:.4f}", flush=True)
-
-        # 6. Validasi Persentase Akurasi Minimum
-        skor_persen = hitung_persentase_akurasi(dist1, self.threshold)
-        persentase_skor = f"{skor_persen:.2f}%"
-        min_acc = float(getattr(self, 'min_face_accuracy', 70.0))
-
-        if skor_persen < min_acc:
-            return {
-                "status": "gagal_akurasi",
-                "pesan": f"Kemiripan wajah terdeteksi ({persentase_skor}), namun di bawah batas minimum ({min_acc:.0f}%). Harap hadap kamera lebih tegak dan jelas.",
-                "nisn": nisn1,
-                "nama": nama1,
-                "kelas": kelas1,
-                "akurasi": persentase_skor,
-                "jarak": round(dist1, 4),
-                "margin": round(selisih, 4)
-            }
-
-        return {
-            "status": "valid",
-            "nisn": nisn1,
-            "nama": nama1,
-            "kelas": kelas1,
-            "akurasi": persentase_skor,
-            "skor_persen": skor_persen,
-            "jarak": round(dist1, 4),
-            "margin": round(selisih, 4),
-            "ambigu": ambigu,
-            "kandidat_2_nisn": nisn2,
-            "kandidat_2_jarak": round(dist2, 4) if nisn2 else None
-        }
-
+    # =========================================================================
+    # Metode Siklus Hidup dan Sinkronisasi Data
+    # =========================================================================
     def inisialisasi(self):
         """Memuat data siswa dan vektor embedding wajah langsung dari database Laravel."""
         print(f"[*] Menginisialisasi Layanan Wajah (Model: {self.model_name}, Threshold: {self.threshold})...")
-        
-        # 1. Muat data siswa dan vektor embedding langsung dari database Laravel (Single Source of Truth)
         self.muat_data_siswa()
         self.muat_konfigurasi()
-
-        # 2. Database MySQL sebagai Single Source of Truth
-        # Matikan auto-scan disk massal agar startup instan (< 1-2 detik) dan CPU server tidak spike 100%
-        # Ekstraksi foto ditangani secara on-demand saat foto diunggah di web admin.
-
-        # 3. Bangun matriks 2D untuk pencocokan secepat kilat (0.01 ms)
         self.perbarui_matrix_embeddings()
-
-        # 4. Pemanasan model FaceNet (Warmup) agar pemindaian pertama langsung instan (< 1-2 detik)
-        print("[*] Melakukan pemanasan (warmup) model FaceNet...")
-        try:
-            dummy = np.zeros((160, 160, 3), dtype=np.uint8)
-            with self.model_lock:
-                DeepFace.represent(dummy, model_name=self.model_name, detector_backend="skip", enforce_detection=False)
-            print("[+] Pemanasan model FaceNet selesai. Siap memindai secara instan!")
-        except Exception as e_warm:
-            print(f"[!] Warning warmup model: {e_warm}")
+        self.embedder.warmup()
+        if self.student_repo.embeddings_db:
+            self.is_ready = True
+            print(f"[+] Layanan Wajah Siap! ({len(self.student_repo.embeddings_db)} vektor embedding terindeks).")
+        else:
+            print("[*] Layanan Wajah diinisialisasi (database embedding belum terisi).")
 
     def muat_konfigurasi(self):
         """Memuat batas minimum akurasi dari konfigurasi Laravel."""
-        try:
-            url = f"{self.laravel_api_url}/api/presensi/konfigurasi"
-            res = requests.get(url, timeout=3)
-            if res.status_code == 200:
-                cfg = res.json()
-                self.min_face_accuracy = float(cfg.get("min_face_accuracy", 70.0))
-                print(f"[+] Batas minimum akurasi pemindaian: {self.min_face_accuracy:.2f}%")
-        except Exception as e:
-            print(f"[!] Info konfigurasi akurasi Laravel: {e}")
+        acc = self.attendance_client.muat_konfigurasi()
+        self.matcher.min_persen_cocok = acc
+        return acc
 
     def muat_data_siswa(self):
-        """Memuat daftar siswa dan vektor embedding wajah langsung dari database Laravel."""
-        loaded = False
-        candidate_urls = [
-            f"{self.laravel_api_url.rstrip('/')}/api/presensi/daftar-siswa",
-            "http://127.0.0.1/api/presensi/daftar-siswa",
-            "http://localhost/api/presensi/daftar-siswa",
-        ]
-        # Hilangkan duplikat
-        seen = set()
-        unique_urls = []
-        for u in candidate_urls:
-            if u not in seen:
-                seen.add(u)
-                unique_urls.append(u)
+        """Memuat daftar siswa dan embedding dari Laravel."""
+        berhasil = self.student_repo.muat_data_siswa()
+        if berhasil:
+            self.perbarui_matrix_embeddings()
+            if self.student_repo.embeddings_db:
+                self.is_ready = True
+        return berhasil
 
-        for url in unique_urls:
-            try:
-                res = requests.get(url, timeout=3)
-                if res.status_code == 200:
-                    self.data_siswa = res.json()
-                    print(f"[+] Berhasil memuat data {len(self.data_siswa)} siswa dari {url}.")
+    def perbarui_matrix_embeddings(self):
+        """Menyusun matriks numpy 2D dari embeddings_db untuk pencocokan cepat."""
+        return self.matcher.perbarui_matrix(
+            self.student_repo.embeddings_db,
+            self.student_repo.data_siswa
+        )
 
-                    # Ekstrak vektor embedding wajah langsung dari database Laravel (Single Source of Truth)
-                    db_embeddings = []
-                    for nisn, info in self.data_siswa.items():
-                        raw_embs = info.get("embeddings", [])
-                        for idx, emb_raw in enumerate(raw_embs):
-                            if emb_raw and len(emb_raw) == 128:
-                                emb_vec = np.array(emb_raw, dtype=np.float32)
-                                norm = np.linalg.norm(emb_vec)
-                                if norm > 0:
-                                    emb_vec = emb_vec / norm
-                                db_embeddings.append({
-                                    "label": str(nisn),
-                                    "embedding": emb_vec,
-                                    "path": f"db://faces/{nisn}/{idx}"
-                                })
+    def cocokkan_dua_kandidat(self, query_emb):
+        """Mencocokkan embedding query ke database dengan validasi dua kandidat."""
+        return self.matcher.cocokkan(
+            query_emb,
+            data_siswa=self.student_repo.data_siswa,
+            fallback_db=self.student_repo.embeddings_db
+        )
 
-                    if db_embeddings:
-                        self.embeddings_db = db_embeddings
-                        print(f"[+] Berhasil memuat {len(self.embeddings_db)} vektor embedding wajah langsung dari database MySQL.")
-                        self.perbarui_matrix_embeddings()
-                        self.is_ready = True
-                    loaded = True
-                    break
-            except Exception as e:
-                pass
+    def reset_riwayat_wajah(self):
+        """Mereset riwayat kestabilan antar-frame."""
+        self.tracker.reset()
 
-        if not loaded:
-            print("[*] Belum dapat terhubung ke Laravel untuk memuat daftar siswa.")
+    def catat_presensi_ke_laravel(self, nisn):
+        """Memanggil API Laravel untuk mencatat presensi siswa otomatis."""
+        return self.attendance_client.catat_presensi(nisn)
 
-    def bangun_index_wajah(self):
-        """Membuat embedding untuk semua foto siswa yang tersimpan di dataset."""
-        print("[*] Memulai pemindaian direktori dataset untuk membangun index wajah...")
-        self.embeddings_db = []
+    def sinkronisasi_dataset_baru(self):
+        """Memeriksa folder dataset di disk dan mengekstrak wajah baru."""
+        total = self.student_repo.sinkronisasi_dataset_baru()
+        if total > 0:
+            self.perbarui_matrix_embeddings()
+            self.is_ready = True
+        return total
 
-        if not self.data_siswa:
-            self.muat_data_siswa()
+    def potong_dan_zoom_wajah(self, img_path):
+        """Auto-crop dan zoom pasfoto wajah."""
+        return self.student_repo.potong_dan_zoom_wajah(img_path)
 
-        if not self.data_siswa:
-            print("[!] Belum ada data siswa terdaftar di Laravel. Index wajah dilewati.")
-            self.embeddings_matrix = None
-            self.labels_list = []
-            return
-        
-        folders_to_scan = []
-        if os.path.exists(self.storage_path):
-            folders_to_scan.append(self.storage_path)
+    def ekstrak_dan_sinkronisasi_siswa(self, nisn, nama="", simpan_cache=True):
+        """Mengekstrak embedding siswa baru yang diunggah dari Laravel."""
+        res = self.student_repo.ekstrak_dan_sinkronisasi_siswa(nisn, nama=nama, simpan_cache=simpan_cache)
+        if res.get("status") == "sukses":
+            self.perbarui_matrix_embeddings()
+            self.is_ready = True
+        return res
 
-        seen_labels = set()
-        count = 0
-
-        for base_folder in folders_to_scan:
-            if not os.path.isdir(base_folder):
-                continue
-            for item in os.listdir(base_folder):
-                item_path = os.path.join(base_folder, item)
-                if os.path.isdir(item_path):
-                    label = item  # NISN atau NIP
-                    if label not in self.data_siswa:
-                        continue
-                    if label in seen_labels:
-                        continue
-                    
-                    for file_name in os.listdir(item_path):
-                        if file_name.lower().endswith(('.jpg', '.jpeg', '.png')):
-                            img_path = os.path.join(item_path, file_name)
-                            try:
-                                with self.model_lock:
-                                    representations = DeepFace.represent(
-                                        img_path=img_path,
-                                        model_name=self.model_name,
-                                        detector_backend=self.detector_backend,
-                                        enforce_detection=False
-                                    )
-                                if representations and len(representations) > 0:
-                                    emb = np.array(representations[0]["embedding"], dtype=np.float32)
-                                    norm = np.linalg.norm(emb)
-                                    if norm > 0:
-                                        emb = emb / norm
-                                    
-                                    self.embeddings_db.append({
-                                        "label": label,
-                                        "embedding": emb,
-                                        "path": img_path
-                                    })
-                                    seen_labels.add(label)
-                                    count += 1
-                                    if count % 25 == 0:
-                                        print(f"[*] Berhasil memproses {count} dataset wajah...")
-                                    break
-                            except Exception as e:
-                                print(f"[!] Lewati {img_path}: {e}")
-
-        print(f"[+] Selesai! Sebanyak {len(self.embeddings_db)} wajah siswa berhasil diindeks ke memori.")
+    def hapus_embedding_siswa(self, nisn):
+        """Menghapus embedding siswa dari memori."""
+        res = self.student_repo.hapus_embedding_siswa(nisn)
         self.perbarui_matrix_embeddings()
-        self.is_ready = True
+        return res
+
+    def deteksi_wajah_cnn(self, img, min_score=0.40):
+        """Mendeteksi wajah menggunakan model Deep Learning CNN."""
+        return self.detector.deteksi_wajah(img, min_score=min_score)
+
+    @staticmethod
+    def normalisasi_pencahayaan_adaptif(img):
+        return FaceDetector.normalisasi_pencahayaan_adaptif(img)
 
     def gambar_bounding_box_opencv(self, frame, x, y, w, h, label_text="TERDETEKSI", status="sukses", skor=""):
-        """
-        Menggambar kotak deteksi wajah khas Python OpenCV:
-        - Bounding rectangle presisi
-        - Sudut-sudut tebal (Corner brackets beraksen cyberpunk/CV)
-        - Badge label di atas kepala (Nama Siswa, NISN, Persentase)
-        - Status badge terverifikasi
-        """
-        # Konfigurasi warna (BGR OpenCV)
-        if status == "sukses":
-            color = (0, 220, 0)         # Hijau Cerah
-            status_text = "TERVERIFIKASI"
-            text_color = (0, 0, 0)
-        elif status == "sudah_absen":
-            color = (255, 170, 0)       # Cyan / Biru Muda
-            status_text = "SUDAH ABSEN"
-            text_color = (0, 0, 0)
-        elif status == "tidak_dikenali":
-            color = (0, 0, 235)         # Merah
-            status_text = "TIDAK DIKENAL"
-            text_color = (255, 255, 255)
-        else:
-            color = (0, 215, 255)       # Kuning
-            status_text = "MEMINDAI..."
-            text_color = (0, 0, 0)
-
-        # 1. Kotak Utama Wajah
-        cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
-
-        # 2. Sudut-Sudut Aksen Khas OpenCV (Corner Accents)
-        corner_len = max(15, int(min(w, h) * 0.22))
-        thickness = 4
-        # Top-Left
-        cv2.line(frame, (x, y), (x + corner_len, y), color, thickness)
-        cv2.line(frame, (x, y), (x, y + corner_len), color, thickness)
-        # Top-Right
-        cv2.line(frame, (x + w, y), (x + w - corner_len, y), color, thickness)
-        cv2.line(frame, (x + w, y), (x + w, y + corner_len), color, thickness)
-        # Bottom-Left
-        cv2.line(frame, (x, y + h), (x + corner_len, y + h), color, thickness)
-        cv2.line(frame, (x, y + h), (x, y + h - corner_len), color, thickness)
-        # Bottom-Right
-        cv2.line(frame, (x + w, y + h), (x + w - corner_len, y + h), color, thickness)
-        cv2.line(frame, (x + w, y + h), (x + w, y + h - corner_len), color, thickness)
-
-        # 3. Label Badge di Atas Kotak Wajah
-        full_label = f"{label_text}"
-        if skor:
-            full_label += f" ({skor})"
-        
-        font = cv2.FONT_HERSHEY_DUPLEX
-        font_scale = 0.52
-        (tw, th), baseline = cv2.getTextSize(full_label, font, font_scale, 1)
-
-        # Kotak background label atas
-        badge_y1 = max(0, y - th - 12)
-        badge_y2 = y
-        badge_x2 = min(frame.shape[1], x + tw + 16)
-        cv2.rectangle(frame, (x, badge_y1), (badge_x2, badge_y2), color, cv2.FILLED)
-        cv2.putText(frame, full_label, (x + 8, y - 7), font, font_scale, text_color, 1, cv2.LINE_AA)
-
-        # 4. Badge Status di Bawah Kotak
-        (stw, sth), _ = cv2.getTextSize(status_text, font, 0.42, 1)
-        sub_y1 = y + h
-        sub_y2 = min(frame.shape[0], y + h + sth + 10)
-        sub_x2 = min(frame.shape[1], x + stw + 14)
-        cv2.rectangle(frame, (x, sub_y1), (sub_x2, sub_y2), color, cv2.FILLED)
-        cv2.putText(frame, status_text, (x + 7, y + h + sth + 3), font, 0.42, text_color, 1, cv2.LINE_AA)
-
-        return frame
+        return self.visualizer.gambar_bounding_box(frame, x, y, w, h, label_text=label_text, status=status, skor=skor)
 
     def gambar_hud_opencv(self, frame):
-        """Menggambar banner HUD OpenCV di bagian atas frame video."""
-        h, w = frame.shape[:2]
-        # Header transparan atas
-        overlay = frame.copy()
-        cv2.rectangle(overlay, (0, 0), (w, 32), (18, 18, 18), cv2.FILLED)
-        cv2.addWeighted(overlay, 0.75, frame, 0.25, 0, frame)
+        return self.visualizer.gambar_hud(frame, total_wajah_db=len(self.student_repo.embeddings_db))
 
-        # Teks Judul Kiri
-        cv2.putText(frame, "SMAN 2 TONDANO | COMPUTER VISION (OPENCV & DEEPFACE)", 
-                    (12, 21), cv2.FONT_HERSHEY_SIMPLEX, 0.44, (0, 245, 180), 1, cv2.LINE_AA)
+    def kenali_wajah_dari_base64(self, gambar_base64):
+        res = self.proses_frame_kamera(gambar_base64)
+        if res.get("hasil"):
+            return res["hasil"]
+        return res
 
-        # Status Kanan
-        status_info = f"MODEL: {self.model_name.upper()} | DB: {len(self.embeddings_db)} WAJAH"
-        (tw, _), _ = cv2.getTextSize(status_info, cv2.FONT_HERSHEY_SIMPLEX, 0.38, 1)
-        cv2.putText(frame, status_info, (w - tw - 12, 21), 
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.38, (0, 220, 0), 1, cv2.LINE_AA)
-        return frame
-
+    # =========================================================================
+    # Pipeline Utama Inferensi Frame Video Kamera
+    # =========================================================================
     def proses_frame_kamera(self, gambar_base64, catat_laravel=False):
         """
-        Menerima frame kamera dari browser HP / Desktop,
-        Mendeteksi wajah, mencocokkan ke database DeepFace,
-        Menggambar kotak-kotak wajah OpenCV,
-        Mencatat absensi ke Laravel (opsional),
-        dan Mengembalikan gambar beranotasi OpenCV.
+        Menerima frame kamera, mendeteksi wajah dengan YuNet CNN,
+        mengekstrak fitur FaceNet teraligni, menstabilkan identitas via sliding-window voting,
+        merender visual OpenCV, dan mencatat absensi ke Laravel jika terkonfirmasi.
         """
-        if not self.is_ready or not self.embeddings_db:
+        if not self.is_ready or not self.student_repo.embeddings_db:
             return {
                 "status": "memindai",
                 "pesan": "Server AI sedang menyiapkan model...",
@@ -639,14 +240,12 @@ class LayananWajah:
                 return {"status": "error", "pesan": "Format gambar tidak valid."}
 
             h_orig, w_orig = frame.shape[:2]
-            now = time.time()
 
             # 1. Deteksi Wajah dengan Deep Learning CNN (YuNet ONNX + CLAHE Adaptive Lighting)
-            cnn_faces = self.deteksi_wajah_cnn(frame, min_score=0.50)
+            cnn_faces = self.detector.deteksi_wajah(frame, min_score=0.50)
             if not cnn_faces:
-                # Fallback CLAHE jika pencahayaan redup/berbayang
-                frame_enhanced = self.normalisasi_pencahayaan_adaptif(frame)
-                cnn_faces = self.deteksi_wajah_cnn(frame_enhanced, min_score=0.40)
+                frame_enhanced = self.detector.normalisasi_pencahayaan_adaptif(frame)
+                cnn_faces = self.detector.deteksi_wajah(frame_enhanced, min_score=0.40)
 
             detected_faces = []
             for item in cnn_faces:
@@ -665,8 +264,9 @@ class LayananWajah:
                 fx, fy, fw, fh = fa["x"], fa["y"], fa["w"], fa["h"]
                 x, y, w, h = fx, fy, fw, fh
 
+                # Crop wajah dengan padding proporsional untuk area ekstraksi & perataan wajah
                 pad_top = int(fh * 0.35)
-                pad_bottom = int(fh * 0.35)
+                pad_bottom = int(fh * 0.40)
                 pad_side = int(fw * 0.30)
                 y1 = max(0, fy - pad_top)
                 y2 = min(h_orig, fy + fh + pad_bottom)
@@ -674,127 +274,31 @@ class LayananWajah:
                 x2 = min(w_orig, fx + fw + pad_side)
                 face_crop = frame[y1:y2, x1:x2]
 
-                target_img = face_crop if (face_crop is not None and face_crop.size > 0 and face_crop.shape[0] > 20 and face_crop.shape[1] > 20) else frame
+                target_img = face_crop if (face_crop is not None and face_crop.size > 0 and 
+                                           face_crop.shape[0] > 20 and face_crop.shape[1] > 20) else frame
 
-                # Ambil embedding wajah teraligni secara konsisten dengan backend skip (karena sudah dicrop dengan padding optimal oleh YuNet)
-                representations = []
-                try:
-                    with self.model_lock:
-                        representations = DeepFace.represent(
-                            img_path=target_img,
-                            model_name=self.model_name,
-                            detector_backend="skip",
-                            enforce_detection=False
-                        )
-                except Exception:
-                    try:
-                        with self.model_lock:
-                            representations = DeepFace.represent(
-                                img_path=frame,
-                                model_name=self.model_name,
-                                detector_backend="opencv",
-                                enforce_detection=False
-                            )
-                    except Exception:
-                        representations = []
+                # Ekstraksi fitur embedding FaceNet dengan perataan wajah (aligned opencv) konsisten
+                query_emb = self.embedder.ekstrak_embedding(
+                    target_img, 
+                    frame_lengkap=frame, 
+                    detector_backend="opencv"
+                )
 
-                if representations and len(representations) > 0:
-                    query_emb = representations[0]["embedding"]
+                if query_emb is not None:
+                    # Cocokkan embedding query ke database
+                    eval_res = self.matcher.cocokkan(
+                        query_emb,
+                        data_siswa=self.student_repo.data_siswa,
+                        fallback_db=self.student_repo.embeddings_db
+                    )
 
-                    # Cocokkan embedding menggunakan metode terstandarisasi (Validasi Dua Kandidat & Ambiguity Check)
-                    eval_res = self.cocokkan_dua_kandidat(query_emb)
-                    eval_status = eval_res.get("status")
+                    # Evaluasi kestabilan multi-frame (sliding window voting)
+                    identitas_tervalidasi, terpilih_entry, meta = self.tracker.evaluasi_frame(
+                        x, y, w, h, w_orig, h_orig,
+                        eval_res=eval_res,
+                        data_siswa=self.student_repo.data_siswa
+                    )
 
-                    with self.history_lock:
-                        # 1. Reset riwayat jika jeda antar-frame melebihi batas waktu (timeout)
-                        if (now - self.last_seen_timestamp) > self.face_timeout_seconds:
-                            self.voting_window.clear()
-                            self.confirmed_identity = None
-
-                        # 2. Reset riwayat jika posisi wajah melompat drastis (indikasi pergantian orang)
-                        if self.last_bounding_box is not None:
-                            lx, ly, lw, lh = self.last_bounding_box
-                            center_dist = np.hypot((x + w / 2.0) - (lx + lw / 2.0), (y + h / 2.0) - (ly + lh / 2.0))
-                            if center_dist > max(w_orig, h_orig) * 0.50:
-                                self.voting_window.clear()
-                                self.confirmed_identity = None
-
-                        self.last_seen_timestamp = now
-                        self.last_bounding_box = (x, y, w, h)
-
-                        # 3. Masukkan hasil evaluasi frame ke dalam buffer jendela voting (sliding window)
-                        frame_entry = {
-                            "status": eval_status,
-                            "nisn": eval_res.get("nisn") if eval_status == "valid" else None,
-                            "nama": eval_res.get("nama") if eval_status == "valid" else None,
-                            "kelas": eval_res.get("kelas") if eval_status == "valid" else None,
-                            "akurasi": eval_res.get("akurasi") if eval_status == "valid" else None,
-                            "jarak": eval_res.get("jarak") if eval_status == "valid" else None,
-                            "margin": eval_res.get("margin", 0.0),
-                            "ambigu": eval_res.get("ambigu", False),
-                            "timestamp": now
-                        }
-
-                        # Buang frame yang sudah kedaluwarsa dari jendela
-                        self.voting_window = [
-                            e for e in self.voting_window 
-                            if (now - e["timestamp"]) <= self.face_timeout_seconds
-                        ]
-                        self.voting_window.append(frame_entry)
-                        if len(self.voting_window) > self.max_window_size:
-                            self.voting_window.pop(0)
-
-                        window_len = len(self.voting_window)
-
-                        # 4. Agregasi suara (voting) untuk tiap kandidat siswa
-                        vote_counts = {}
-                        candidate_latest_entry = {}
-                        for entry in self.voting_window:
-                            if entry["status"] == "valid" and entry["nisn"]:
-                                n = entry["nisn"]
-                                vote_counts[n] = vote_counts.get(n, 0) + 1
-                                candidate_latest_entry[n] = entry
-
-                        best_nisn = None
-                        best_votes = 0
-                        if vote_counts:
-                            best_nisn, best_votes = max(vote_counts.items(), key=lambda it: it[1])
-
-                        # 5. Evaluasi Kestabilan Identitas & Temporal Smoothing
-                        identitas_tervalidasi = False
-                        terpilih_entry = None
-
-                        if self.confirmed_identity is not None:
-                            # Skenario A: Wajah sudah terkonfirmasi sebelumnya pada sesi tracking ini
-                            # Pertahankan identitas jika siswa tersebut masih mendapat dukungan di jendela
-                            # ATAU kandidat baru belum mencapai suara mayoritas mutlak (>= required_votes)
-                            if best_nisn == self.confirmed_identity or best_votes < self.required_votes:
-                                terpilih_entry = candidate_latest_entry.get(self.confirmed_identity)
-                                if not terpilih_entry:
-                                    s_data = self.data_siswa.get(self.confirmed_identity, {})
-                                    terpilih_entry = {
-                                        "nisn": self.confirmed_identity,
-                                        "nama": s_data.get("nama", f"Siswa {self.confirmed_identity}"),
-                                        "kelas": s_data.get("kelas", "-"),
-                                        "akurasi": eval_res.get("akurasi", "85%"),
-                                        "jarak": eval_res.get("jarak", 0.28)
-                                    }
-                                identitas_tervalidasi = True
-                            else:
-                                # Kandidat baru berhasil mengumpulkan suara mayoritas (>= required_votes)
-                                self.confirmed_identity = best_nisn
-                                terpilih_entry = candidate_latest_entry[best_nisn]
-                                identitas_tervalidasi = True
-                        else:
-                            # Skenario B: Belum ada identitas terkonfirmasi (wajah baru sedang diverifikasi)
-                            if best_nisn is not None and best_votes >= self.required_votes:
-                                self.confirmed_identity = best_nisn
-                                terpilih_entry = candidate_latest_entry[best_nisn]
-                                identitas_tervalidasi = True
-                            else:
-                                identitas_tervalidasi = False
-
-                    # 6. Konstruksi Respon Sesuai Hasil Voting Multi-Frame
                     if identitas_tervalidasi and terpilih_entry:
                         kandidat_nisn = terpilih_entry["nisn"]
                         nama_siswa = terpilih_entry["nama"]
@@ -810,26 +314,22 @@ class LayananWajah:
                             "kelas": kelas_siswa,
                             "akurasi": persentase_skor,
                             "jarak": min_dist,
-                            "suara": best_votes,
-                            "target_suara": self.required_votes,
-                            "ukuran_jendela": window_len
+                            "suara": meta["suara"],
+                            "target_suara": meta["target_suara"],
+                            "ukuran_jendela": meta["ukuran_jendela"]
                         }
 
                         # Kirim presensi ke Laravel jika diminta
                         if catat_laravel:
-                            sekarang = time.time()
-                            last_time = self.last_attendance_time.get(kandidat_nisn, 0)
-                            if (sekarang - last_time) > self.cooldown_seconds:
-                                res_laravel = self.catat_presensi_ke_laravel(kandidat_nisn)
-                                self.last_attendance_time[kandidat_nisn] = sekarang
-                                if res_laravel:
-                                    hasil_pencocokan["presensi"] = res_laravel
-                                    if res_laravel.get("status") == "sudah_absen":
-                                        status_scan = "sudah_absen"
-                                        hasil_pencocokan["status"] = "sudah_absen"
+                            res_laravel = self.attendance_client.catat_presensi(kandidat_nisn)
+                            if res_laravel:
+                                hasil_pencocokan["presensi"] = res_laravel
+                                if res_laravel.get("status") == "sudah_absen":
+                                    status_scan = "sudah_absen"
+                                    hasil_pencocokan["status"] = "sudah_absen"
 
                         # Gambar Kotak Hijau OpenCV
-                        self.gambar_bounding_box_opencv(
+                        self.visualizer.gambar_bounding_box(
                             frame, x, y, w, h, 
                             label_text=nama_siswa, 
                             status=status_scan, 
@@ -838,17 +338,15 @@ class LayananWajah:
 
                     else:
                         # Identitas belum tervalidasi pada jendela geser saat ini
-                        if window_len >= 3 and best_votes == 0:
-                            # Sudah 3 frame berturut-turut tidak ada siswa terdaftar yang cocok
-                            total_gagal_akurasi = sum(1 for e in self.voting_window if e["status"] == "gagal_akurasi")
-                            if total_gagal_akurasi >= 2:
+                        if meta["ukuran_jendela"] >= 3 and meta["suara"] == 0:
+                            if meta["total_gagal_akurasi"] >= 2:
                                 hasil_pencocokan = {
                                     "status": "gagal_akurasi",
                                     "pesan": "Posisikan wajah lebih jelas tegak lurus ke kamera.",
                                     "nama": eval_res.get("nama", "Siswa"),
                                     "akurasi": eval_res.get("akurasi", "")
                                 }
-                                self.gambar_bounding_box_opencv(
+                                self.visualizer.gambar_bounding_box(
                                     frame, x, y, w, h,
                                     label_text=f"{hasil_pencocokan['nama']} ({hasil_pencocokan['akurasi']})",
                                     status="gagal_akurasi",
@@ -859,26 +357,27 @@ class LayananWajah:
                                     "status": "tidak_dikenali",
                                     "pesan": "Data belum terdaftar. Silahkan hubungi administrator."
                                 }
-                                # Gambar Kotak Merah OpenCV
-                                self.gambar_bounding_box_opencv(
+                                self.visualizer.gambar_bounding_box(
                                     frame, x, y, w, h, 
                                     label_text="BELUM TERDAFTAR", 
                                     status="tidak_dikenali", 
                                     skor=None
                                 )
                         else:
-                            # Masih dalam tahap akumulasi frame atau transisi: Status memindai
-                            target_info = f"({best_votes}/{self.required_votes})" if best_votes > 0 else "..."
+                            # Masih dalam tahap stabilisasi: Status memindai
+                            suara = meta["suara"]
+                            target_suara = meta["target_suara"]
+                            target_info = f"({suara}/{target_suara})" if suara > 0 else "..."
                             hasil_pencocokan = {
                                 "status": "memindai",
                                 "pesan": f"Memvalidasi kestabilan wajah {target_info}...",
                                 "nisn": None,
                                 "nama": None,
-                                "suara": best_votes,
-                                "target_suara": self.required_votes,
-                                "ukuran_jendela": window_len
+                                "suara": suara,
+                                "target_suara": target_suara,
+                                "ukuran_jendela": meta["ukuran_jendela"]
                             }
-                            self.gambar_bounding_box_opencv(
+                            self.visualizer.gambar_bounding_box(
                                 frame, x, y, w, h, 
                                 label_text="MEMINDAI...", 
                                 status="memindai", 
@@ -886,27 +385,27 @@ class LayananWajah:
                             )
                 else:
                     # Gagal ekstraksi embedding
-                    self.reset_riwayat_wajah()
+                    self.tracker.reset()
                     hasil_pencocokan = {
                         "status": "tidak_ada_wajah",
                         "pesan": "Arahkan wajah ke kamera."
                     }
                     fa = detected_faces[0]
-                    self.gambar_bounding_box_opencv(
+                    self.visualizer.gambar_bounding_box(
                         frame, fa["x"], fa["y"], fa["w"], fa["h"], 
                         label_text="MEMINDAI...", 
                         status="memindai"
                     )
             else:
                 # Wajah menghilang dari kamera: reset riwayat pelacakan
-                self.reset_riwayat_wajah()
+                self.tracker.reset()
                 hasil_pencocokan = {
                     "status": "tidak_ada_wajah",
                     "pesan": "Arahkan wajah ke kamera."
                 }
 
             # 3. Gambar HUD Atas
-            self.gambar_hud_opencv(frame)
+            self.visualizer.gambar_hud(frame, total_wajah_db=len(self.student_repo.embeddings_db))
 
             # 4. Susun data bounding box untuk frontend client (HTML5 Video & Canvas)
             wajah_data = None
@@ -946,13 +445,10 @@ class LayananWajah:
                     "status": status_box
                 }
 
-            # 5. Hindari encoding ulang JPEG yang memakan waktu CPU (browser sudah memiliki feed video native)
-            frame_base64 = None
-
             return {
                 "status": hasil_pencocokan.get("status", "ok") if hasil_pencocokan else "ok",
                 "terdeteksi": len(detected_faces) > 0,
-                "frame_annotated": frame_base64,
+                "frame_annotated": None,
                 "hasil": hasil_pencocokan,
                 "wajah": wajah_data,
                 "total_wajah_frame": len(detected_faces)
@@ -963,215 +459,3 @@ class LayananWajah:
                 "status": "error",
                 "pesan": f"Kesalahan memproses frame: {str(e)}"
             }
-
-    def catat_presensi_ke_laravel(self, nisn):
-        """Memanggil API Laravel untuk mencatat absensi siswa secara otomatis."""
-        try:
-            url = f"{self.laravel_api_url}/api/presensi/pindai-wajah"
-            payload = {"nisn": str(nisn)}
-            response = requests.post(url, json=payload, timeout=3)
-            if response.status_code in [200, 400, 404]:
-                return response.json()
-            else:
-                return None
-        except Exception as e:
-            print(f"[!] Gagal mencatat presensi ke Laravel: {e}")
-            return None
-
-    def kenali_wajah_dari_base64(self, gambar_base64):
-        """Metode kompatibilitas untuk endpoint lama."""
-        res = self.proses_frame_kamera(gambar_base64)
-        if res.get("hasil"):
-            return res["hasil"]
-        return res
-
-    def sinkronisasi_dataset_baru(self):
-        """Memeriksa folder dataset di disk dan mengekstrak wajah baru yang belum ada di cache FaceNet."""
-        folders_to_scan = []
-        if os.path.exists(self.storage_path):
-            folders_to_scan.append(self.storage_path)
-
-        indexed_labels = set(str(item.get("label")) for item in self.embeddings_db)
-        missing_labels = []
-
-        for base_folder in folders_to_scan:
-            if not os.path.isdir(base_folder):
-                continue
-            for item in os.listdir(base_folder):
-                item_path = os.path.join(base_folder, item)
-                if os.path.isdir(item_path):
-                    # Hanya sinkronkan folder siswa yang terdaftar di Laravel jika data_siswa tersedia
-                    if self.data_siswa and item not in self.data_siswa:
-                        continue
-                    if item not in indexed_labels and item not in missing_labels:
-                        missing_labels.append(item)
-
-        if missing_labels:
-            print(f"[*] Ditemukan {len(missing_labels)} dataset siswa baru yang belum terindeks FaceNet: {missing_labels}")
-            total_added = 0
-            for label in missing_labels:
-                res = self.ekstrak_dan_sinkronisasi_siswa(label, simpan_cache=False)
-                if res.get("status") == "sukses":
-                    total_added += res.get("total_embedding", 0)
-
-            if total_added > 0:
-                print(f"[+] Sinkronisasi startup selesai! {total_added} embedding FaceNet baru berhasil dimuat.")
-                self.perbarui_matrix_embeddings()
-
-    def potong_dan_zoom_wajah(self, img_path):
-        """
-        Mendeteksi wajah pada gambar (misal foto full body/setengah badan),
-        lalu memotong dan melakukan zoom proporsional (area kepala/bahu portrait)
-        agar foto yang disimpan ke disk & database adalah pasfoto wajah optimal.
-        """
-        try:
-            if not os.path.exists(img_path):
-                return False
-
-            img = cv2.imread(img_path)
-            if img is None or img.size == 0:
-                return False
-
-            h_img, w_img = img.shape[:2]
-            # Deteksi wajah menggunakan Deep Learning CNN (YuNet ONNX + CLAHE)
-            faces = self.deteksi_wajah_cnn(img, min_score=0.45)
-            if not faces:
-                return False
-
-            # Ambil wajah dengan ukuran paling dominan
-            faces = sorted(faces, key=lambda f: f[2] * f[3], reverse=True)
-            x, y, w, h = faces[0][:4]
-
-            # Jika wajah sudah mengisi > 70% dari gambar, tidak perlu dipotong lagi
-            if (w * h) / (w_img * h_img) > 0.70:
-                return True
-
-            # Tambahkan margin atas, bawah, dan samping untuk pasfoto portrait (zoom ke wajah)
-            pad_top = int(h * 0.40)
-            pad_bottom = int(h * 0.45)
-            pad_side = int(w * 0.35)
-
-            y1 = max(0, y - pad_top)
-            y2 = min(h_img, y + h + pad_bottom)
-            x1 = max(0, x - pad_side)
-            x2 = min(w_img, x + w + pad_side)
-
-            cropped = img[y1:y2, x1:x2]
-            if cropped is not None and cropped.size > 0:
-                cv2.imwrite(img_path, cropped, [int(cv2.IMWRITE_JPEG_QUALITY), 95])
-                return True
-
-        except Exception as e:
-            print(f"[!] Gagal auto-crop zoom wajah pada {img_path}: {e}")
-
-        return False
-
-    def ekstrak_dan_sinkronisasi_siswa(self, nisn, nama="", simpan_cache=True):
-        """
-        Mengekstrak fitur citra wajah (face embedding 128-dimensi FaceNet)
-        dari foto yang diunggah ke folder dataset siswa.
-        Dipanggil otomatis oleh Laravel saat Admin menambah atau memperbarui foto siswa.
-        """
-        nisn = str(nisn).strip()
-        folder_siswa = os.path.join(self.storage_path, nisn)
-
-        if not os.path.exists(folder_siswa) or not os.path.isdir(folder_siswa):
-            return {"status": "error", "pesan": f"Folder foto untuk NISN {nisn} tidak ditemukan di storage."}
-
-        foto_files = [f for f in os.listdir(folder_siswa) if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
-        if not foto_files:
-            return {"status": "error", "pesan": f"Tidak ada berkas foto di folder storage NISN {nisn}."}
-
-        new_embeddings = []
-        for file_name in foto_files:
-            img_path = os.path.join(folder_siswa, file_name)
-            img = cv2.imread(img_path)
-            if img is None or img.size == 0:
-                continue
-
-            h_img, w_img = img.shape[:2]
-            faces = self.deteksi_wajah_cnn(img, min_score=0.40)
-
-            target_face = img
-            if faces:
-                faces = sorted(faces, key=lambda f: f[2] * f[3], reverse=True)
-                fx, fy, fw, fh = faces[0][:4]
-                pad_top = int(fh * 0.35)
-                pad_bottom = int(fh * 0.40)
-                pad_side = int(fw * 0.30)
-                y1 = max(0, fy - pad_top)
-                y2 = min(h_img, fy + fh + pad_bottom)
-                x1 = max(0, fx - pad_side)
-                x2 = min(w_img, fx + fw + pad_side)
-                crop = img[y1:y2, x1:x2]
-                if crop is not None and crop.size > 0:
-                    target_face = crop
-
-            representations = []
-            try:
-                with self.model_lock:
-                    representations = DeepFace.represent(
-                        img_path=target_face,
-                        model_name=self.model_name,
-                        detector_backend="skip",
-                        enforce_detection=False
-                    )
-            except Exception:
-                try:
-                    with self.model_lock:
-                        representations = DeepFace.represent(
-                            img_path=img_path,
-                            model_name=self.model_name,
-                            detector_backend="opencv",
-                            enforce_detection=False
-                        )
-                except Exception as e:
-                    print(f"[!] Gagal mengekstrak fitur foto {img_path}: {e}")
-                    representations = []
-
-            if representations and len(representations) > 0:
-                emb = np.array(representations[0]["embedding"], dtype=np.float32)
-                norm = np.linalg.norm(emb)
-                if norm > 0:
-                    emb = emb / norm
-                new_embeddings.append({
-                    "label": nisn,
-                    "embedding": emb,
-                    "path": img_path
-                })
-
-        if not new_embeddings:
-            return {"status": "error", "pesan": f"Wajah tidak terdeteksi pada berkas foto NISN {nisn}."}
-
-        # Perbarui basis data embedding di memori
-        self.embeddings_db = [item for item in self.embeddings_db if str(item.get("label")) != nisn]
-        self.embeddings_db.extend(new_embeddings)
-
-        if nama:
-            self.data_siswa[nisn] = {"nama": nama, "kelas": self.data_siswa.get(nisn, {}).get("kelas", "-")}
-
-        self.perbarui_matrix_embeddings()
-        self.is_ready = True
-        return {
-            "status": "sukses",
-            "pesan": f"Berhasil mengekstrak {len(new_embeddings)} vektor embedding FaceNet untuk NISN {nisn}.",
-            "total_embedding": len(new_embeddings),
-            "embeddings": {
-                os.path.basename(item["path"]): item["embedding"].tolist()
-                for item in new_embeddings
-            }
-        }
-
-    def hapus_embedding_siswa(self, nisn):
-        """Menghapus embedding siswa dari database memori saat siswa dihapus di Laravel."""
-        nisn = str(nisn).strip()
-        sebelum = len(self.embeddings_db)
-        self.embeddings_db = [item for item in self.embeddings_db if str(item.get("label")) != nisn]
-        sesudah = len(self.embeddings_db)
-
-        if self.data_siswa and nisn in self.data_siswa:
-            del self.data_siswa[nisn]
-
-        print(f"[+] Embedding untuk NISN {nisn} dihapus dari memori ({sebelum - sesudah} data).")
-        self.perbarui_matrix_embeddings()
-        return {"status": "sukses", "pesan": f"Embedding untuk NISN {nisn} berhasil dihapus."}
