@@ -49,54 +49,54 @@ class FaceEmbedder:
             print(f"[!] FaceEmbedder: Peringatan warmup model: {e}")
             return False
 
-    def ekstrak_embedding(self, target_img, frame_lengkap=None, detector_backend="opencv"):
+    def ekstrak_embedding(self, target_img, frame_lengkap=None, detector_backend="skip"):
         """
         Mengekstrak vektor embedding 128-dimensi FaceNet dengan normalisasi L2.
-        Secara default menggunakan detector_backend='opencv' agar perataan (alignment)
-        wajah identik dengan vektor yang tersimpan di database MySQL.
+        Secara default menggunakan detector_backend='skip' karena target_img
+        sudah dipotong dan diselaraskan secara presisi oleh YuNet CNN detector (~20ms).
         Fallback berjenjang:
-        1. target_img dengan backend opencv (alignment pada area crop wajah)
+        1. target_img dengan backend skip (instan, ~20ms)
         2. frame_lengkap dengan backend opencv (jika target_img gagal)
-        3. target_img dengan backend skip (jika alignment opencv tidak menemukan fitur mata)
+        3. target_img dengan backend opencv (jika masih gagal)
         """
         if target_img is None or target_img.size == 0:
             return None
 
         representations = []
 
-        # 1. Coba ekstraksi dengan alignment opencv pada target_img
+        # 1. Ekstraksi langsung dari target_img (YuNet crop) dengan backend skip
         try:
             with self.model_lock:
                 representations = DeepFace.represent(
                     img_path=target_img,
                     model_name=self.model_name,
-                    detector_backend=detector_backend,
+                    detector_backend="skip",
                     enforce_detection=False
                 )
         except Exception:
             representations = []
 
-        # 2. Jika gagal dan frame_lengkap tersedia, coba pada frame_lengkap
+        # 2. Jika gagal dan frame_lengkap tersedia, coba pada frame_lengkap dengan opencv
         if not representations and frame_lengkap is not None and frame_lengkap.size > 0:
             try:
                 with self.model_lock:
                     representations = DeepFace.represent(
                         img_path=frame_lengkap,
                         model_name=self.model_name,
-                        detector_backend=detector_backend,
+                        detector_backend="opencv",
                         enforce_detection=False
                     )
             except Exception:
                 representations = []
 
-        # 3. Fallback terakhir: ekstraksi langsung tanpa alignment (skip)
+        # 3. Fallback terakhir: coba target_img dengan opencv
         if not representations:
             try:
                 with self.model_lock:
                     representations = DeepFace.represent(
                         img_path=target_img,
                         model_name=self.model_name,
-                        detector_backend="skip",
+                        detector_backend="opencv",
                         enforce_detection=False
                     )
             except Exception:

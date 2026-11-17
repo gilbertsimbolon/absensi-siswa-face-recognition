@@ -180,7 +180,7 @@ class StudentRepository:
                         target_face = crop
 
             if self.embedder is not None:
-                emb = self.embedder.ekstrak_embedding(target_face, frame_lengkap=img, detector_backend="opencv")
+                emb = self.embedder.ekstrak_embedding(target_face, frame_lengkap=img, detector_backend="skip")
                 if emb is not None:
                     new_embeddings.append({
                         "label": nisn,

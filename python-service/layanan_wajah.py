@@ -277,11 +277,11 @@ class LayananWajah:
                 target_img = face_crop if (face_crop is not None and face_crop.size > 0 and 
                                            face_crop.shape[0] > 20 and face_crop.shape[1] > 20) else frame
 
-                # Ekstraksi fitur embedding FaceNet dengan perataan wajah (aligned opencv) konsisten
+                # Ekstraksi fitur embedding FaceNet dengan perataan wajah instan (~20ms)
                 query_emb = self.embedder.ekstrak_embedding(
                     target_img, 
                     frame_lengkap=frame, 
-                    detector_backend="opencv"
+                    detector_backend="skip"
                 )
 
                 if query_emb is not None:
@@ -384,7 +384,7 @@ class LayananWajah:
                             )
                 else:
                     # Gagal ekstraksi embedding
-                    self.tracker.reset()
+                    self.tracker.catat_wajah_hilang()
                     hasil_pencocokan = {
                         "status": "tidak_ada_wajah",
                         "pesan": "Arahkan wajah ke kamera."
@@ -396,8 +396,8 @@ class LayananWajah:
                         status="memindai"
                     )
             else:
-                # Wajah menghilang dari kamera: reset riwayat pelacakan
-                self.tracker.reset()
+                # Wajah menghilang dari kamera: catat toleransi kehilangan wajah antar-frame
+                self.tracker.catat_wajah_hilang()
                 hasil_pencocokan = {
                     "status": "tidak_ada_wajah",
                     "pesan": "Arahkan wajah ke kamera."

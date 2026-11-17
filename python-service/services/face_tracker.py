@@ -9,7 +9,7 @@ class FaceTracker:
     dan mencegah state wajah sebelumnya terbawa ke wajah orang berikutnya.
     """
 
-    def __init__(self, max_window_size=5, required_votes=3, timeout_seconds=1.2):
+    def __init__(self, max_window_size=5, required_votes=3, timeout_seconds=2.5):
         self.max_window_size = max_window_size
         self.required_votes = required_votes
         self.face_timeout_seconds = timeout_seconds
@@ -19,6 +19,7 @@ class FaceTracker:
         self.last_seen_timestamp = 0.0
         self.last_bounding_box = None
         self.confirmed_identity = None
+        self.consecutive_no_face = 0
 
     def reset(self):
         """Mereset riwayat kestabilan ketika wajah menghilang atau berganti orang."""
@@ -27,6 +28,16 @@ class FaceTracker:
             self.last_seen_timestamp = 0.0
             self.last_bounding_box = None
             self.confirmed_identity = None
+            self.consecutive_no_face = 0
+
+    def catat_wajah_hilang(self):
+        """Dicatat saat suatu frame tidak mendeteksi wajah."""
+        with self.history_lock:
+            self.consecutive_no_face += 1
+            now = time.time()
+            # Hanya reset jika wajah benar-benar menghilang (>= 2 frame tanpa wajah atau timeout)
+            if self.consecutive_no_face >= 2 or (self.last_seen_timestamp > 0 and (now - self.last_seen_timestamp) > self.face_timeout_seconds):
+                self.reset()
 
     def evaluasi_frame(self, x, y, w, h, w_frame, h_frame, eval_res, data_siswa=None):
         """
@@ -40,8 +51,10 @@ class FaceTracker:
         eval_status = eval_res.get("status")
 
         with self.history_lock:
+            self.consecutive_no_face = 0
+
             # 1. Reset jika jeda antar-frame melebihi batas waktu (timeout)
-            if (now - self.last_seen_timestamp) > self.face_timeout_seconds:
+            if self.last_seen_timestamp > 0 and (now - self.last_seen_timestamp) > self.face_timeout_seconds:
                 self.voting_window.clear()
                 self.confirmed_identity = None
 
@@ -49,7 +62,7 @@ class FaceTracker:
             if self.last_bounding_box is not None:
                 lx, ly, lw, lh = self.last_bounding_box
                 center_dist = np.hypot((x + w / 2.0) - (lx + lw / 2.0), (y + h / 2.0) - (ly + lh / 2.0))
-                if center_dist > max(w_frame, h_frame) * 0.50:
+                if center_dist > max(w_frame, h_frame) * 0.45:
                     self.voting_window.clear()
                     self.confirmed_identity = None
 
@@ -120,7 +133,14 @@ class FaceTracker:
                     identitas_tervalidasi = True
             else:
                 # Skenario B: Belum ada identitas terkonfirmasi (wajah baru sedang diverifikasi)
-                if best_nisn is not None and best_votes >= self.required_votes:
+                # Syarat validasi:
+                # 1. best_votes >= required_votes (misal 3 suara), ATAU
+                # 2. 2 frame berturut-turut kandidat sama dengan jarak sangat dekat (jarak <= 0.26)
+                is_confident_two_frames = (
+                    best_votes >= 2 and window_len >= 2 and 
+                    candidate_latest_entry.get(best_nisn, {}).get("jarak", 1.0) <= 0.26
+                )
+                if best_nisn is not None and (best_votes >= self.required_votes or is_confident_two_frames):
                     self.confirmed_identity = best_nisn
                     terpilih_entry = candidate_latest_entry[best_nisn]
                     identitas_tervalidasi = True
