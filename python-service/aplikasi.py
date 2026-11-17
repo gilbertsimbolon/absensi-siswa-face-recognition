@@ -172,6 +172,18 @@ def sinkronisasi_siswa_api(nisn):
     status_code = 200 if hasil.get("status") == "sukses" else 400
     return jsonify(hasil), status_code
 
+# Endpoint Segarkan Data Siswa & Embeddings dari Laravel
+@app.route('/segarkan-data', methods=['GET', 'POST'])
+@app.route('/scanner/segarkan-data', methods=['GET', 'POST'])
+def segarkan_data_api():
+    layanan.muat_data_siswa()
+    layanan.sinkronisasi_dataset_baru()
+    return jsonify({
+        "status": "sukses",
+        "total_siswa": len(layanan.data_siswa),
+        "total_embeddings": len(layanan.embeddings_db)
+    })
+
 # Endpoint Penghapusan Embedding Wajah Siswa
 @app.route('/hapus-siswa/<nisn>', methods=['DELETE', 'POST'])
 @app.route('/scanner/hapus-siswa/<nisn>', methods=['DELETE', 'POST'])

@@ -745,6 +745,13 @@ class AttendanceController extends Controller
 
         // 1. Periksa ketersediaan layanan Python tanpa menjalankan proses secara otomatis
         $isOnline = PythonServiceManager::isRunning();
+        if ($isOnline) {
+            try {
+                Http::timeout(1)->get(config('services.deepface.base_url', 'http://127.0.0.1:5000').'/segarkan-data');
+            } catch (\Throwable $e) {
+                // Non-blocking sinkronisasi
+            }
+        }
         $pythonStatus = PythonServiceManager::getStatus();
 
         // 2. Hasilkan token otentikasi HMAC terenkripsi untuk akses aman ke layanan Flask

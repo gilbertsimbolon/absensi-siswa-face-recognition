@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Classes;
 use App\Models\Student;
 use App\Models\StudentFace;
+use App\Services\PythonServiceManager;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\File;
@@ -132,9 +133,13 @@ class StudentController extends Controller
         ]);
 
         // Simpan foto wajah siswa dan ekstrak embedding ke database
-        $this->saveStudentPhotos($request, $student);
+        $extracted = $this->saveStudentPhotos($request, $student);
 
-        return redirect()->route('admin.student.index')->with('success', 'Berhasil');
+        if (! $extracted) {
+            return redirect()->route('admin.student.index')->with('warning', 'Data siswa berhasil disimpan, namun fitur wajah belum terekstraksi oleh Face AI. Pastikan foto wajah tegak dan jelas.');
+        }
+
+        return redirect()->route('admin.student.index')->with('success', 'Berhasil menambahkan data siswa.');
     }
 
     /**
@@ -188,7 +193,11 @@ class StudentController extends Controller
         ]);
 
         // Update foto jika diunggah baru
-        $this->saveStudentPhotos($request, $student, true);
+        $extracted = $this->saveStudentPhotos($request, $student, true);
+
+        if (! $extracted && ($request->hasFile('photos') || $request->hasFile('photo') || $request->hasFile('photo_depan'))) {
+            return redirect()->route('admin.student.index')->with('warning', 'Data siswa berhasil diperbarui, namun fitur wajah baru belum terekstraksi oleh Face AI. Pastikan foto wajah tegak dan jelas.');
+        }
 
         return redirect()->route('admin.student.index')->with('success', 'Berhasil');
     }
@@ -239,7 +248,7 @@ class StudentController extends Controller
     /**
      * Helper penyimpanan foto ke storage public (faces/{nisn}) dan ekstraksi embedding di microservice Python.
      */
-    private function saveStudentPhotos(Request $request, Student $student, bool $isUpdate = false): void
+    private function saveStudentPhotos(Request $request, Student $student, bool $isUpdate = false): bool
     {
         // Kumpulkan semua file gambar yang diunggah
         $uploadedFiles = [];
@@ -256,7 +265,7 @@ class StudentController extends Controller
         }
 
         if (empty($uploadedFiles)) {
-            return;
+            return true;
         }
 
         foreach ($uploadedFiles as $idx => $file) {
@@ -274,7 +283,7 @@ class StudentController extends Controller
         }
 
         // Otomatis sinkronisasi, deteksi auto-crop zoom wajah, dan ekstraksi embedding FaceNet di microservice Python
-        $this->triggerFaceExtraction($student);
+        return $this->triggerFaceExtraction($student);
     }
 
     /**
@@ -283,6 +292,10 @@ class StudentController extends Controller
     private function triggerFaceExtraction(Student $student): bool
     {
         try {
+            if (! PythonServiceManager::isRunning()) {
+                PythonServiceManager::startService();
+            }
+
             $pythonUrl = config('services.deepface.base_url', 'http://127.0.0.1:5000').'/sinkronisasi-siswa/'.$student->nisn;
             $response = Http::timeout(120)->post($pythonUrl, [
                 'nama' => $student->name,

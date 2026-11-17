@@ -18,28 +18,28 @@ from PIL import Image
 from deepface import DeepFace
 import konfigurasi
 
-def hitung_persentase_akurasi(cosine_dist, threshold=0.50):
+def hitung_persentase_akurasi(cosine_dist, threshold=0.40):
     """
     Mengonversi jarak kosinus FaceNet (0.0 - 1.0+) menjadi persentase akurasi yang proporsional.
-    - Wajah cocok (jarak <= threshold 0.50): menghasilkan skor 87.5% - 99.9%
+    - Wajah cocok (jarak <= threshold 0.40): menghasilkan skor 85.0% - 99.9%
       sehingga siswa terdaftar langsung lolos verifikasi standar sekolah (80% - 85%) dalam < 1-2 detik.
-    - Wajah bukan siswa (jarak > threshold 0.50): skor langsung drop tajam ke bawah 70%.
+    - Wajah bukan siswa / berbeda (jarak > threshold 0.40): skor langsung drop tajam ke bawah 60%.
     """
     if cosine_dist <= 0:
         return 100.0
 
-    th = float(threshold) if threshold and float(threshold) > 0 else 0.50
+    th = float(threshold) if threshold and float(threshold) > 0 else 0.40
     d = float(cosine_dist)
 
     if d <= th:
-        # Interpolasi proporsional dari 100% pada jarak 0.0 ke 87.5% pada batas threshold
-        skor = 100.0 - (d / th) * 12.5
-        return round(max(87.5, min(99.99, skor)), 2)
+        # Interpolasi proporsional dari 100% pada jarak 0.0 ke 85.0% pada batas threshold
+        skor = 100.0 - (d / th) * 15.0
+        return round(max(85.0, min(99.99, skor)), 2)
     else:
-        # Di atas threshold (bukan siswa / wajah berbeda): drop tajam dari 87.5% ke bawah
+        # Di atas threshold (bukan siswa / wajah berbeda): drop tajam dari 84.9% ke bawah
         over = d - th
-        skor = 87.5 - (over / 0.20) * 45.0
-        return round(max(0.0, min(87.49, skor)), 2)
+        skor = 84.9 - (over / 0.15) * 50.0
+        return round(max(0.0, min(84.99, skor)), 2)
 
 class LayananWajah:
     def __init__(self):
@@ -233,38 +233,49 @@ class LayananWajah:
 
     def muat_data_siswa(self):
         """Memuat daftar siswa dan vektor embedding wajah langsung dari database Laravel."""
-        try:
-            url = f"{self.laravel_api_url}/api/presensi/daftar-siswa"
-            res = requests.get(url, timeout=4)
-            if res.status_code == 200:
-                self.data_siswa = res.json()
-                print(f"[+] Berhasil memuat data {len(self.data_siswa)} siswa dari database Laravel.")
+        candidate_bases = [self.laravel_api_url]
+        for base in ["http://127.0.0.1", "http://127.0.0.1:8000", "http://localhost", "http://localhost:8000"]:
+            if base not in candidate_bases:
+                candidate_bases.append(base)
 
-                # Ekstrak vektor embedding wajah langsung dari database Laravel (Single Source of Truth)
-                db_embeddings = []
-                for nisn, info in self.data_siswa.items():
-                    raw_embs = info.get("embeddings", [])
-                    for idx, emb_raw in enumerate(raw_embs):
-                        if emb_raw and len(emb_raw) == 128:
-                            emb_vec = np.array(emb_raw, dtype=np.float32)
-                            norm = np.linalg.norm(emb_vec)
-                            if norm > 0:
-                                emb_vec = emb_vec / norm
-                            db_embeddings.append({
-                                "label": str(nisn),
-                                "embedding": emb_vec,
-                                "path": f"db://faces/{nisn}/{idx}"
-                            })
+        loaded = False
+        for base_url in candidate_bases:
+            try:
+                url = f"{base_url.rstrip('/')}/api/presensi/daftar-siswa"
+                res = requests.get(url, timeout=3)
+                if res.status_code == 200:
+                    self.data_siswa = res.json()
+                    self.laravel_api_url = base_url.rstrip('/')
+                    print(f"[+] Berhasil memuat data {len(self.data_siswa)} siswa dari {url}.")
 
-                if db_embeddings:
-                    self.embeddings_db = db_embeddings
-                    print(f"[+] Berhasil memuat {len(self.embeddings_db)} vektor embedding wajah langsung dari database MySQL.")
-                    self.perbarui_matrix_embeddings()
-                    self.is_ready = True
-            else:
-                print(f"[*] Gagal memuat daftar siswa dari Laravel (Status: {res.status_code}).")
-        except Exception as e:
-            print(f"[*] Belum dapat terhubung ke Laravel ({e}). Nama siswa akan menggunakan NISN.")
+                    # Ekstrak vektor embedding wajah langsung dari database Laravel (Single Source of Truth)
+                    db_embeddings = []
+                    for nisn, info in self.data_siswa.items():
+                        raw_embs = info.get("embeddings", [])
+                        for idx, emb_raw in enumerate(raw_embs):
+                            if emb_raw and len(emb_raw) == 128:
+                                emb_vec = np.array(emb_raw, dtype=np.float32)
+                                norm = np.linalg.norm(emb_vec)
+                                if norm > 0:
+                                    emb_vec = emb_vec / norm
+                                db_embeddings.append({
+                                    "label": str(nisn),
+                                    "embedding": emb_vec,
+                                    "path": f"db://faces/{nisn}/{idx}"
+                                })
+
+                    if db_embeddings:
+                        self.embeddings_db = db_embeddings
+                        print(f"[+] Berhasil memuat {len(self.embeddings_db)} vektor embedding wajah langsung dari database MySQL.")
+                        self.perbarui_matrix_embeddings()
+                        self.is_ready = True
+                    loaded = True
+                    break
+            except Exception:
+                continue
+
+        if not loaded:
+            print("[*] Belum dapat terhubung ke Laravel untuk memuat daftar siswa.")
 
     def bangun_index_wajah(self):
         """Membuat embedding untuk semua foto siswa yang tersimpan di dataset."""
