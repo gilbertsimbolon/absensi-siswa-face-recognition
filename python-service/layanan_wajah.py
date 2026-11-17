@@ -806,6 +806,7 @@ class LayananWajah:
             # Terapkan teknik auto-crop & zoom wajah langsung pada berkas foto di storage publik
             berhasil_crop = self.potong_dan_zoom_wajah(img_path)
 
+            representations = []
             try:
                 # Selalu gunakan backend OpenCV agar perataan wajah (alignment) identik 100% antara foto dataset dan kamera
                 with self.model_lock:
@@ -827,18 +828,17 @@ class LayananWajah:
                 except Exception as e:
                     print(f"[!] Gagal mengekstrak fitur foto {img_path}: {e}")
                     representations = []
-                if representations and len(representations) > 0:
-                    emb = np.array(representations[0]["embedding"], dtype=np.float32)
-                    norm = np.linalg.norm(emb)
-                    if norm > 0:
-                        emb = emb / norm
-                    new_embeddings.append({
-                        "label": nisn,
-                        "embedding": emb,
-                        "path": img_path
-                    })
-            except Exception as e:
-                print(f"[!] Gagal mengekstrak fitur foto {img_path}: {e}")
+
+            if representations and len(representations) > 0:
+                emb = np.array(representations[0]["embedding"], dtype=np.float32)
+                norm = np.linalg.norm(emb)
+                if norm > 0:
+                    emb = emb / norm
+                new_embeddings.append({
+                    "label": nisn,
+                    "embedding": emb,
+                    "path": img_path
+                })
 
         if not new_embeddings:
             return {"status": "error", "pesan": f"Wajah tidak terdeteksi pada berkas foto NISN {nisn}."}
