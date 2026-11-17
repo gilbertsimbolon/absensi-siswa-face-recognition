@@ -528,7 +528,7 @@ class LayananWajah:
 
                             # Diagnostik jarak kosinus (indeks dan nilai jarak saja, tanpa nama/NISN siswa)
                             top_indices = np.argsort(cosine_distances)[:3]
-                            diag_distances = [f"kandidat_{i+1}_dist={float(cosine_distances[idx]):.4f}" for i, idx in enumerate(top_indices)]
+                            diag_distances = [f"kandidat_{i+1}({self.labels_list[idx]}:{self.data_siswa.get(self.labels_list[idx], {}).get('nama', '')})_dist={float(cosine_distances[idx]):.4f}" for i, idx in enumerate(top_indices)]
                             print(f"[DIAGNOSTIK WAJAH] {', '.join(diag_distances)}", flush=True)
                         else:
                             db_embeddings = np.array([item["embedding"] for item in self.embeddings_db])
