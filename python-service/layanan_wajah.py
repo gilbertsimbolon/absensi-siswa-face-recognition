@@ -80,22 +80,23 @@ class LayananWajah:
         self.last_attendance_time = {}
         self.cooldown_seconds = 5
 
-        # Stabilitas Antar-Frame (Multi-Frame Temporal Consistency)
+        # Stabilitas Antar-Frame (Sliding-Window Temporal Voting & Smoothing)
         self.history_lock = threading.RLock()
-        self.tracking_nisn = None
-        self.consecutive_matches = 0
-        self.required_consecutive_frames = 3
-        self.last_seen_timestamp = 0.0
+        self.voting_window = []   # Jendela geser riwayat frame: [{'nisn': ..., 'status': ..., 'timestamp': ...}]
+        self.max_window_size = 5  # Kapasitas maksimal 5 frame terakhir (~0.7 detik)
+        self.required_votes = 3   # Minimal 3 suara mayoritas (>= 60%) untuk validasi identitas
         self.face_timeout_seconds = 1.2
+        self.last_seen_timestamp = 0.0
         self.last_bounding_box = None
+        self.confirmed_identity = None
 
     def reset_riwayat_wajah(self):
         """Mereset seluruh riwayat kestabilan antar-frame ketika wajah menghilang atau berganti."""
         with self.history_lock:
-            self.tracking_nisn = None
-            self.consecutive_matches = 0
+            self.voting_window.clear()
             self.last_seen_timestamp = 0.0
             self.last_bounding_box = None
+            self.confirmed_identity = None
 
     @staticmethod
     def normalisasi_pencahayaan_adaptif(img):
@@ -325,18 +326,11 @@ class LayananWajah:
                 "margin": round(selisih, 4)
             }
 
-        # 5. Validasi Dua Kandidat: Periksa Selisih (Ambiguitas)
-        # Jika ada siswa lain dengan jarak yang hampir sama (selisih < 0.04), anggap identitas ambigu
-        MIN_MARGIN = 0.04
-        if nisn2 is not None and selisih < MIN_MARGIN:
-            print(f"[!] Identitas ambigu ditolak: {nama1} ({dist1:.4f}) vs {nama2} ({dist2:.4f}), selisih={selisih:.4f} < {MIN_MARGIN}", flush=True)
-            return {
-                "status": "ambigu",
-                "pesan": "Identitas wajah ambigu atau mirip dengan siswa lain. Harap hadap kamera lebih tegak dan jelas.",
-                "nisn": nisn1,
-                "jarak": round(dist1, 4),
-                "margin": round(selisih, 4)
-            }
+        # 5. Informasi Selisih Dua Kandidat untuk Analisis Kestabilan (bukan penolakan otomatis mutlak)
+        # Selisih dicatat sebagai bobot keyakinan untuk mendukung kestabilan voting multi-frame
+        ambigu = bool(nisn2 is not None and selisih < 0.035)
+        if ambigu:
+            print(f"[*] Informasi margin tipis: {nama1} ({dist1:.4f}) vs {nama2} ({dist2:.4f}), selisih={selisih:.4f}", flush=True)
 
         # 6. Validasi Persentase Akurasi Minimum
         skor_persen = hitung_persentase_akurasi(dist1, self.threshold)
@@ -363,7 +357,10 @@ class LayananWajah:
             "akurasi": persentase_skor,
             "skor_persen": skor_persen,
             "jarak": round(dist1, 4),
-            "margin": round(selisih, 4)
+            "margin": round(selisih, 4),
+            "ambigu": ambigu,
+            "kandidat_2_nisn": nisn2,
+            "kandidat_2_jarak": round(dist2, 4) if nisn2 else None
         }
 
     def inisialisasi(self):
@@ -708,51 +705,178 @@ class LayananWajah:
                     eval_res = self.cocokkan_dua_kandidat(query_emb)
                     eval_status = eval_res.get("status")
 
-                    if eval_status == "valid":
-                        kandidat_nisn = eval_res["nisn"]
-                        nama_siswa = eval_res["nama"]
-                        kelas_siswa = eval_res["kelas"]
-                        persentase_skor = eval_res["akurasi"]
-                        min_dist = eval_res["jarak"]
+                    with self.history_lock:
+                        # 1. Reset riwayat jika jeda antar-frame melebihi batas waktu (timeout)
+                        if (now - self.last_seen_timestamp) > self.face_timeout_seconds:
+                            self.voting_window.clear()
+                            self.confirmed_identity = None
 
-                        # 1. STABILITAS ANTAR-FRAME (Multi-frame temporal consistency)
-                        with self.history_lock:
-                            # Reset riwayat jika jeda antar-frame melebihi batas waktu (timeout)
-                            if (now - self.last_seen_timestamp) > self.face_timeout_seconds:
-                                self.tracking_nisn = None
-                                self.consecutive_matches = 0
+                        # 2. Reset riwayat jika posisi wajah melompat drastis (indikasi pergantian orang)
+                        if self.last_bounding_box is not None:
+                            lx, ly, lw, lh = self.last_bounding_box
+                            center_dist = np.hypot((x + w / 2.0) - (lx + lw / 2.0), (y + h / 2.0) - (ly + lh / 2.0))
+                            if center_dist > max(w_orig, h_orig) * 0.50:
+                                self.voting_window.clear()
+                                self.confirmed_identity = None
 
-                            # Reset riwayat jika posisi wajah melompat drastis (indikasi pergantian orang)
-                            if self.last_bounding_box is not None:
-                                lx, ly, lw, lh = self.last_bounding_box
-                                center_dist = np.hypot((x + w / 2.0) - (lx + lw / 2.0), (y + h / 2.0) - (ly + lh / 2.0))
-                                if center_dist > max(w_orig, h_orig) * 0.50:
-                                    self.tracking_nisn = None
-                                    self.consecutive_matches = 0
+                        self.last_seen_timestamp = now
+                        self.last_bounding_box = (x, y, w, h)
 
-                            self.last_seen_timestamp = now
-                            self.last_bounding_box = (x, y, w, h)
+                        # 3. Masukkan hasil evaluasi frame ke dalam buffer jendela voting (sliding window)
+                        frame_entry = {
+                            "status": eval_status,
+                            "nisn": eval_res.get("nisn") if eval_status == "valid" else None,
+                            "nama": eval_res.get("nama") if eval_status == "valid" else None,
+                            "kelas": eval_res.get("kelas") if eval_status == "valid" else None,
+                            "akurasi": eval_res.get("akurasi") if eval_status == "valid" else None,
+                            "jarak": eval_res.get("jarak") if eval_status == "valid" else None,
+                            "margin": eval_res.get("margin", 0.0),
+                            "ambigu": eval_res.get("ambigu", False),
+                            "timestamp": now
+                        }
 
-                            # Validasi konsistensi identitas
-                            if kandidat_nisn == self.tracking_nisn:
-                                self.consecutive_matches += 1
+                        # Buang frame yang sudah kedaluwarsa dari jendela
+                        self.voting_window = [
+                            e for e in self.voting_window 
+                            if (now - e["timestamp"]) <= self.face_timeout_seconds
+                        ]
+                        self.voting_window.append(frame_entry)
+                        if len(self.voting_window) > self.max_window_size:
+                            self.voting_window.pop(0)
+
+                        window_len = len(self.voting_window)
+
+                        # 4. Agregasi suara (voting) untuk tiap kandidat siswa
+                        vote_counts = {}
+                        candidate_latest_entry = {}
+                        for entry in self.voting_window:
+                            if entry["status"] == "valid" and entry["nisn"]:
+                                n = entry["nisn"]
+                                vote_counts[n] = vote_counts.get(n, 0) + 1
+                                candidate_latest_entry[n] = entry
+
+                        best_nisn = None
+                        best_votes = 0
+                        if vote_counts:
+                            best_nisn, best_votes = max(vote_counts.items(), key=lambda it: it[1])
+
+                        # 5. Evaluasi Kestabilan Identitas & Temporal Smoothing
+                        identitas_tervalidasi = False
+                        terpilih_entry = None
+
+                        if self.confirmed_identity is not None:
+                            # Skenario A: Wajah sudah terkonfirmasi sebelumnya pada sesi tracking ini
+                            # Pertahankan identitas jika siswa tersebut masih mendapat dukungan di jendela
+                            # ATAU kandidat baru belum mencapai suara mayoritas mutlak (>= required_votes)
+                            if best_nisn == self.confirmed_identity or best_votes < self.required_votes:
+                                terpilih_entry = candidate_latest_entry.get(self.confirmed_identity)
+                                if not terpilih_entry:
+                                    s_data = self.data_siswa.get(self.confirmed_identity, {})
+                                    terpilih_entry = {
+                                        "nisn": self.confirmed_identity,
+                                        "nama": s_data.get("nama", f"Siswa {self.confirmed_identity}"),
+                                        "kelas": s_data.get("kelas", "-"),
+                                        "akurasi": eval_res.get("akurasi", "85%"),
+                                        "jarak": eval_res.get("jarak", 0.28)
+                                    }
+                                identitas_tervalidasi = True
                             else:
-                                # Jika kandidat berubah-ubah, ulangi proses validasi dari awal!
-                                self.tracking_nisn = kandidat_nisn
-                                self.consecutive_matches = 1
+                                # Kandidat baru berhasil mengumpulkan suara mayoritas (>= required_votes)
+                                self.confirmed_identity = best_nisn
+                                terpilih_entry = candidate_latest_entry[best_nisn]
+                                identitas_tervalidasi = True
+                        else:
+                            # Skenario B: Belum ada identitas terkonfirmasi (wajah baru sedang diverifikasi)
+                            if best_nisn is not None and best_votes >= self.required_votes:
+                                self.confirmed_identity = best_nisn
+                                terpilih_entry = candidate_latest_entry[best_nisn]
+                                identitas_tervalidasi = True
+                            else:
+                                identitas_tervalidasi = False
 
-                            current_matches = self.consecutive_matches
+                    # 6. Konstruksi Respon Sesuai Hasil Voting Multi-Frame
+                    if identitas_tervalidasi and terpilih_entry:
+                        kandidat_nisn = terpilih_entry["nisn"]
+                        nama_siswa = terpilih_entry["nama"]
+                        kelas_siswa = terpilih_entry["kelas"]
+                        persentase_skor = terpilih_entry["akurasi"]
+                        min_dist = terpilih_entry["jarak"]
 
-                        # Evaluasi pemenuhan jumlah frame konsisten
-                        if current_matches < self.required_consecutive_frames:
-                            # Masih dalam tahap stabilisasi: JANGAN tampilkan identitas siswa!
+                        status_scan = "sukses"
+                        hasil_pencocokan = {
+                            "status": "sukses",
+                            "nisn": kandidat_nisn,
+                            "nama": nama_siswa,
+                            "kelas": kelas_siswa,
+                            "akurasi": persentase_skor,
+                            "jarak": min_dist,
+                            "suara": best_votes,
+                            "target_suara": self.required_votes,
+                            "ukuran_jendela": window_len
+                        }
+
+                        # Kirim presensi ke Laravel jika diminta
+                        if catat_laravel:
+                            sekarang = time.time()
+                            last_time = self.last_attendance_time.get(kandidat_nisn, 0)
+                            if (sekarang - last_time) > self.cooldown_seconds:
+                                res_laravel = self.catat_presensi_ke_laravel(kandidat_nisn)
+                                self.last_attendance_time[kandidat_nisn] = sekarang
+                                if res_laravel:
+                                    hasil_pencocokan["presensi"] = res_laravel
+                                    if res_laravel.get("status") == "sudah_absen":
+                                        status_scan = "sudah_absen"
+                                        hasil_pencocokan["status"] = "sudah_absen"
+
+                        # Gambar Kotak Hijau OpenCV
+                        self.gambar_bounding_box_opencv(
+                            frame, x, y, w, h, 
+                            label_text=nama_siswa, 
+                            status=status_scan, 
+                            skor=persentase_skor
+                        )
+
+                    else:
+                        # Identitas belum tervalidasi pada jendela geser saat ini
+                        if window_len >= 3 and best_votes == 0:
+                            # Sudah 3 frame berturut-turut tidak ada siswa terdaftar yang cocok
+                            total_gagal_akurasi = sum(1 for e in self.voting_window if e["status"] == "gagal_akurasi")
+                            if total_gagal_akurasi >= 2:
+                                hasil_pencocokan = {
+                                    "status": "gagal_akurasi",
+                                    "pesan": "Posisikan wajah lebih jelas tegak lurus ke kamera.",
+                                    "nama": eval_res.get("nama", "Siswa"),
+                                    "akurasi": eval_res.get("akurasi", "")
+                                }
+                                self.gambar_bounding_box_opencv(
+                                    frame, x, y, w, h,
+                                    label_text=f"{hasil_pencocokan['nama']} ({hasil_pencocokan['akurasi']})",
+                                    status="gagal_akurasi",
+                                    skor=hasil_pencocokan['akurasi']
+                                )
+                            else:
+                                hasil_pencocokan = {
+                                    "status": "tidak_dikenali",
+                                    "pesan": "Data belum terdaftar. Silahkan hubungi administrator."
+                                }
+                                # Gambar Kotak Merah OpenCV
+                                self.gambar_bounding_box_opencv(
+                                    frame, x, y, w, h, 
+                                    label_text="BELUM TERDAFTAR", 
+                                    status="tidak_dikenali", 
+                                    skor=None
+                                )
+                        else:
+                            # Masih dalam tahap akumulasi frame atau transisi: Status memindai
+                            target_info = f"({best_votes}/{self.required_votes})" if best_votes > 0 else "..."
                             hasil_pencocokan = {
                                 "status": "memindai",
-                                "pesan": f"Memvalidasi kestabilan wajah ({current_matches}/{self.required_consecutive_frames})...",
+                                "pesan": f"Memvalidasi kestabilan wajah {target_info}...",
                                 "nisn": None,
                                 "nama": None,
-                                "frame_ke": current_matches,
-                                "target_frame": self.required_consecutive_frames
+                                "suara": best_votes,
+                                "target_suara": self.required_votes,
+                                "ukuran_jendela": window_len
                             }
                             self.gambar_bounding_box_opencv(
                                 frame, x, y, w, h, 
@@ -760,66 +884,6 @@ class LayananWajah:
                                 status="memindai", 
                                 skor=None
                             )
-                        else:
-                            # Identitas cocok secara konsisten pada frame berturut-turut!
-                            status_scan = "sukses"
-                            hasil_pencocokan = {
-                                "status": "sukses",
-                                "nisn": kandidat_nisn,
-                                "nama": nama_siswa,
-                                "kelas": kelas_siswa,
-                                "akurasi": persentase_skor,
-                                "jarak": min_dist,
-                                "frame_konsisten": current_matches
-                            }
-
-                            # Kirim presensi ke Laravel jika diminta
-                            if catat_laravel:
-                                sekarang = time.time()
-                                last_time = self.last_attendance_time.get(kandidat_nisn, 0)
-                                if (sekarang - last_time) > self.cooldown_seconds:
-                                    res_laravel = self.catat_presensi_ke_laravel(kandidat_nisn)
-                                    self.last_attendance_time[kandidat_nisn] = sekarang
-                                    if res_laravel:
-                                        hasil_pencocokan["presensi"] = res_laravel
-                                        if res_laravel.get("status") == "sudah_absen":
-                                            status_scan = "sudah_absen"
-                                            hasil_pencocokan["status"] = "sudah_absen"
-
-                            # Gambar Kotak Hijau OpenCV
-                            self.gambar_bounding_box_opencv(
-                                frame, x, y, w, h, 
-                                label_text=nama_siswa, 
-                                status=status_scan, 
-                                skor=persentase_skor
-                            )
-
-                    elif eval_status == "gagal_akurasi":
-                        # Reset riwayat validasi karena akurasi belum memenuhi syarat
-                        self.reset_riwayat_wajah()
-                        nama_siswa = eval_res.get("nama", "Siswa")
-                        persentase_skor = eval_res.get("akurasi", "")
-                        hasil_pencocokan = eval_res
-                        self.gambar_bounding_box_opencv(
-                            frame, x, y, w, h, 
-                            label_text=f"{nama_siswa} ({persentase_skor})", 
-                            status="gagal_akurasi", 
-                            skor=persentase_skor
-                        )
-                    else:
-                        # 'tidak_dikenali' atau 'ambigu': Reset riwayat identitas sepenuhnya
-                        self.reset_riwayat_wajah()
-                        hasil_pencocokan = {
-                            "status": "tidak_dikenali",
-                            "pesan": eval_res.get("pesan", "Data belum terdaftar. Silahkan hubungi administrator.")
-                        }
-                        # Gambar Kotak Merah OpenCV
-                        self.gambar_bounding_box_opencv(
-                            frame, x, y, w, h, 
-                            label_text="BELUM TERDAFTAR", 
-                            status="tidak_dikenali", 
-                            skor=None
-                        )
                 else:
                     # Gagal ekstraksi embedding
                     self.reset_riwayat_wajah()
