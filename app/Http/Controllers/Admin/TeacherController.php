@@ -61,9 +61,9 @@ class TeacherController extends Controller
             'password' => 'required|min:8',
             'nip' => 'required|string|max:50|unique:teachers,nip',
             'phone' => 'required|string|max:30',
-            'photo_depan' => 'nullable|image|mimes:jpeg,jpg,png|max:5120',
-            'photo_kanan' => 'nullable|image|mimes:jpeg,jpg,png|max:5120',
-            'photo_kiri' => 'nullable|image|mimes:jpeg,jpg,png|max:5120',
+            'photo_depan' => 'nullable|image|mimes:jpeg,jpg,png|max:10240',
+            'photo_kanan' => 'nullable|image|mimes:jpeg,jpg,png|max:10240',
+            'photo_kiri' => 'nullable|image|mimes:jpeg,jpg,png|max:10240',
         ]);
 
         if ($validate->fails()) {
@@ -103,9 +103,9 @@ class TeacherController extends Controller
             'password' => 'nullable|min:8',
             'nip' => 'required|string|max:50|unique:teachers,nip,'.$teacher->id,
             'phone' => 'required|string|max:30',
-            'photo_depan' => 'nullable|image|mimes:jpeg,jpg,png|max:5120',
-            'photo_kanan' => 'nullable|image|mimes:jpeg,jpg,png|max:5120',
-            'photo_kiri' => 'nullable|image|mimes:jpeg,jpg,png|max:5120',
+            'photo_depan' => 'nullable|image|mimes:jpeg,jpg,png|max:10240',
+            'photo_kanan' => 'nullable|image|mimes:jpeg,jpg,png|max:10240',
+            'photo_kiri' => 'nullable|image|mimes:jpeg,jpg,png|max:10240',
         ]);
 
         if ($validate->fails()) {

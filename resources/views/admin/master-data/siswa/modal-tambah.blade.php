@@ -112,6 +112,9 @@
                         <span class="text-uppercase small fw-semibold text-muted me-2">Foto Wajah Siswa (DeepFace FaceNet)</span>
                         <hr class="flex-grow-1 m-0">
                     </div>
+                    <div class="form-text small text-muted mb-2">
+                        Format berkas didukung: JPG, JPEG, PNG (Maksimal 10 MB per foto).
+                    </div>
 
                     <div id="container-foto-tambah">
                         <div class="row align-items-center mb-2 item-foto-tambah">

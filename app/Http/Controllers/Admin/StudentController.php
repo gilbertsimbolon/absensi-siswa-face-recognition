@@ -109,7 +109,10 @@ class StudentController extends Controller
         $validator = Validator::make($request->all(), $rules, [
             'photos.required' => 'Minimal 1 foto wajah siswa wajib diunggah.',
             'photos.*.image' => 'Berkas yang diunggah harus berupa gambar (JPG/PNG).',
+            'photos.*.max' => 'Ukuran setiap foto wajah maksimal 10MB.',
             'photo.required' => 'Foto wajah siswa wajib diunggah.',
+            'photo.max' => 'Ukuran foto wajah maksimal 10MB.',
+            'photo_depan.max' => 'Ukuran foto wajah maksimal 10MB.',
         ]);
 
         if ($validator->fails()) {
@@ -162,6 +165,10 @@ class StudentController extends Controller
             'photos.*' => 'nullable|image|mimes:jpeg,jpg,png|max:10240',
             'photo' => 'nullable|image|mimes:jpeg,jpg,png|max:10240',
             'photo_depan' => 'nullable|image|mimes:jpeg,jpg,png|max:10240',
+        ], [
+            'photos.*.max' => 'Ukuran setiap foto wajah maksimal 10MB.',
+            'photo.max' => 'Ukuran foto wajah maksimal 10MB.',
+            'photo_depan.max' => 'Ukuran foto wajah maksimal 10MB.',
         ]);
 
         if ($validator->fails()) {
