@@ -139,17 +139,16 @@
             }
         }
 
-        /* Video Feed MJPEG & Kamera HTML5 */
+        /* Video Feed Kamera HTML5 */
         .video-feed {
             width: 100%;
             height: 100%;
             object-fit: cover;
             display: block;
             background: #000;
-            transition: transform 0.35s cubic-bezier(0.2, 0.9, 0.3, 1), transform-origin 0.35s cubic-bezier(0.2, 0.9, 0.3, 1);
         }
 
-        /* Overlay Canvas Bounding Box & HUD AI (Auto-Zoom Dinamis) */
+        /* Overlay Canvas Bounding Box & HUD AI (Stabil Bebas Getar) */
         .overlay-canvas {
             position: absolute;
             top: 0;
@@ -158,7 +157,6 @@
             height: 100%;
             pointer-events: none;
             z-index: 20;
-            transition: transform 0.35s cubic-bezier(0.2, 0.9, 0.3, 1), transform-origin 0.35s cubic-bezier(0.2, 0.9, 0.3, 1);
         }
 
         /* Notifikasi Status Absensi di Dalam Frame Kamera */
@@ -1064,13 +1062,8 @@
             }
         }
 
-        // 5. Gambar Bounding Box AI & Dynamic Auto-Zoom ke Wajah Siswa
-        function resetAutoZoom() {
-            if (videoEl) {
-                videoEl.style.transformOrigin = 'center center';
-                videoEl.style.transform = (currentFacingMode === 'user') ? 'scaleX(-1) scale(1.0)' : 'scale(1.0)';
-            }
-        }
+        // 5. Gambar Bounding Box AI (Lock Wajah & Pencocokan Presisi - Bebas Getar)
+        let smoothBox = null;
 
         function gambarKotakWajah(wajah) {
             if (!overlayCanvas || !overlayCtx || !videoEl) return;
@@ -1084,7 +1077,7 @@
             overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
 
             if (!wajah || !wajah.w || !wajah.h) {
-                resetAutoZoom();
+                smoothBox = null;
                 return;
             }
 
@@ -1093,57 +1086,60 @@
             const scaleX = rect.width / frameW;
             const scaleY = rect.height / frameH;
 
-            let bx = wajah.x * scaleX;
-            let by = wajah.y * scaleY;
-            let bw = wajah.w * scaleX;
-            let bh = wajah.h * scaleY;
+            let targetX = wajah.x * scaleX;
+            let targetY = wajah.y * scaleY;
+            let targetW = wajah.w * scaleX;
+            let targetH = wajah.h * scaleY;
 
             // Jika kamera depan, cerminkan koordinat X agar sinkron dengan cermin video
             if (currentFacingMode === 'user') {
-                bx = rect.width - (bx + bw);
+                targetX = rect.width - (targetX + targetW);
             }
 
-            // Auto-Zoom Dinamis: Saat titik wajah terdeteksi, kamera langsung fokus & zoom in ke area wajah
-            const faceCenterX = bx + bw / 2;
-            const faceCenterY = by + bh / 2;
-            const originXPct = Math.max(15, Math.min(85, (faceCenterX / rect.width) * 100));
-            const originYPct = Math.max(15, Math.min(85, (faceCenterY / rect.height) * 100));
-
-            let zoomScale = 1.0;
-            const faceWidthRatio = bw / rect.width;
-            if (faceWidthRatio < 0.25) {
-                zoomScale = 1.35; // Zoom 35% lebih dekat jika siswa agak jauh
-            } else if (faceWidthRatio < 0.42) {
-                zoomScale = 1.20; // Zoom 20% jika jarak sedang
+            // Interpolasi Halus (Smooth Damping) agar kotak mengunci stabil tanpa getar / jedag-jedug
+            if (!smoothBox) {
+                smoothBox = { x: targetX, y: targetY, w: targetW, h: targetH };
+            } else {
+                smoothBox.x += (targetX - smoothBox.x) * 0.45;
+                smoothBox.y += (targetY - smoothBox.y) * 0.45;
+                smoothBox.w += (targetW - smoothBox.w) * 0.45;
+                smoothBox.h += (targetH - smoothBox.h) * 0.45;
             }
 
-            const originStyle = `${originXPct}% ${originYPct}%`;
-            videoEl.style.transformOrigin = originStyle;
-            videoEl.style.transform = (currentFacingMode === 'user') ? `scaleX(-1) scale(${zoomScale})` : `scale(${zoomScale})`;
+            const bx = smoothBox.x;
+            const by = smoothBox.y;
+            const bw = smoothBox.w;
+            const bh = smoothBox.h;
 
             const status = wajah.status || 'memindai';
-            let color = '#06b6d4'; // cyan memindai
-            let badgeBg = 'rgba(6, 182, 212, 0.90)';
+            let color = '#06b6d4'; // cyan: mengunci wajah
+            let badgeBg = 'rgba(6, 182, 212, 0.92)';
+            let statusText = '🔒 MENGUNCI WAJAH...';
+
             if (status === 'sukses') {
-                color = '#22c55e'; // emerald green
-                badgeBg = 'rgba(34, 197, 94, 0.92)';
+                color = '#22c55e'; // emerald green: cocok
+                badgeBg = 'rgba(34, 197, 94, 0.94)';
+                statusText = `${wajah.nama || 'TERKONFIRMASI'}${wajah.skor ? ' (' + wajah.skor + ')' : ''}`;
             } else if (status === 'sudah_absen') {
-                color = '#0284c7'; // sky blue
-                badgeBg = 'rgba(2, 132, 199, 0.92)';
+                color = '#0284c7'; // sky blue: sudah absen
+                badgeBg = 'rgba(2, 132, 199, 0.94)';
+                statusText = `${wajah.nama || 'SISWA'} • SUDAH ABSEN`;
             } else if (status === 'tidak_dikenali') {
-                color = '#ef4444'; // red
-                badgeBg = 'rgba(239, 68, 68, 0.92)';
+                color = '#ef4444'; // red: belum terdaftar
+                badgeBg = 'rgba(239, 68, 68, 0.94)';
+                statusText = '✗ BELUM TERDAFTAR';
             } else if (status === 'gagal_akurasi') {
                 color = '#f59e0b'; // amber
-                badgeBg = 'rgba(245, 158, 11, 0.92)';
+                badgeBg = 'rgba(245, 158, 11, 0.94)';
+                statusText = 'POSISIKAN TEGAK LURUS';
             }
 
-            // 1. Gambar Bounding Box dengan Sudut Autofokus Futuristik (Corner Brackets)
+            // 1. Gambar Bounding Box Target (Corner Brackets Presisi)
             overlayCtx.save();
             overlayCtx.strokeStyle = color;
             overlayCtx.lineWidth = 3;
             overlayCtx.shadowColor = color;
-            overlayCtx.shadowBlur = 10;
+            overlayCtx.shadowBlur = 12;
 
             const cornerLen = Math.min(bw, bh) * 0.28;
 
@@ -1175,18 +1171,19 @@
             overlayCtx.lineTo(bx, by + bh - cornerLen);
             overlayCtx.stroke();
 
-            // Kotak tipis di sekeliling wajah
+            // Kotak tipis di sekeliling area kunci
             overlayCtx.strokeStyle = color;
             overlayCtx.lineWidth = 1;
             overlayCtx.strokeRect(bx, by, bw, bh);
 
-            // 2. Label Nama Siswa & Status di Atas Kotak Wajah
-            const durasiTeks = wajah.waktu_proses ? ` • ⚡ ${wajah.waktu_proses}` : '';
-            const labelText = wajah.nama ? `${wajah.nama}${wajah.skor ? ' (' + wajah.skor + ')' : ''}${durasiTeks}` : `MEMINDAI...${durasiTeks}`;
+            // 2. Label Status Terkunci di Atas Kotak Wajah
+            const durasiTeks = (status === 'sukses' && wajah.waktu_proses) ? ` • ⚡ ${wajah.waktu_proses}` : '';
+            const fullLabel = `${statusText}${durasiTeks}`;
+
             overlayCtx.font = 'bold 12px "Plus Jakarta Sans", sans-serif';
-            const textWidth = overlayCtx.measureText(labelText).width;
-            const badgeW = textWidth + 18;
-            const badgeH = 24;
+            const textWidth = overlayCtx.measureText(fullLabel).width;
+            const badgeW = textWidth + 20;
+            const badgeH = 26;
             const badgeX = Math.max(8, Math.min(rect.width - badgeW - 8, bx + (bw - badgeW) / 2));
             const badgeY = Math.max(badgeH + 4, by - 8);
 
@@ -1203,7 +1200,7 @@
             // Teks Label
             overlayCtx.fillStyle = '#ffffff';
             overlayCtx.shadowBlur = 0;
-            overlayCtx.fillText(labelText, badgeX + 9, badgeY - 7);
+            overlayCtx.fillText(fullLabel, badgeX + 10, badgeY - 8);
 
             overlayCtx.restore();
 
@@ -1212,7 +1209,7 @@
                 if (overlayCtx && overlayCanvas) {
                     overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
                 }
-                resetAutoZoom();
+                smoothBox = null;
             }, 600);
         }
 
