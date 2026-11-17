@@ -18,17 +18,17 @@ from PIL import Image
 from deepface import DeepFace
 import konfigurasi
 
-def hitung_persentase_akurasi(cosine_dist, threshold=0.40):
+def hitung_persentase_akurasi(cosine_dist, threshold=0.35):
     """
     Mengonversi jarak kosinus FaceNet (0.0 - 1.0+) menjadi persentase akurasi yang proporsional.
-    - Wajah cocok (jarak <= threshold 0.40): menghasilkan skor 85.0% - 99.9%
+    - Wajah cocok (jarak <= threshold 0.35): menghasilkan skor 85.0% - 99.9%
       sehingga siswa terdaftar langsung lolos verifikasi standar sekolah (80% - 85%) dalam < 1-2 detik.
-    - Wajah bukan siswa / berbeda (jarak > threshold 0.40): skor langsung drop tajam ke bawah 60%.
+    - Wajah bukan siswa / berbeda (jarak > threshold 0.35): skor langsung drop tajam ke bawah 60%.
     """
     if cosine_dist <= 0:
         return 100.0
 
-    th = float(threshold) if threshold and float(threshold) > 0 else 0.40
+    th = float(threshold) if threshold and float(threshold) > 0 else 0.35
     d = float(cosine_dist)
 
     if d <= th:
@@ -171,8 +171,11 @@ class LayananWajah:
                 aktif_db = self.embeddings_db
                 if self.data_siswa and len(self.data_siswa) > 0:
                     aktif_db = [item for item in self.embeddings_db if str(item.get("label")) in self.data_siswa]
-                    if not aktif_db:
-                        aktif_db = self.embeddings_db
+
+                if not aktif_db:
+                    self.embeddings_matrix = None
+                    self.labels_list = []
+                    return
 
                 self.embeddings_matrix = np.array([item["embedding"] for item in aktif_db], dtype=np.float32)
                 self.labels_list = [str(item["label"]) for item in aktif_db]
@@ -281,6 +284,15 @@ class LayananWajah:
         """Membuat embedding untuk semua foto siswa yang tersimpan di dataset."""
         print("[*] Memulai pemindaian direktori dataset untuk membangun index wajah...")
         self.embeddings_db = []
+
+        if not self.data_siswa:
+            self.muat_data_siswa()
+
+        if not self.data_siswa:
+            print("[!] Belum ada data siswa terdaftar di Laravel. Index wajah dilewati.")
+            self.embeddings_matrix = None
+            self.labels_list = []
+            return
         
         folders_to_scan = []
         if os.path.exists(self.storage_path):
@@ -296,7 +308,7 @@ class LayananWajah:
                 item_path = os.path.join(base_folder, item)
                 if os.path.isdir(item_path):
                     label = item  # NISN atau NIP
-                    if self.data_siswa and label not in self.data_siswa:
+                    if label not in self.data_siswa:
                         continue
                     if label in seen_labels:
                         continue

@@ -97,6 +97,46 @@ class PythonServiceManager
     }
 
     /**
+     * Jalankan layanan mikro Python secara otomatis jika sedang tidak aktif.
+     */
+    public static function startService(): bool
+    {
+        if (self::isRunning()) {
+            return true;
+        }
+
+        try {
+            if (PHP_OS_FAMILY === 'Windows') {
+                $scriptPath = base_path('python-service/aplikasi.py');
+                pclose(popen("start /B \"Python AI\" python \"{$scriptPath}\"", 'r'));
+            } else {
+                // Di Linux / VPS
+                $venvPython = base_path('python-service/venv/bin/python');
+                $scriptPath = base_path('python-service/aplikasi.py');
+
+                if (file_exists('/etc/systemd/system/absensi-ai.service')) {
+                    @exec('sudo systemctl start absensi-ai > /dev/null 2>&1 &');
+                } elseif (file_exists($venvPython)) {
+                    @exec('cd '.base_path('python-service')." && {$venvPython} {$scriptPath} > /dev/null 2>&1 &");
+                } else {
+                    @exec('cd '.base_path('python-service')." && python3 {$scriptPath} > /dev/null 2>&1 &");
+                }
+            }
+
+            for ($i = 0; $i < 8; $i++) {
+                usleep(250000);
+                if (self::isRunning()) {
+                    return true;
+                }
+            }
+        } catch (\Throwable $e) {
+            // Ignore
+        }
+
+        return self::isRunning();
+    }
+
+    /**
      * Periksa ketersediaan layanan Python tanpa menjalankan proses secara otomatis.
      * Sesuai ketentuan: proses Python harus dijalankan secara terpisah dari Laravel.
      *
