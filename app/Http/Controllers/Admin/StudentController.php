@@ -268,6 +268,16 @@ class StudentController extends Controller
             return true;
         }
 
+        // Jika ini adalah pembaruan (update) dan ada foto baru diunggah, bersihkan foto lama agar tidak menumpuk
+        if ($isUpdate) {
+            foreach ($student->faces as $oldFace) {
+                if ($oldFace->file_path && Storage::disk('public')->exists($oldFace->file_path)) {
+                    Storage::disk('public')->delete($oldFace->file_path);
+                }
+                $oldFace->delete();
+            }
+        }
+
         foreach ($uploadedFiles as $idx => $file) {
             if (! $file || ! $file->isValid()) {
                 continue;
