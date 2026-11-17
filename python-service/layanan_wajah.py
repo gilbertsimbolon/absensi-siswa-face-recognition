@@ -195,18 +195,9 @@ class LayananWajah:
         self.muat_data_siswa()
         self.muat_konfigurasi()
 
-        # 2. Jika database belum memiliki embedding sama sekali, bangun indeks dari file foto fisik
-        if not self.embeddings_db:
-            self.bangun_index_wajah()
-        else:
-            # Periksa apakah ada siswa terdaftar yang fotonya di disk belum diekstrak ke embedding
-            label_terindeks = set(str(item.get("label")) for item in self.embeddings_db)
-            siswa_tanpa_embedding = [str(nisn) for nisn in self.data_siswa if str(nisn) not in label_terindeks]
-            if siswa_tanpa_embedding:
-                print(f"[*] Ditemukan {len(siswa_tanpa_embedding)} siswa belum memiliki embedding di memori. Memulai ekstraksi otomatis...")
-                for nisn in siswa_tanpa_embedding:
-                    nama_s = self.data_siswa.get(nisn, {}).get("nama", "")
-                    self.ekstrak_dan_sinkronisasi_siswa(nisn, nama=nama_s)
+        # 2. Database MySQL sebagai Single Source of Truth
+        # Matikan auto-scan disk massal agar startup instan (< 1-2 detik) dan CPU server tidak spike 100%
+        # Ekstraksi foto ditangani secara on-demand saat foto diunggah di web admin.
 
         # 3. Bangun matriks 2D untuk pencocokan secepat kilat (0.01 ms)
         self.perbarui_matrix_embeddings()
