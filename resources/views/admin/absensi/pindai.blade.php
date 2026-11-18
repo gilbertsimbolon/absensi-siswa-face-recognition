@@ -139,13 +139,14 @@
             }
         }
 
-        /* Video Feed Kamera HTML5 */
+        /* Video Feed Kamera HTML5 (Auto-Zoom Halus Tanpa CSS Transition Conflict) */
         .video-feed {
             width: 100%;
             height: 100%;
             object-fit: cover;
             display: block;
             background: #000;
+            will-change: transform, transform-origin;
         }
 
         /* Overlay Canvas Bounding Box & HUD AI (Stabil Bebas Getar) */
@@ -1031,6 +1032,9 @@
                     videoEl.play();
                     perbaruiTombolKamera();
                     mulaiSiklusPemindaian();
+                    if (!rafId) {
+                        rafId = requestAnimationFrame(loopAnimasiKamera);
+                    }
                 };
             } catch (err) {
                 console.error("Gagal membuka kamera:", err);
@@ -1053,6 +1057,7 @@
 
         function toggleKamera() {
             currentFacingMode = (currentFacingMode === 'user') ? 'environment' : 'user';
+            resetAutoZoom();
             mulaiKamera();
         }
 
@@ -1062,10 +1067,86 @@
             }
         }
 
-        // 5. Gambar Bounding Box AI (Lock Wajah & Pencocokan Presisi - Bebas Getar)
+        // 5. Animasi Auto-Zoom Kamera Ultra Halus (60 FPS) & Bounding Box Bebas Jedag-Jedug
+        let currentZoom = 1.0;
+        let targetZoom = 1.0;
+        let currentCenterY = 45.0; // 45% (posisi natural mata & wajah di frame)
+        let targetCenterY = 45.0;
+        let activeWajah = null;
+        let lastFaceTimestamp = 0;
         let smoothBox = null;
+        let rafId = null;
 
+        function perbaruiDataWajah(wajah) {
+            if (wajah && wajah.w && wajah.h) {
+                activeWajah = wajah;
+                lastFaceTimestamp = Date.now();
+
+                // Target Zoom: Ketika titik wajah terdeteksi, kamera auto-zoom masuk ~28% lebih dekat
+                targetZoom = 1.28;
+
+                // Target Origin Y: Kunci fokus vertikal di area mata / wajah (dibatasi 35% - 55% agar frame seimbang)
+                const frameH = wajah.frame_h || 300;
+                const faceCenterRatio = (wajah.y + wajah.h * 0.45) / frameH;
+                const targetYPct = Math.max(35, Math.min(55, faceCenterRatio * 100));
+
+                // Deadband filter: hanya perbarui titik pusat Y jika bergeser > 3% agar tidak ada micro-jitter
+                if (Math.abs(targetYPct - targetCenterY) > 3.0) {
+                    targetCenterY = targetYPct;
+                }
+            } else {
+                // Jangan langsung zoom-out jika 1 frame drop; toleransi 1.2 detik agar bebas bouncing
+                if (Date.now() - lastFaceTimestamp > 1200) {
+                    activeWajah = null;
+                    targetZoom = 1.0;
+                    targetCenterY = 45.0;
+                }
+            }
+        }
+
+        // Kompatibilitas pemanggilan gambarKotakWajah
         function gambarKotakWajah(wajah) {
+            perbaruiDataWajah(wajah);
+        }
+
+        function resetAutoZoom() {
+            activeWajah = null;
+            targetZoom = 1.0;
+            targetCenterY = 45.0;
+            smoothBox = null;
+            if (overlayCtx && overlayCanvas) {
+                overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+            }
+        }
+
+        function loopAnimasiKamera() {
+            // 1. Cek batas toleransi deteksi wajah
+            const now = Date.now();
+            if (activeWajah && (now - lastFaceTimestamp > 1200)) {
+                activeWajah = null;
+                targetZoom = 1.0;
+                targetCenterY = 45.0;
+            }
+
+            // 2. Interpolasi Lerp 60 FPS (Ultra Halus & Bebas Getar / Jedag-Jedug)
+            currentZoom += (targetZoom - currentZoom) * 0.075;
+            currentCenterY += (targetCenterY - currentCenterY) * 0.05;
+
+            // 3. Terapkan Zoom pada Elemen Video Kamera (Origin X selalu 50% di tengah agar rotasi cermin stabil)
+            if (videoEl) {
+                videoEl.style.transformOrigin = `50% ${currentCenterY.toFixed(2)}%`;
+                videoEl.style.transform = (currentFacingMode === 'user') 
+                    ? `scaleX(-1) scale(${currentZoom.toFixed(3)})` 
+                    : `scale(${currentZoom.toFixed(3)})`;
+            }
+
+            // 4. Render Bounding Box di Overlay Canvas Sinkron dengan Zoom
+            renderOverlayBox();
+
+            rafId = requestAnimationFrame(loopAnimasiKamera);
+        }
+
+        function renderOverlayBox() {
             if (!overlayCanvas || !overlayCtx || !videoEl) return;
 
             const rect = videoEl.getBoundingClientRect();
@@ -1076,34 +1157,43 @@
 
             overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
 
-            if (!wajah || !wajah.w || !wajah.h) {
+            if (!activeWajah || !activeWajah.w || !activeWajah.h) {
                 smoothBox = null;
                 return;
             }
 
-            const frameW = wajah.frame_w || 400;
-            const frameH = wajah.frame_h || 300;
+            const frameW = activeWajah.frame_w || 400;
+            const frameH = activeWajah.frame_h || 300;
             const scaleX = rect.width / frameW;
             const scaleY = rect.height / frameH;
 
-            let targetX = wajah.x * scaleX;
-            let targetY = wajah.y * scaleY;
-            let targetW = wajah.w * scaleX;
-            let targetH = wajah.h * scaleY;
+            let rawX = activeWajah.x * scaleX;
+            let rawY = activeWajah.y * scaleY;
+            let rawW = activeWajah.w * scaleX;
+            let rawH = activeWajah.h * scaleY;
 
-            // Jika kamera depan, cerminkan koordinat X agar sinkron dengan cermin video
+            // Cerminkan koordinat X jika kamera depan (selfie)
             if (currentFacingMode === 'user') {
-                targetX = rect.width - (targetX + targetW);
+                rawX = rect.width - (rawX + rawW);
             }
 
-            // Interpolasi Halus (Smooth Damping) agar kotak mengunci stabil tanpa getar / jedag-jedug
+            // Hitung posisi Bounding Box di layar setelah dipengaruhi Auto-Zoom Kamera
+            const originX_px = rect.width * 0.5; // X selalu 50% (tengah)
+            const originY_px = rect.height * (currentCenterY / 100);
+
+            const targetScreenX = originX_px + (rawX - originX_px) * currentZoom;
+            const targetScreenY = originY_px + (rawY - originY_px) * currentZoom;
+            const targetScreenW = rawW * currentZoom;
+            const targetScreenH = rawH * currentZoom;
+
+            // Damping Bounding Box agar pergerakan kotak menempel stabil tanpa gemetar
             if (!smoothBox) {
-                smoothBox = { x: targetX, y: targetY, w: targetW, h: targetH };
+                smoothBox = { x: targetScreenX, y: targetScreenY, w: targetScreenW, h: targetScreenH };
             } else {
-                smoothBox.x += (targetX - smoothBox.x) * 0.45;
-                smoothBox.y += (targetY - smoothBox.y) * 0.45;
-                smoothBox.w += (targetW - smoothBox.w) * 0.45;
-                smoothBox.h += (targetH - smoothBox.h) * 0.45;
+                smoothBox.x += (targetScreenX - smoothBox.x) * 0.35;
+                smoothBox.y += (targetScreenY - smoothBox.y) * 0.35;
+                smoothBox.w += (targetScreenW - smoothBox.w) * 0.35;
+                smoothBox.h += (targetScreenH - smoothBox.h) * 0.35;
             }
 
             const bx = smoothBox.x;
@@ -1111,7 +1201,7 @@
             const bw = smoothBox.w;
             const bh = smoothBox.h;
 
-            const status = wajah.status || 'memindai';
+            const status = activeWajah.status || 'memindai';
             let color = '#06b6d4'; // cyan: mengunci wajah
             let badgeBg = 'rgba(6, 182, 212, 0.92)';
             let statusText = '🔒 MENGUNCI WAJAH...';
@@ -1119,11 +1209,11 @@
             if (status === 'sukses') {
                 color = '#22c55e'; // emerald green: cocok
                 badgeBg = 'rgba(34, 197, 94, 0.94)';
-                statusText = `${wajah.nama || 'TERKONFIRMASI'}${wajah.skor ? ' (' + wajah.skor + ')' : ''}`;
+                statusText = `${activeWajah.nama || 'TERKONFIRMASI'}${activeWajah.skor ? ' (' + activeWajah.skor + ')' : ''}`;
             } else if (status === 'sudah_absen') {
                 color = '#0284c7'; // sky blue: sudah absen
                 badgeBg = 'rgba(2, 132, 199, 0.94)';
-                statusText = `${wajah.nama || 'SISWA'} • SUDAH ABSEN`;
+                statusText = `${activeWajah.nama || 'SISWA'} • SUDAH ABSEN`;
             } else if (status === 'tidak_dikenali') {
                 color = '#ef4444'; // red: belum terdaftar
                 badgeBg = 'rgba(239, 68, 68, 0.94)';
@@ -1177,7 +1267,7 @@
             overlayCtx.strokeRect(bx, by, bw, bh);
 
             // 2. Label Status Terkunci di Atas Kotak Wajah
-            const durasiTeks = (status === 'sukses' && wajah.waktu_proses) ? ` • ⚡ ${wajah.waktu_proses}` : '';
+            const durasiTeks = (status === 'sukses' && activeWajah.waktu_proses) ? ` • ⚡ ${activeWajah.waktu_proses}` : '';
             const fullLabel = `${statusText}${durasiTeks}`;
 
             overlayCtx.font = 'bold 12px "Plus Jakarta Sans", sans-serif';
@@ -1203,14 +1293,6 @@
             overlayCtx.fillText(fullLabel, badgeX + 10, badgeY - 8);
 
             overlayCtx.restore();
-
-            if (clearBoxTimer) clearTimeout(clearBoxTimer);
-            clearBoxTimer = setTimeout(() => {
-                if (overlayCtx && overlayCanvas) {
-                    overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
-                }
-                smoothBox = null;
-            }, 600);
         }
 
         // 6. Siklus Penangkapan Citra & Pengiriman ke Backend Python Secepat Kilat
@@ -1270,9 +1352,10 @@
                 if (response.ok) {
                     const data = await response.json();
                     if (data.wajah) {
-                        gambarKotakWajah(data.wajah);
+                        data.wajah.waktu_proses = data.waktu_proses || data.durasi_detik || '';
+                        perbaruiDataWajah(data.wajah);
                     } else if (data.status === 'tidak_ada_wajah') {
-                        gambarKotakWajah(null);
+                        perbaruiDataWajah(null);
                     }
                     tanganiResponPresensi(data);
                 } else {
@@ -1369,6 +1452,7 @@
             // Tahan tampilan selama 3.5 detik agar terbaca dengan jelas oleh pengguna
             cooldownTimer = setTimeout(() => {
                 isCoolingDown = false;
+                resetAutoZoom();
                 if (notifSukses) notifSukses.classList.add('d-none');
                 if (notifLive) notifLive.classList.remove('d-none');
                 perbaruiNotifLive('state-standby', '<i class="bx bx-scan"></i>', 'Arahkan Wajah ke Kamera', 'Posisikan wajah Anda di dalam frame untuk presensi otomatis');
@@ -1456,6 +1540,7 @@
             // Tampilkan kartu status selama 3.5 detik untuk siswa, lalu kembali ke standby & lanjut memindai instan
             cooldownTimer = setTimeout(() => {
                 isCoolingDown = false;
+                resetAutoZoom();
                 if (notifSukses) notifSukses.classList.add('d-none');
                 if (notifLive) notifLive.classList.remove('d-none');
                 perbaruiNotifLive('state-standby', '<i class="bx bx-scan"></i>', 'Arahkan Wajah ke Kamera', 'Posisikan wajah Anda di dalam frame untuk presensi otomatis');
